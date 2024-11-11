@@ -9,14 +9,22 @@ body {
 	-moz-osx-font-smoothing: grayscale;
 }
 .inner-work {
-	margin:auto;
     text-align: center;
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: stretch;
   }
-
+	@media (max-width: 904px) {
+		.inner-work {
+			display: block;
+		}
+	}
+	@media (max-width: 460px) {
+		.inner-work {
+			display: flex;
+			}
+		}
 .work-item {
 display: inline-block;
 width: 340px;
@@ -66,7 +74,12 @@ color: #263040;
 	padding-bottom: 30px;
 	margin-bottom: 30px;
 	}
-	
+@media (max-width: 460px) {
+	.single-padding {
+		margin-left: 0;
+		margin-right: 0;
+		}
+	}
 .parallax {
 	position: absolute;
 	overflow: hidden;
@@ -529,9 +542,10 @@ section {
 }
 
 .portfolio_a {
-	display: block;
+	display: inline-block;
 	height: auto;
-	padding-bottom:40px;
+	padding-top:20px;
+
 }
 @-webkit-keyframes ripple-animation {
 	from {
