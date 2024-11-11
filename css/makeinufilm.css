@@ -8,7 +8,65 @@ body {
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 }
+.inner-work {
+	margin:auto;
+    text-align: center;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: stretch;
+  }
 
+.work-item {
+display: inline-block;
+width: 340px;
+margin: 4px;
+border: 3px solid #ffffff;
+border-radius: 10px;
+}
+
+.work-content {
+padding: 15px;
+height:360px;
+}
+
+.work-thumbnail {
+height: 150px;
+margin-bottom: 10px;
+}
+
+.work-content h3 {
+font-size: 1.5em;
+margin-bottom: 10px;
+}
+
+.work-content p {
+font-size: 1em;
+margin-top: 20px;
+margin-bottom: 10px;
+}
+
+.work-content a {
+color: #ffffff;
+text-decoration: none;
+border: 1px solid #ffffff;
+padding: 5px 10px;
+border-radius: 5px;
+transition: all 0.3s ease;
+}
+
+.work-content a:hover {
+background-color: #ffffff;
+color: #263040;
+}
+.single-padding {
+	width:80%;
+	margin-left:auto;
+	margin-right:auto;
+	padding-bottom: 30px;
+	margin-bottom: 30px;
+	}
+	
 .parallax {
 	position: absolute;
 	overflow: hidden;
@@ -311,6 +369,12 @@ nav.navbar-fixed-top .navbar-nav > li > a:not(.btn) {
 /* Sections */
 section {
 	position: relative;
+}
+.section-about {
+	padding-top: 40px;
+	margin-top: -40px;
+}
+.section-guard {
 	padding-top: 90px;
 	margin-top: -90px;
 }
@@ -467,7 +531,7 @@ section {
 .portfolio_a {
 	display: block;
 	height: auto;
-	padding-bottom:90px;
+	padding-bottom:40px;
 }
 @-webkit-keyframes ripple-animation {
 	from {
