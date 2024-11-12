@@ -25,13 +25,32 @@ body {
 			display: flex;
 			}
 		}
+
 .work-item {
-display: inline-block;
-width: 340px;
-margin: 4px;
-border: 3px solid #ffffff;
-border-radius: 10px;
-}
+	display: inline-block;
+	width: 340px;
+	margin: 4px;
+	border: 3px solid #ffffff;
+	border-radius: 10px;
+	}
+
+@media (max-width: 768px) {
+	#work {
+		flex-direction: column;
+	}
+	
+	.work-item {
+		width: 90%;
+		margin: 10px auto;
+	}
+	}
+
+@media (max-width: 480px) {
+	.work-item {
+	  margin: 0 auto;
+	  width: 90%;
+	}
+  }
 
 .work-content {
 padding: 15px;
@@ -42,16 +61,28 @@ height:360px;
 height: 150px;
 margin-bottom: 10px;
 }
-
+@media (max-width: 480px) {
+	.work-thumbnail img {
+		width: 100%;
+		height: auto;
+		display: block;
+		object-fit: cover;
+	}
+}
 .work-content h3 {
 font-size: 1.5em;
 margin-bottom: 10px;
 }
 
 .work-content p {
-font-size: 1em;
-margin-top: 20px;
-margin-bottom: 10px;
+	font-size: 1em;
+	margin-top: 30px;
+	margin-bottom: 10px;
+	}
+@media (max-width: 480px) {
+	.work-content p {
+	margin-top: 40px;
+	}
 }
 
 .work-content a {
@@ -76,8 +107,7 @@ color: #263040;
 	}
 @media (max-width: 460px) {
 	.single-padding {
-		margin-left: 0;
-		margin-right: 0;
+		width:100%;
 		}
 	}
 .parallax {
@@ -546,6 +576,14 @@ section {
 	height: auto;
 	padding-top:20px;
 
+}
+@media (max-width: 480px) {
+	.portfolio_a img {
+		width: 100%;
+		height: auto;
+		display: block;
+		object-fit: cover;
+	}
 }
 @-webkit-keyframes ripple-animation {
 	from {
