@@ -4314,7 +4314,7 @@ select[multiple].input-group-sm > .input-group-btn > .btn {
   text-decoration: none;
 }
 .navbar-brand > img {
-  display: block;
+  /*display: block;*/
   height: 100%;
 }
 @media (min-width: 768px) {

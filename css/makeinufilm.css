@@ -24,8 +24,26 @@ body {
 		.inner-work {
 			display: flex;
 			}
-		}
-
+	}
+.logo-large {
+	display: block;
+	}
+	
+	.logo-small {
+	display: none;
+	}
+	
+	@media (max-width: 360px) {
+	.logo-large {
+		display: none;
+	}
+	
+	.logo-small {
+		display: block;
+		width: 72px; /* 小さいロゴのサイズ */
+		height: auto;
+	}
+	}
 .work-item {
 	display: inline-block;
 	width: 340px;
@@ -104,6 +122,12 @@ color: #263040;
 	margin-right:auto;
 	padding-bottom: 30px;
 	margin-bottom: 30px;
+	}
+
+@media (min-width: 1340px) {
+	.single-padding {
+		width:80em;
+		}
 	}
 @media (max-width: 460px) {
 	.single-padding {
