@@ -75,18 +75,32 @@ padding: 15px;
 height:360px;
 }
 
-.work-thumbnail {
-height: 150px;
+.work-thumbnail-harf {
+height: 72px;
 margin-bottom: 10px;
 }
 @media (max-width: 480px) {
-	.work-thumbnail img {
+	.work-thumbnail-harf img {
 		width: 100%;
 		height: auto;
 		display: block;
 		object-fit: cover;
 	}
 }
+
+.work-thumbnail {
+height: 150px;
+margin-bottom: 10px;
+}
+@media (max-width: 480px) {
+	.work-thumbnail-harf img {
+		width: 100%;
+		height: auto;
+		display: block;
+		object-fit: cover;
+	}
+}
+
 .work-content h3 {
 font-size: 1.5em;
 margin-bottom: 10px;
