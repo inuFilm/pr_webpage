@@ -29,7 +29,31 @@ body {
 	}
 	}
 
-/*  */
+/*form css*/
+
+.form-inner{
+	display: block;
+	}
+@media (max-width: 990px) {
+	.form-inner{
+		margin-left:3em;
+		margin-right:3em;
+		}
+}
+
+@media (max-width: 480px) {
+	.form-inner{
+		margin-left:1em;
+		margin-right:1em;
+		}
+}
+@media (max-width: 380px) {
+	.form-inner{
+		margin-left:0em;
+		margin-right:0em;
+		}
+}
+/*about css*/
 .about-inner {
 	text-align: center;
 	display: block;
@@ -40,6 +64,10 @@ body {
 	width: 720px;
 	margin: 4px;
 	}
+.about-width {
+	margin-left: 24px;
+	margin-right: 24px;
+}
 
 @media (max-width: 904px) {
 	#work {
@@ -401,14 +429,14 @@ header .typed-cursor {
 @media(max-width:768px){
 	.custom-widgh img {
         margin-top: 10px;		
-		width: 50em;
+		width: 80%;
 		}
 	}
 
 @media(min-width:769px){
 	.custom-widgh img {
         margin-top: 60px;	
-		width: 52%;
+		width: 50em;
 		}
 	}
 
@@ -708,12 +736,12 @@ section {
 }
 .portfolio_a img {
 	width: 90%;
+	text-align: center;
 }
 @media (max-width: 480px) {
 	.portfolio_a img {
-		width: 90%;
+		width: 80%;
 		height: auto;
-		display: block;
 		object-fit: cover;
 	}
 }
