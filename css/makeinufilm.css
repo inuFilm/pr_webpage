@@ -57,6 +57,7 @@ body {
 .about-inner {
 	text-align: center;
 	display: block;
+	margin-top: 12px;
 	}
 
 .about-item {
@@ -121,6 +122,7 @@ margin-bottom: 15px;
     flex-wrap: wrap;
     justify-content: space-between;
     align-items: stretch;
+	margin-top:48px;
   }
 	@media (max-width: 904px) {
 		.work-inner {
