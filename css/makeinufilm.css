@@ -573,12 +573,11 @@ section {
 	position: relative;
 }
 .section-about {
-	padding-top: 40px;
-	margin-top: -40px;
+	padding-top: 32px;
+
 }
 .section-guard {
-	padding-top: 90px;
-	margin-top: -90px;
+	padding-top: 48px;
 }
 
 .section {
