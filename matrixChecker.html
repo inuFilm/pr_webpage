@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+      <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-R7QHH5JRET');
+    </script>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Matrix Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #1a1a1a; color: #e0e0e0; overscroll-behavior: none; }
+        #canvas-container { touch-action: none; }
+        .control-panel { background-color: #2a2a2a; }
+        .slider { -webkit-appearance: none; appearance: none; width: 100%; height: 4px; background: #4a4a4a; outline: none; opacity: 0.9; transition: opacity .2s; border-radius: 2px; }
+        .slider:hover { opacity: 1; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; background: #3b82f6; cursor: pointer; border-radius: 50%; }
+        .slider::-moz-range-thumb { width: 16px; height: 16px; background: #3b82f6; cursor: pointer; border-radius: 50%; }
+        .matrix-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; font-family: 'Roboto Mono', monospace; transition: box-shadow 0.3s; }
+        .matrix-grid.highlight { box-shadow: 0 0 10px 2px #3b82f6; }
+        .matrix-cell { background-color: #333; padding: 6px 4px; text-align: center; border-radius: 4px; font-size: 0.85rem; min-width: 55px; }
+        .matrix-input { width: 100%; background-color: #383838; border: 1px solid #555; color: #e0e0e0; text-align: center; border-radius: 4px; font-size: 0.85rem; padding: 6px 2px; }
+        .matrix-input:focus { outline: none; border-color: #3b82f6; }
+        .btn { background-color: #3b82f6; color: white; padding: 8px 16px; border-radius: 6px; font-weight: 500; transition: background-color 0.2s; }
+        .btn:hover { background-color: #2563eb; }
+        .formula-container { display: flex; align-items: center; justify-content: center; gap: 8px; font-family: 'Roboto Mono', monospace; flex-wrap: wrap;}
+        .formula-item { cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: background-color 0.2s; }
+        .formula-item:hover { background-color: #444; }
+        .formula-equals { font-weight: bold; }
+        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.35s ease-in-out; }
+        .collapsible-header.active + .collapsible-content { max-height: 1000px; /* Adjust if content is taller */ }
+        .chevron { transition: transform 0.3s ease-in-out; }
+        .collapsible-header.active .chevron { transform: rotate(180deg); }
+    </style>
+</head>
+<body class="overflow-hidden">
+
+    <div class="flex flex-col md:flex-row h-screen">
+        <!-- 3D View -->
+        <div id="canvas-container" class="flex-grow h-1/2 md:h-full w-full md:w-auto"></div>
+
+        <!-- Controls -->
+        <div class="control-panel w-full md:w-[480px] p-4 overflow-y-auto h-1/2 md:h-full flex flex-col">
+            <div class="flex justify-between items-center mb-4 flex-shrink-0">
+                <h1 class="text-xl font-bold" data-translate-key="title">インタラクティブ行列計算機</h1>
+                <button id="lang-toggle" class="text-sm btn">English</button>
+            </div>
+            
+            <div class="flex-grow overflow-y-auto">
+                <!-- Collapsible Sliders Section -->
+                <div class="mb-4">
+                    <h2 class="collapsible-header flex justify-between items-center cursor-pointer p-2 bg-gray-700 rounded-md">
+                        <span class="font-bold" data-translate-key="sliders_title">変形操作パネル</span>
+                        <svg class="chevron w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </h2>
+                    <div class="collapsible-content pt-2">
+                        <div class="space-y-3">
+                             <div><h2 class="font-bold text-sm mb-1" data-translate-key="translation">移動 (Translation)</h2><div class="text-xs space-y-1"><div class="grid grid-cols-5 items-center"><label for="trans-x" class="col-span-1">X:</label><input type="range" id="trans-x" class="slider col-span-3" min="-5" max="5" value="0" step="0.1"><span id="trans-x-val" class="text-right">0.0</span></div><div class="grid grid-cols-5 items-center"><label for="trans-y" class="col-span-1">Y:</label><input type="range" id="trans-y" class="slider col-span-3" min="-5" max="5" value="0" step="0.1"><span id="trans-y-val" class="text-right">0.0</span></div><div class="grid grid-cols-5 items-center"><label for="trans-z" class="col-span-1">Z:</label><input type="range" id="trans-z" class="slider col-span-3" min="-5" max="5" value="0" step="0.1"><span id="trans-z-val" class="text-right">0.0</span></div></div></div>
+                             <div><h2 class="font-bold text-sm mb-1" data-translate-key="rotation">回転 (Rotation)</h2><div class="text-xs space-y-1"><div class="grid grid-cols-5 items-center"><label for="rot-x" class="col-span-1">X:</label><input type="range" id="rot-x" class="slider col-span-3" min="-180" max="180" value="0" step="1"><span id="rot-x-val" class="text-right">0°</span></div><div class="grid grid-cols-5 items-center"><label for="rot-y" class="col-span-1">Y:</label><input type="range" id="rot-y" class="slider col-span-3" min="-180" max="180" value="0" step="1"><span id="rot-y-val" class="text-right">0°</span></div><div class="grid grid-cols-5 items-center"><label for="rot-z" class="col-span-1">Z:</label><input type="range" id="rot-z" class="slider col-span-3" min="-180" max="180" value="0" step="1"><span id="rot-z-val" class="text-right">0°</span></div></div></div>
+                             <div><h2 class="font-bold text-sm mb-1" data-translate-key="scale">拡縮 (Scale)</h2><div class="text-xs space-y-1"><div class="grid grid-cols-5 items-center"><label for="scale-x" class="col-span-1">X:</label><input type="range" id="scale-x" class="slider col-span-3" min="0.1" max="3" value="1" step="0.05"><span id="scale-x-val" class="text-right">1.0</span></div><div class="grid grid-cols-5 items-center"><label for="scale-y" class="col-span-1">Y:</label><input type="range" id="scale-y" class="slider col-span-3" min="0.1" max="3" value="1" step="0.05"><span id="scale-y-val" class="text-right">1.0</span></div><div class="grid grid-cols-5 items-center"><label for="scale-z" class="col-span-1">Z:</label><input type="range" id="scale-z" class="slider col-span-3" min="0.1" max="3" value="1" step="0.05"><span id="scale-z-val" class="text-right">1.0</span></div></div></div>
+                             <div><h2 class="font-bold text-sm mb-1" data-translate-key="shear">シアー (Shear)</h2><div class="text-xs space-y-1"><div class="grid grid-cols-5 items-center"><label for="shear-xy" class="col-span-1">XY:</label><input type="range" id="shear-xy" class="slider col-span-3" min="-1" max="1" value="0" step="0.05"><span id="shear-xy-val" class="text-right">0.0</span></div><div class="grid grid-cols-5 items-center"><label for="shear-xz" class="col-span-1">XZ:</label><input type="range" id="shear-xz" class="slider col-span-3" min="-1" max="1" value="0" step="0.05"><span id="shear-xz-val" class="text-right">0.0</span></div><div class="grid grid-cols-5 items-center"><label for="shear-yx" class="col-span-1">YX:</label><input type="range" id="shear-yx" class="slider col-span-3" min="-1" max="1" value="0" step="0.05"><span id="shear-yx-val" class="text-right">0.0</span></div></div></div>
+                             <div><button id="reset-btn" class="w-full btn mt-2" data-translate-key="reset">リセット</button></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Collapsible Individual Matrices Section -->
+                <div class="mb-4">
+                     <h2 class="collapsible-header flex justify-between items-center cursor-pointer p-2 bg-gray-700 rounded-md">
+                        <span class="font-bold" data-translate-key="individual_matrices">個別の変換行列 (入力可)</span>
+                        <svg class="chevron w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </h2>
+                    <div class="collapsible-content pt-2">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div><h3 class="text-sm font-medium text-center mb-1" data-translate-key="translation_matrix">移動</h3><div id="trans-matrix" class="matrix-grid"></div></div>
+                            <div><h3 class="text-sm font-medium text-center mb-1" data-translate-key="rotation_matrix">回転</h3><div id="rot-matrix" class="matrix-grid"></div></div>
+                            <div><h3 class="text-sm font-medium text-center mb-1" data-translate-key="scale_matrix">拡縮</h3><div id="scale-matrix" class="matrix-grid"></div></div>
+                            <div><h3 class="text-sm font-medium text-center mb-1" data-translate-key="shear_matrix">シアー</h3><div id="shear-matrix" class="matrix-grid"></div></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Collapsible Detailed Composition Formula Section -->
+                <div class="mb-4">
+                     <h2 class="collapsible-header flex justify-between items-center cursor-pointer p-2 bg-gray-700 rounded-md">
+                        <span class="font-bold" data-translate-key="composition_order">行列の合成の計算式</span>
+                        <svg class="chevron w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </h2>
+                     <div class="collapsible-content pt-2">
+                        <div id="formula-display-container" class="formula-container">
+                            <!-- Populated by JavaScript -->
+                        </div>
+                     </div>
+                </div>
+
+                <!-- Collapsible Final Matrix Section -->
+                <div id="final-matrix-container" class="mb-4">
+                     <h2 class="collapsible-header flex justify-between items-center cursor-pointer p-2 bg-gray-700 rounded-md">
+                        <span class="font-bold" data-translate-key="final_matrix">最終的な変換行列 (結果)</span>
+                        <svg class="chevron w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </h2>
+                    <div class="collapsible-content pt-2">
+                        <div id="final-matrix" class="matrix-grid"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.138.3/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.138.3/examples/jsm/" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        const translations = {
+            title: { ja: "インタラクティブ行列計算機", en: "Interactive Matrix Calculator" },
+            sliders_title: { ja: "変形操作パネル", en: "Transformation Controls" },
+            translation: { ja: "移動 (Translation)", en: "Translation" },
+            rotation: { ja: "回転 (Rotation)", en: "Rotation" },
+            scale: { ja: "拡縮 (Scale)", en: "Scale" },
+            shear: { ja: "シアー (Shear)", en: "Shear" },
+            reset: { ja: "リセット", en: "Reset" },
+            composition_order: { ja: "行列の合成の計算式", en: "Matrix Composition Formula" },
+            f_final: { ja: "Final", en: "Final" },
+            f_trans: { ja: "Translate", en: "Translate" },
+            f_rot: { ja: "Rotate", en: "Rotate" },
+            f_shear: { ja: "Shear", en: "Shear" },
+            f_scale: { ja: "Scale", en: "Scale" },
+            individual_matrices: { ja: "個別の変換行列 (入力可)", en: "Individual Matrices (Editable)" },
+            translation_matrix: { ja: "移動", en: "Translate" },
+            rotation_matrix: { ja: "回転", en: "Rotate" },
+            scale_matrix: { ja: "拡縮", en: "Scale" },
+            shear_matrix: { ja: "シアー", en: "Shear" },
+            final_matrix: { ja: "最終的な変換行列 (結果)", en: "Final Transformation Matrix (Result)" },
+            langBtn: { ja: "English", en: "日本語" },
+        };
+        let currentLang = 'ja';
+
+        function setLanguage(lang) {
+            currentLang = lang;
+            document.querySelectorAll('[data-translate-key]').forEach(el => {
+                const key = el.dataset.translateKey;
+                if (translations[key]?.[lang]) {
+                    el.textContent = translations[key][lang];
+                }
+            });
+            document.getElementById('lang-toggle').textContent = translations.langBtn[lang === 'ja' ? 'ja' : 'en'];
+        }
+
+        let scene, camera, renderer, controls, knot;
+        const container = document.getElementById('canvas-container');
+
+        const translationMatrix = new THREE.Matrix4();
+        const rotationMatrix = new THREE.Matrix4();
+        const scaleMatrix = new THREE.Matrix4();
+        const shearMatrix = new THREE.Matrix4();
+        const finalMatrix = new THREE.Matrix4();
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a);
+            camera = new THREE.PerspectiveCamera(75, container.clientWidth / container.clientHeight, 0.1, 1000);
+            camera.position.set(3, 4, 7);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            container.appendChild(renderer.domElement);
+            
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7.5);
+            scene.add(directionalLight);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+
+            const geometry = new THREE.TorusKnotGeometry(1.5, 0.4, 100, 16);
+            const material = new THREE.MeshStandardMaterial({ color: 0x3b82f6, metalness: 0.3, roughness: 0.4 });
+            knot = new THREE.Mesh(geometry, material);
+            knot.matrixAutoUpdate = false;
+            scene.add(knot);
+
+            const gridHelper = new THREE.GridHelper(20, 20, 0x555555, 0x333333);
+            scene.add(gridHelper);
+            const objectAxes = new THREE.AxesHelper(3);
+            knot.add(objectAxes);
+
+            setupEditableMatrixUI();
+            setupFormulaDisplayUI();
+            setupCollapsibles();
+
+            window.addEventListener('resize', onWindowResize);
+            document.querySelectorAll('.slider').forEach(s => s.addEventListener('input', updateFromSliders));
+            document.getElementById('lang-toggle').addEventListener('click', () => setLanguage(currentLang === 'ja' ? 'en' : 'ja'));
+            document.getElementById('reset-btn').addEventListener('click', resetTransforms);
+
+            resetTransforms();
+            setLanguage('ja');
+        }
+
+        function setupCollapsibles() {
+            document.querySelectorAll('.collapsible-header').forEach(header => {
+                header.addEventListener('click', () => {
+                    header.classList.toggle('active');
+                });
+            });
+            // Open the sliders panel by default
+            const slidersHeader = document.querySelector('[data-translate-key="sliders_title"]').parentElement;
+            if (slidersHeader) {
+                slidersHeader.classList.add('active');
+            }
+        }
+
+        function setupEditableMatrixUI() {
+            createMatrixUI('trans-matrix', 'trans-m', updateFromMatrixInputs);
+            createMatrixUI('rot-matrix', 'rot-m', updateFromMatrixInputs);
+            createMatrixUI('scale-matrix', 'scale-m', updateFromMatrixInputs);
+            createMatrixUI('shear-matrix', 'shear-m', updateFromMatrixInputs);
+            createMatrixUI('final-matrix', 'final-m', null, true); // Read-only
+        }
+
+        function setupFormulaDisplayUI() {
+            const container = document.getElementById('formula-display-container');
+            container.innerHTML = ''; // Clear container
+
+            const components = [
+                { name: 'Final', id: 'final', key: 'f_final', target: 'final-matrix-container' },
+                { op: '=' },
+                { name: 'Translate', id: 'trans', key: 'f_trans', target: 'trans-matrix' },
+                { op: '*' },
+                { name: 'Rotate', id: 'rot', key: 'f_rot', target: 'rot-matrix' },
+                { op: '*' },
+                { name: 'Shear', id: 'shear', key: 'f_shear', target: 'shear-matrix' },
+                { op: '*' },
+                { name: 'Scale', id: 'scale', key: 'f_scale', target: 'scale-matrix' },
+            ];
+
+            components.forEach(comp => {
+                if (comp.op) {
+                    const opSpan = document.createElement('span');
+                    opSpan.className = 'text-2xl self-center';
+                    opSpan.textContent = comp.op;
+                    container.appendChild(opSpan);
+                } else {
+                    const compContainer = document.createElement('div');
+                    compContainer.className = 'text-center';
+                    compContainer.addEventListener('click', () => {
+                        document.querySelectorAll('.matrix-grid').forEach(grid => grid.classList.remove('highlight'));
+                        const targetElement = document.getElementById(comp.target);
+                        if(targetElement) {
+                             const matrixGrid = targetElement.querySelector('.matrix-grid') || targetElement;
+                             matrixGrid.classList.add('highlight');
+                        }
+                    });
+
+                    const title = document.createElement('h4');
+                    title.className = 'text-xs font-medium cursor-pointer hover:text-blue-400';
+                    title.dataset.translateKey = comp.key;
+                    title.textContent = comp.name;
+
+                    const matrixGrid = document.createElement('div');
+                    matrixGrid.id = `formula-${comp.id}-matrix`;
+                    matrixGrid.className = 'matrix-grid mt-1';
+                    
+                    compContainer.appendChild(title);
+                    compContainer.appendChild(matrixGrid);
+                    container.appendChild(compContainer);
+                    
+                    createMatrixUI(matrixGrid, `formula-${comp.id}-m`, null, true);
+                }
+            });
+        }
+        
+        function createMatrixUI(containerOrId, prefix, listener, isReadOnly = false) {
+            const container = typeof containerOrId === 'string' ? document.getElementById(containerOrId) : containerOrId;
+            container.innerHTML = '';
+            for (let i = 0; i < 4; i++) { // row
+                for (let j = 0; j < 4; j++) { // column
+                    const id = `${prefix}_${i}_${j}`;
+                    if (isReadOnly) {
+                        const cell = document.createElement('span');
+                        cell.className = 'matrix-cell';
+                        cell.id = id;
+                        container.appendChild(cell);
+                    } else {
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.className = 'matrix-input';
+                        input.id = id;
+                        if (listener) input.addEventListener('input', listener);
+                        container.appendChild(input);
+                    }
+                }
+            }
+        }
+
+        function updateFromSliders() {
+            const tx = parseFloat(document.getElementById('trans-x').value);
+            const ty = parseFloat(document.getElementById('trans-y').value);
+            const tz = parseFloat(document.getElementById('trans-z').value);
+            document.getElementById('trans-x-val').textContent = tx.toFixed(1);
+            document.getElementById('trans-y-val').textContent = ty.toFixed(1);
+            document.getElementById('trans-z-val').textContent = tz.toFixed(1);
+            translationMatrix.makeTranslation(tx, ty, tz);
+
+            const rx = THREE.MathUtils.degToRad(parseFloat(document.getElementById('rot-x').value));
+            const ry = THREE.MathUtils.degToRad(parseFloat(document.getElementById('rot-y').value));
+            const rz = THREE.MathUtils.degToRad(parseFloat(document.getElementById('rot-z').value));
+            document.getElementById('rot-x-val').textContent = `${(rx * 180 / Math.PI).toFixed(0)}°`;
+            document.getElementById('rot-y-val').textContent = `${(ry * 180 / Math.PI).toFixed(0)}°`;
+            document.getElementById('rot-z-val').textContent = `${(rz * 180 / Math.PI).toFixed(0)}°`;
+            rotationMatrix.makeRotationFromEuler(new THREE.Euler(rx, ry, rz, 'XYZ'));
+
+            const sx = parseFloat(document.getElementById('scale-x').value);
+            const sy = parseFloat(document.getElementById('scale-y').value);
+            const sz = parseFloat(document.getElementById('scale-z').value);
+            document.getElementById('scale-x-val').textContent = sx.toFixed(1);
+            document.getElementById('scale-y-val').textContent = sy.toFixed(1);
+            document.getElementById('scale-z-val').textContent = sz.toFixed(1);
+            scaleMatrix.makeScale(sx, sy, sz);
+
+            const sxy = parseFloat(document.getElementById('shear-xy').value);
+            const sxz = parseFloat(document.getElementById('shear-xz').value);
+            const syx = parseFloat(document.getElementById('shear-yx').value);
+            document.getElementById('shear-xy-val').textContent = sxy.toFixed(1);
+            document.getElementById('shear-xz-val').textContent = sxz.toFixed(1);
+            document.getElementById('shear-yx-val').textContent = syx.toFixed(1);
+            shearMatrix.identity();
+            shearMatrix.elements[1] = syx; // Shear Y by X
+            shearMatrix.elements[4] = sxy; // Shear X by Y
+            shearMatrix.elements[8] = sxz; // Shear X by Z - Note: This is a simplification. Full shear is more complex.
+
+
+            updateAllMatrixDisplays();
+            composeFinalMatrix();
+        }
+
+        function updateFromMatrixInputs() {
+            readMatrixFromUI('trans-m', translationMatrix);
+            readMatrixFromUI('rot-m', rotationMatrix);
+            readMatrixFromUI('scale-m', scaleMatrix);
+            readMatrixFromUI('shear-m', shearMatrix);
+            composeFinalMatrix();
+        }
+        
+        function readMatrixFromUI(prefix, targetMatrix) {
+            const colMajorElements = [];
+            for (let j = 0; j < 4; j++) { // column
+                for (let i = 0; i < 4; i++) { // row
+                    const val = parseFloat(document.getElementById(`${prefix}_${i}_${j}`).value) || 0;
+                    colMajorElements.push(val);
+                }
+            }
+            targetMatrix.fromArray(colMajorElements);
+        }
+
+        function composeFinalMatrix() {
+            finalMatrix.identity()
+                .multiply(translationMatrix)
+                .multiply(rotationMatrix)
+                .multiply(shearMatrix)
+                .multiply(scaleMatrix);
+            knot.matrix.copy(finalMatrix);
+            displayMatrix(finalMatrix, 'final-m', true);
+            displayMatrix(finalMatrix, 'formula-final-m', true);
+        }
+
+        function updateAllMatrixDisplays() {
+            displayMatrix(translationMatrix, 'trans-m');
+            displayMatrix(rotationMatrix, 'rot-m');
+            displayMatrix(scaleMatrix, 'scale-m');
+            displayMatrix(shearMatrix, 'shear-m');
+            
+            // Update formula display matrices
+            displayMatrix(translationMatrix, 'formula-trans-m', true);
+            displayMatrix(rotationMatrix, 'formula-rot-m', true);
+            displayMatrix(scaleMatrix, 'formula-scale-m', true);
+            displayMatrix(shearMatrix, 'formula-shear-m', true);
+        }
+        
+        function displayMatrix(matrix, prefix, isReadOnly = false) {
+             const elements = matrix.elements;
+             for (let i = 0; i < 4; i++) { // row
+                for (let j = 0; j < 4; j++) { // column
+                    const el = document.getElementById(`${prefix}_${i}_${j}`);
+                    // For column-major matrix.elements, the element at (row i, col j) is elements[j*4 + i]
+                    const value = elements[j * 4 + i].toFixed(3);
+                    if (isReadOnly) {
+                        el.textContent = value;
+                    } else {
+                        el.value = value;
+                    }
+                }
+            }
+        }
+
+        function resetTransforms() {
+            const sliders = ['trans-x', 'trans-y', 'trans-z', 'rot-x', 'rot-y', 'rot-z', 'shear-xy', 'shear-xz', 'shear-yx'];
+            sliders.forEach(id => document.getElementById(id).value = 0);
+            ['scale-x', 'scale-y', 'scale-z'].forEach(id => document.getElementById(id).value = 1);
+            updateFromSliders();
+        }
+        
+        function onWindowResize() {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        init();
+        animate();
+    </script>
+</body>
+</html>
+
