@@ -58,7 +58,7 @@ jQuery(function($) {
 			currentClass: 'active',
 			changeHash: false,
 			scrollSpeed: 400,
-			filter: ':not(.btn)'
+			filter: ':not(.btn):not(.ext-page)'
 		});
 	});
 	// Window Scroll

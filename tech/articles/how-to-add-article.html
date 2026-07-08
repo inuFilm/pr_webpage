@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>記事の追加方法 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="この技術メモに新しい記事を追加する手順。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>記事の追加方法</h1>
+        <p class="tech-meta">サイト運用 / 2026-07-08</p>
+        <p>この技術メモは、ビルドツールなしの素の HTML/CSS/JS だけで動いている。記事の追加は次の2ステップで完了する。</p>
+        <h2>手順1: テンプレートをコピーして記事 HTML を作る</h2>
+        <p><code>tech/articles/template.html</code> を同じフォルダにコピーし、ファイル名を記事の slug（英数字とハイフン）にする。例: <code>my-new-article.html</code>。中の <code>&lt;title&gt;</code>・<code>&lt;h1&gt;</code>・<code>.tech-meta</code>・本文を書き換える。</p>
+        <h2>手順2: articles.js に1行追加する</h2>
+        <p><code>tech/articles.js</code> の配列の先頭に、次の形のエントリを追加する。</p>
+        <pre><code>{
+  slug: "my-new-article",        // ファイル名と一致させる
+  title: "記事のタイトル",
+  category: "カテゴリ名",         // 既存と同名なら同じグループに入る
+  date: "2026-07-08",
+  description: "一覧に表示される説明文。"
+},</code></pre>
+        <p>slug がファイル名と一致していれば、サイドバーと一覧ページに自動で表示される。</p>
+        <h2>公開する</h2>
+        <p>変更を GitHub の main ブランチに push すれば、GitHub Pages が自動で makeinufilm.com に反映する。ローカル確認はブラウザで <code>tech/index.html</code> を直接開くだけでよい（サーバ不要）。</p>
+        <h2>書ける要素</h2>
+        <p>template.html のコメントに書き方の例がある。見出しは <code>&lt;h2&gt;</code>/<code>&lt;h3&gt;</code>、コードは <code>&lt;pre&gt;&lt;code&gt;</code>、画像は <code>img/pic/</code> に置いて <code>&lt;img&gt;</code>、表は <code>&lt;div class="table-wrap"&gt;&lt;table&gt;</code> で囲むとスマホで横スクロールになる。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

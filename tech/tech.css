@@ -1,0 +1,253 @@
+*, *::before, *::after { box-sizing: border-box; }
+body, h1, h2, h3, p, ul, ol, figure, blockquote { margin: 0; }
+
+/* ============================================================
+   tech セクション専用スタイル（自己完結。既存 CSS には依存しない）
+   ============================================================ */
+
+:root {
+  --tech-dark: #203744;      /* 既存サイトのベース色 */
+  --tech-accent: #2CA9E1;    /* 既存サイトのアクセント色 */
+  --tech-bg: #f4f6f8;
+  --tech-panel: #ffffff;
+  --tech-text: #2b3a44;
+  --tech-muted: #7a868e;
+  --tech-border: #dde3e8;
+  --tech-code-bg: #1b2a35;
+}
+
+body.tech {
+  background: var(--tech-bg);
+  color: var(--tech-text);
+  font-family: 'Roboto', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', Meiryo, sans-serif;
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+/* ヘッダー */
+
+.tech-header {
+  background: var(--tech-dark);
+  color: #ffffff;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 12px 20px;
+}
+
+.tech-brand {
+  color: #ffffff;
+  text-decoration: none;
+}
+
+.tech-section-title {
+  color: var(--tech-accent);
+  text-decoration: none;
+}
+
+/* レイアウト */
+
+.tech-layout {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+@media (min-width: 900px) {
+  .tech-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  #tech-sidebar {
+    position: sticky;
+    top: 24px;
+    align-self: start;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+  }
+}
+
+/* サイドバー */
+
+#tech-sidebar {
+  background: var(--tech-panel);
+  border: 1px solid var(--tech-border);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.tech-sidebar-top {
+  display: block;
+  font-weight: bold;
+  color: var(--tech-dark);
+}
+
+details.tech-cat summary {
+  font-weight: bold;
+  cursor: pointer;
+  color: var(--tech-dark);
+  padding: 6px 0;
+}
+
+#tech-sidebar ul {
+  list-style: none;
+  padding-left: 8px;
+}
+
+#tech-sidebar ul a {
+  color: var(--tech-text);
+  text-decoration: none;
+}
+
+#tech-sidebar ul a:hover {
+  color: var(--tech-accent);
+}
+
+#tech-sidebar li.is-current > a {
+  color: var(--tech-accent);
+  font-weight: bold;
+  border-left: 3px solid var(--tech-accent);
+}
+
+/* 本文パネル */
+
+.tech-main {
+  background: var(--tech-panel);
+  border: 1px solid var(--tech-border);
+  border-radius: 6px;
+  padding: 24px;
+}
+
+/* 記事タイポグラフィ */
+
+.tech-article h1 {
+  font-size: 1.6rem;
+  border-bottom: 2px solid var(--tech-accent);
+  padding-bottom: 8px;
+}
+
+.tech-article .tech-meta {
+  color: var(--tech-muted);
+  font-size: 0.85rem;
+}
+
+.tech-article h2,
+.tech-cat-block h2 {
+  font-size: 1.25rem;
+  border-left: 4px solid var(--tech-accent);
+  padding-left: 8px;
+  margin-top: 32px;
+}
+
+.tech-article h3 {
+  font-size: 1.1rem;
+  margin-top: 24px;
+}
+
+.tech-article p,
+.tech-article ul,
+.tech-article ol {
+  margin-top: 12px;
+  margin-bottom: 12px;
+}
+
+.tech-article ul,
+.tech-article ol {
+  padding-left: 24px;
+}
+
+.tech-article a {
+  color: var(--tech-accent);
+}
+
+.tech-article code {
+  background: #eef2f5;
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.tech-article pre {
+  background: var(--tech-code-bg);
+  color: #dce8f0;
+  padding: 14px;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.tech-article pre code {
+  background: none;
+  padding: 0;
+}
+
+.tech-article img {
+  max-width: 100%;
+  height: auto;
+}
+
+.tech-article .table-wrap {
+  overflow-x: auto;
+}
+
+.tech-article table {
+  border-collapse: collapse;
+}
+
+.tech-article th,
+.tech-article td {
+  border: 1px solid var(--tech-border);
+  padding: 6px 10px;
+}
+
+.tech-article th {
+  background: #eef2f5;
+}
+
+.tech-article blockquote {
+  border-left: 4px solid var(--tech-border);
+  padding-left: 12px;
+  color: var(--tech-muted);
+}
+
+/* 一覧カード（index） */
+
+.tech-card {
+  display: block;
+  border: 1px solid var(--tech-border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  text-decoration: none;
+}
+
+.tech-card:hover {
+  border-color: var(--tech-accent);
+}
+
+.tech-card-title {
+  font-weight: bold;
+  color: var(--tech-dark);
+}
+
+.tech-card-date {
+  font-size: 0.8rem;
+  color: var(--tech-muted);
+}
+
+.tech-card-desc {
+  display: block;
+  font-size: 0.9rem;
+  color: var(--tech-text);
+}
+
+/* フッター */
+
+.tech-footer {
+  text-align: center;
+  color: var(--tech-muted);
+  padding: 24px 0 40px;
+  font-size: 0.85rem;
+}

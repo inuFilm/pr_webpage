@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>このサイトの構成メモ | 技術メモ | makeinufilm</title>
+  <meta name="description" content="makeinufilm.com の構成と、この技術メモセクションの仕組み。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>このサイトの構成メモ</h1>
+        <p class="tech-meta">サイト運用 / 2026-07-08</p>
+        <p>makeinufilm.com は GitHub Pages（リポジトリ inuFilm/pr_webpage の main ブランチ直下）で配信している純静的サイト。ビルド工程はない。</p>
+        <h2>トップページ</h2>
+        <p><code>index.html</code>（日本語）と <code>en.html</code>（英語）は Bootstrap 3 ベースのシングルページ。jQuery + onePageNav でセクションスクロールを制御している。</p>
+        <h2>技術メモセクション</h2>
+        <p><code>tech/</code> 配下はトップページとは独立した作りで、Bootstrap にも jQuery にも依存しない。記事メタデータは <code>tech/articles.js</code> の配列1つで管理し、<code>tech/tech-nav.js</code> がサイドバーと記事一覧を描画する。スタイルは <code>tech/tech.css</code> の1枚のみ。</p>
+        <ul>
+          <li><code>tech/index.html</code> — 記事一覧</li>
+          <li><code>tech/articles/*.html</code> — 各記事（template.html をコピーして作る）</li>
+          <li><code>.nojekyll</code> — GitHub Pages の Jekyll 処理を無効化</li>
+        </ul>
+        <h2>デプロイ</h2>
+        <p>main ブランチに push するだけ。カスタムドメインは <code>CNAME</code> ファイル（makeinufilm.com）で設定している。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
