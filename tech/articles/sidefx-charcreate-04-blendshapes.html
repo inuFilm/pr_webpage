@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 4 — 片側だけ彫れば済むプロシージャルなブレンドシェイプ | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第4回の日本語メモです。ブレンドシェイプの命名規則、ミラー用の VEX、マスクでの範囲限定、顔から抽出したカーブで作るスライダーについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 4 — 片側だけ彫れば済むプロシージャルなブレンドシェイプ</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=M6if_274P6c">Character Creation 4 | Blendshapes</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第4回 / 講師 Roy Kristoffersen さん / Houdini 21 / 18:46 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/M6if_274P6c"
+          title="Character Creation 4 | Blendshapes" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>冒頭で「ブレンドシェイプは Houdini コミュニティであまり話題にならない」と言われていました。
+確かに資料が少ない領域だと思います。この回では Simple と Advanced の2つのセットアップを見ていきます。</p>
+
+<ul>
+  <li>片側だけ彫れば反対側が自動でできるミラーの仕組み</li>
+  <li>マスクでブレンドシェイプの効く範囲を限定する</li>
+  <li>APEX の簡易リグを作ってブレンドシェイプを確認する</li>
+  <li>顔のジオメトリから作るスライダー</li>
+</ul>
+
+<h2>1. 名前がすべて</h2>
+
+<img src="img/sidefx-charcreate-04-blendshapes-000408.png" alt="Name ノードのパラメータパネルで Name が p_bs_head_angry_100_L になっている。ネットワークは unsubdivide から Name、Attribute Wrangle、mergepacked、characterblendshapesadd と続く">
+
+<p><span class="tx-red">この回でいちばん強調されていたのが命名です。</span>
+「名前が無いとシステム全体がめちゃくちゃになる（create havoc in your system）」とはっきり言われていました。</p>
+
+<p>実際の名前はこうなっていました。</p>
+
+<pre><code>p_bs_head_angry_100_L</code></pre>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>部分</th><th>意味</th></tr>
+    <tr><td><code>p_bs</code></td><td>ブレンドシェイプであることを示す接頭辞</td></tr>
+    <tr><td><code>head</code></td><td>対象のパーツ</td></tr>
+    <tr><td><code>angry</code></td><td>表情の名前</td></tr>
+    <tr><td><code>100</code></td><td>ウェイト100%</td></tr>
+    <tr><td><code>L</code></td><td>左側</td></tr>
+  </table>
+</div>
+
+<p>この <code>name</code> アトリビュートを <code>Name</code> ノードで付けます。
+<code>Merge Packed</code> と <code>Character Blend Shapes Add</code> がこの名前を読みに行くので、
+ここが決まっていないと後段が成立しません。</p>
+
+<h3>下ごしらえ</h3>
+
+<ol>
+  <li><code>Object Merge</code> で頭を読み込みます</li>
+  <li><code>Blast</code> で頭以外を消し、<code>Attribute Delete</code> で掃除します</li>
+  <li><strong><code>Unsubdivide</code></strong> でポリゴンを減らします。
+      <span class="tx-muted">スカルプトしやすくするためで、デモ用の措置とのことでした</span></li>
+  <li>ベースとなる頭（<code>p_bs_head_base</code>）と、彫る側の名前を付けます</li>
+</ol>
+
+<h2>2. 片側だけ彫れば反対側ができる</h2>
+
+<p><code>Sculpt</code> ノードで表情を彫ります。動画では怒った顔を作っていました。
+<strong>彫るのは片側だけ</strong>で、反対側は <code>Attribute Wrangle</code> が自動で作ってくれます。</p>
+
+<img src="img/sidefx-charcreate-04-blendshapes-000538.png" alt="Attribute Wrangle のパラメータパネルにミラー用の VEX が表示されている。ビューポートには彫られた頭">
+
+<p>その Wrangle（ノード名は <code>pointwrangle_Mirror_Blendshape</code>）の中身が画面に出ていたので書き起こします。
+Run Over は Points です。</p>
+
+<pre><code>//rest in first pos
+//blendshape in second pos
+
+//find mirror points
+vector mirror_pos = set(-@P.x, @P.y, @P.z);
+int ptnum_mirror = nearpoint(0, mirror_pos);
+
+//calculate offset
+vector mirror_P     = point(0, "P", ptnum_mirror);
+vector def_mirror_P = point(1, "P", ptnum_mirror);
+
+vector offset_P        = def_mirror_P - mirror_P;
+vector mirror_offset_P = set(-offset_P.x, offset_P.y, offset_P.z);
+
+@P += mirror_offset_P;</code></pre>
+
+<p>やっていることは素直です。</p>
+
+<ol>
+  <li>入力0 が rest（元の形）、入力1 がブレンドシェイプ（彫ったあと）です</li>
+  <li>自分の X を反転した位置にいちばん近い点を <code>nearpoint</code> で探します</li>
+  <li>その点における「彫ったあと − 元の形」のオフセットを求めます</li>
+  <li>オフセットの X だけ反転して、自分の位置に足します</li>
+</ol>
+
+<p>これで<span class="tx-blue">左を彫れば右が自動で対称に彫られます</span>。</p>
+
+<h3>名前の引き継ぎと、ひとつの落とし穴</h3>
+
+<p>ミラーしたあと <code>Attribute Transfer</code>（ネットワーク上の名前は <code>Transfer_Attribs</code>）で
+name とブレンドシェイプのチャンネル名を引き継ぎ、<code>Name</code> ノードで
+<code>_L</code> を <code>_R</code> に付け替えます。</p>
+
+<blockquote><span class="tx-red">ここに落とし穴があります。</span>
+<code>Merge Packed</code> は、せっかく転送した名前を尊重してくれません。
+<strong>ブレンドシェイプ名としてノード名のほうが使われてしまいます</strong>。
+講師の方も「残念ながら手作業が必要」と言っていて、
+<code>Merge Packed</code> に入る各ノードの名前を手で付け替えていました。</blockquote>
+
+<p>動画ではこの挙動を実際に見せたうえで、ノード名を <code>L</code> / <code>R</code> に直していました。
+ここだけはプロシージャルになりません。</p>
+
+<h2>3. マスクで効く範囲を限定する</h2>
+
+<img src="img/sidefx-charcreate-04-blendshapes-001035.png" alt="Attribute Blur のパラメータパネルで Attributes が mask になっている。ネットワークは attribpaint から attribblur、blendshapes と続く">
+
+<p>スカルプトすると、意図しないところ（動画では目のまわり）まで引っぱられてしまいます。
+これを <code>Blend Shapes</code> ノードのマスクで解決します。</p>
+
+<ol>
+  <li><code>Blend Shapes</code> ノードの設定を <strong>Set from Attribute</strong> にし、
+      マスクを first input から取るようにします</li>
+  <li><code>Attribute Paint</code> で、ブレンドシェイプを効かせたい範囲に <code>mask</code> を塗ります</li>
+  <li><code>Attribute Blur</code> でマスクをならします。
+      <span class="tx-muted">上の画像では Attributes が <code>mask</code>、Mode が Laplacian、
+      Blurring Iterations 1、Step Size 0.5、Influence Type が Connectivity でした</span></li>
+  <li><code>Blend Shapes</code> ノードでそのマスクを指定します</li>
+</ol>
+
+<p>動画ではマスクの有無を切り替えて比較していて、
+<span class="tx-blue">マスクありだと塗った範囲だけが動き、それ以外は元の形が保たれます</span>。
+「スカルプトの初期のミスがそのまま出ていた部分も、マスクで抑えられる」という説明でした。</p>
+
+<h2>4. 確認用の簡易 APEX リグ</h2>
+
+<p>ブレンドシェイプができたら、実際に動かして確認します。そのための最小構成のリグです。</p>
+
+<pre><code>Extract Centroid → Name (root) → Rig Doctor → Capture Proximity
+→ Pack Character → Configure Controls → Blend Shapes</code></pre>
+
+<ol>
+  <li><code>Extract Centroid</code> で点を1つ取り出します。Run Over は Detail にして、
+      ポリゴン全体でひとつの点にします</li>
+  <li><code>Name</code> でその点に <code>root</code> と名前を付けます。これがスケルトンになります</li>
+  <li><code>Rig Doctor</code> を通します</li>
+  <li><code>Capture Proximity</code> で頭をそのジョイントにキャプチャします</li>
+  <li><code>Pack Character</code> でまとめます</li>
+</ol>
+
+<p><span class="tx-red"><code>Pack Character</code> はジオメトリに bone capture のウェイトが付いていること、
+そしてスケルトンがあることを要求します。</span>
+そのため、たとえブレンドシェイプの確認だけが目的でも、
+上の手順で最低限のリグを作っておく必要があります。
+これが無いと APEX のリグにブレンドシェイプを載せられません。</p>
+
+<p>あとは <code>Configure Controls</code> を通して <code>Blend Shapes</code> ノードで確認できます。
+実行すると Houdini が少し考えたあと、ブレンドシェイプが効いた状態になります。</p>
+
+<h2>5. Advanced — 軽量化</h2>
+
+<p>もう一つの「Blend Shapes Add Advanced」は、パフォーマンス向上のためのセットアップです。</p>
+
+<ol>
+  <li>左右と rest を用意し、<code>Point Symmetry</code> を作ります</li>
+  <li><code>Attribute Delete</code> で不要なものを落とし、ブレンドシェイプのジオメトリだけを残します</li>
+  <li>ブレンドシェイプの名前を付けます</li>
+  <li>頭を分けて ID を転送します</li>
+  <li><code>Connectivity</code> で各ブレンドシェイプに ID を振り、ミラーとアトリビュートのコピーを行います</li>
+  <li><strong>ベースとの差がない部分を大量に削除します</strong></li>
+</ol>
+
+<p>ブレンドシェイプは「元の形との差分」なので、
+<span class="tx-blue">差が出ていない頂点は持っている必要がありません</span>。
+それを削ることでブレンドシェイプが軽くなり、リグの動作が軽くなります。</p>
+
+<p class="tx-muted">講師の方は「劇的にパフォーマンスが上がるわけではないが、
+ブレンドシェイプの数が多い場合はかなり効いてくる」と言っていました。
+追加はカスタム HDA 経由で行われています。</p>
+
+<h2>6. 顔のジオメトリから作るスライダー</h2>
+
+<img src="img/sidefx-charcreate-04-blendshapes-001705.png" alt="Labs Edge Group To Curve のパラメータパネルと、extractcentroid から rigdoctor、captureproximity、packcharacter と続くネットワーク。右側に edgegroup_to_curve から resample、reverse、Name、mirror、Sliders.shp と続く枝">
+
+<p>最後はブレンドシェイプを操作するスライダーです。
+これも顔のジオメトリから作られています。</p>
+
+<ol>
+  <li><code>Group Create</code> でエッジのグループを作ります</li>
+  <li><strong><code>Labs Edge Group To Curve</code></strong> でジオメトリから直接カーブを抽出します</li>
+  <li><code>Resample</code> で解像度を上げます</li>
+  <li><code>Reverse</code> で向きを反転します。
+      <span class="tx-muted">ブレンドシェイプにドラッグしたときの動く向きを合わせるためです</span></li>
+  <li><code>Name</code> で名前を付けます。
+      <span class="tx-red">この名前は、操作したいブレンドシェイプの名前と一致している必要があります</span></li>
+  <li><code>Mirror</code> して反対側の名前に付け替えます</li>
+  <li>pack のフォルダに <code>sliders</code> と shape として名前を追加します</li>
+</ol>
+
+<p>カーブをジオメトリから抽出しているので、
+<span class="tx-blue">顔の形を直すとスライダーの位置も一緒に動きます</span>。
+コントローラーが常に顔に貼り付いている状態になります。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li>命名がすべての土台です。<code>p_bs_head_angry_100_L</code> のように、部位・表情・ウェイト・左右を含めます</li>
+  <li>片側を <code>Sculpt</code> で彫れば、<code>Attribute Wrangle</code> のミラー処理で反対側ができます</li>
+  <li><span class="tx-red"><code>Merge Packed</code> は転送した名前を無視してノード名を使います。</span>ここだけ手作業が必要です</li>
+  <li><code>Attribute Paint</code> + <code>Attribute Blur</code> のマスクで、ブレンドシェイプの効く範囲を限定できます</li>
+  <li><code>Pack Character</code> はスケルトンと bone capture を要求するので、確認用でも最小限のリグが要ります</li>
+  <li>Advanced では、ベースと差がない頂点を削ってブレンドシェイプを軽くします</li>
+  <li>スライダーは <code>Labs Edge Group To Curve</code> で顔から抽出したカーブで作れます。名前はブレンドシェイプ名と一致させます</li>
+</ul>
+
+<p>次の第5回は Hair and Groom Workflow です。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

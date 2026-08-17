@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 1 — プリリグを先に作ってモデルを駆動する | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第1回の日本語メモです。「点はジョイントである」という KineFX の原則と、Rig Doctor でスケルトンを作ってモデルを生やす手順について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 1 — プリリグを先に作ってモデルを駆動する</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=CFmpjpcklwk">Character Creation 1 | PreRig Modelling</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第1回 / 講師 Roy Kristoffersen さん / Houdini 21 / 28:47 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体の構成は<a href="sidefx-charcreate-00-intro.html">第0回のメモ</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/CFmpjpcklwk"
+          title="Character Creation 1 | PreRig Modelling" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<ul>
+  <li>プリリグをモデリング段階で使うと何が嬉しいのか</li>
+  <li>KineFX の中核にある「点はジョイントである（a point is a joint）」という考え方</li>
+  <li>最小構成のプリリグを実際に組んで、スキニングして動かすまで</li>
+  <li>そのプリリグから体の各パーツを生やしていく手順</li>
+  <li>バラバラのパーツを1つのジオメトリにまとめてスキニングする方法</li>
+</ul>
+
+<h2>1. なぜプリリグを先に作るのか</h2>
+
+<p>この回の主題は「モデリングを始める前にスケルトンを作っておく」ことの効果です。
+講師の方は、プロポーションが正しいかどうかを確かめる例として
+<span class="tx-blue">人差し指が鼻の先に届くか</span>を試していました。</p>
+
+<p>最初の状態では指が鼻に届かず、このままではアニメーションに耐えないことがわかります。
+そこでスケルトンに戻って腕を長くし、手を外側に動かすと、モデル側がそれに追従します。
+簡易的なスキニングをかけて同じポーズを取らせると、今度は鼻に届くようになる、という流れでした。</p>
+
+<blockquote>ここで大事なのは、この確認が<strong>モデリングを始める前</strong>にできている点だと思います。
+どの DCC でもプロキシジオメトリを置いて「このプロポーションでいいや」と判断する場面はありますが、
+そこで確認を省くと、数週間モデリングして、UV を張って、テクスチャを描いたあとに
+リガーやアニメーターから「これでは動かない」と戻ってくる可能性が残ります。
+そうなるとやり直しの範囲がとても広くなってしまいます。</blockquote>
+
+<h2>2. 核になる原則: 点はジョイントである</h2>
+
+<p>この仕組みを支えているのが KineFX の <strong>「a point is a joint（点はジョイントである）」</strong>という原則です。
+ポイントがそのままジョイントとして扱われるので、普通の SOP のモデリングで線を作れば、
+それがそのままスケルトンになります。</p>
+
+<img src="img/sidefx-charcreate-01-prerig-modelling-000720.png" alt="Rig Doctor のパラメータパネル。Point Names の Initialize Missing Names と Transformations の Initialize Transforms が見えている">
+
+<h3>最小構成を組んでみる</h3>
+
+<ol>
+  <li><code>Add</code> で点を1つ置きます</li>
+  <li>もう1つ <code>Add</code> を足して点を置き、上に動かします</li>
+  <li>3つめの <code>Add</code> の Polygons タブで <strong>By Group</strong> に <code>*</code> を入れます。これで2点が結ばれて線になります</li>
+  <li><code>Resample</code> をかけて点を増やします（動画では11点になっていました）</li>
+</ol>
+
+<p>この時点ではまだただの線です。ここに <code>Rig Doctor</code> を足すとスケルトンとして扱えるようになります。</p>
+
+<h3>Rig Doctor で必要な設定</h3>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>セクション</th><th>パラメータ</th><th>効果</th></tr>
+    <tr><td>Point Names</td><td><strong>Initialize Missing Names</strong></td><td><code>name</code> アトリビュートを付けます。Prefix が <code>point_</code> なので <code>point_0</code>、<code>point_1</code>… という名前になります</td></tr>
+    <tr><td>Transformations</td><td><strong>Initialize Transforms</strong></td><td><code>transform</code>（3×3）と <code>localtransform</code>（4×4）のマトリクスが付きます</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-red">Initialize Transforms を入れ忘れると動きません。</span>
+動画でもここが一番重要だと強調されていました。これを有効にすると、1本の線がモデルとスケルトンの
+両方を駆動するようになります。</p>
+
+<h3>スキニングして動かす</h3>
+
+<img src="img/sidefx-charcreate-01-prerig-modelling-000815.png" alt="Add から Resample、Sweep と Rig Doctor を経て Joint Capture Biharmonic、Rig Pose、Bone Deform へ流れるノードネットワーク">
+
+<p>ノードのつながりはこうなっていました。</p>
+
+<pre><code>add4 → add8 → add9 → resample139 ┬→ sweep72 ────────┐
+                                 └→ rigdoctor6 ─────┤
+                                                    ↓
+                                     jointcapturebiharmonic14
+                                                    ↓
+                                       rigpose1 → bonedeform1</code></pre>
+
+<ul>
+  <li><code>Sweep</code> で線からチューブ状のジオメトリを作ります</li>
+  <li><code>Rig Doctor</code> で同じ線をスケルトンにします</li>
+  <li><strong><code>Joint Capture Biharmonic</code></strong> に両方を入れてスキニングします</li>
+  <li><code>Rig Pose</code> でポーズを付け、<code>Bone Deform</code> で変形させます</li>
+</ul>
+
+<p>ここまで組んでおくと、あとから <code>Sweep</code> の形を変えても、<code>Resample</code> の点数を増やしても、
+スキニングは自動的に付いてきてくれます。動画では「クライアントがチューブの太さに満足しなかったら」という例で、
+<code>Point</code> と Scale Along Curve を足して太さを変えていました。それでも
+<code>Joint Capture Biharmonic</code> は勝手に追従します。</p>
+
+<h2>3. 実際のキャラクター用プリリグ</h2>
+
+<p>ここからは実際の Crazy Uncle のプリリグです。ベースには、講師の方が長く使っている
+ストック済みのスケルトンが使われていました。脚・腕・背骨・頭・目などが一通り入っているものです。</p>
+
+<ol>
+  <li>ルートを削除して、少し編集します</li>
+  <li>手と足を <code>Blast</code> で消します。ここは自分で作り直したいためです</li>
+  <li>不要な <code>Attribute Delete</code> をいくつか通します</li>
+</ol>
+
+<h3>指と足の指を自分で作る</h3>
+
+<p>手足は既製のものを使わず、あとでモデルを生やしやすい形に作り直しています。</p>
+
+<ol>
+  <li><code>Line</code> を置きます</li>
+  <li><code>Resample</code> で指1本あたり3ジョイントになるようにします</li>
+  <li><code>Transform</code> をいくつか重ねて、指の位置に配置します</li>
+  <li><code>Attribute Wrangle</code>（ノード名は <code>rename_multiple_points</code>）で名前を付けます</li>
+</ol>
+
+<img src="img/sidefx-charcreate-01-prerig-modelling-001230.png" alt="Attribute Wrangle のパラメータパネルに VEX が1行書かれており、ジオメトリスプレッドシートに Pinky_L_0 から Pinky_L_3 までの name が並んでいる">
+
+<p>この Wrangle の中身は1行だけです。</p>
+
+<pre><code>@name = 'Pinky_L_' + itoa(@ptnum);</code></pre>
+
+<p>ポイント番号を文字列にして後ろに付けているだけなのですが、これで
+<code>Pinky_L_0</code> / <code>Pinky_L_1</code> / <code>Pinky_L_2</code> / <code>Pinky_L_3</code> と
+連番の名前が付きます。<span class="tx-muted">番号はポイントのソート順に依存します。</span>
+同じものを指と足の指の分だけ用意していました。</p>
+
+<p>作った指たちを <code>Merge</code> でまとめ、<code>Transform</code> を少し入れたあと、
+<strong>ジョイントの親子付け</strong>をします。マージしただけでは親子関係が付いていないので、
+ここを通さないと階層になりません。</p>
+
+<h3>プロポーションの調整と、スキニング用の出力</h3>
+
+<ol>
+  <li><code>Edit Skeleton</code> でプロポーションを整えます。ここは何度でも触れます</li>
+  <li>不要なアトリビュートを <code>Attribute Delete</code> で落とします</li>
+  <li><code>Rig Doctor</code> を足して <strong>Initialize Transforms</strong> を有効にします</li>
+  <li><code>Skeleton Mirror</code> をかけて左右を揃え、これをスキニング用に使います</li>
+</ol>
+
+<h2>4. スケルトンからモデルを生やす</h2>
+
+<p>ここからが「リグがモデルを駆動する」部分です。パーツごとに同じような組み方が繰り返されます。</p>
+
+<h3>パンツ（脚）</h3>
+
+<img src="img/sidefx-charcreate-01-prerig-modelling-001530.png" alt="Pants と書かれた付箋の下に Blast、Resample、Fuse、PolyPath、Sweep、Color、Mirror が縦に並んだノードネットワーク">
+
+<pre><code>blast112 → resample129 → fuse8 → polypath6 → sweep16 → color78 → mirror32</code></pre>
+
+<ol>
+  <li><code>Blast</code> で必要な点だけ残します</li>
+  <li><code>Resample</code> で十分な密度にします</li>
+  <li><code>Fuse</code> で点をくっつけます</li>
+  <li><strong><code>PolyPath</code></strong> で1本のポリゴンにまとめます</li>
+  <li><code>Sweep</code> で断面を掃引して脚の形にします</li>
+  <li><code>Color</code> で色を付け、<code>Mirror</code> で反対側の脚を作ります</li>
+</ol>
+
+<p><span class="tx-blue">ここで <code>PolyPath</code> を入れる理由が実演されていました。</span>
+入れずに <code>Exploded View</code> で見ると、点が<strong>2本の別々のポリゴン</strong>に分かれてしまいます。
+<code>PolyPath</code> を通すと1本のポリゴンにまとまり、<code>Sweep</code> が意図通りに効くようになります。
+腕でも同じ理由で <code>Fuse</code> と <code>PolyPath</code> を通していました。</p>
+
+<h3>足とつま先</h3>
+
+<ul>
+  <li>つま先: <code>Blast</code> → <code>Resample</code> → <code>Sweep</code> → <code>Subdivide</code> → <code>Smooth</code>。<code>Sweep</code> の太さでつま先の大きさを調整できます</li>
+  <li>足そのもの: <code>Box</code> → <code>Edit</code> → <code>Match Size</code> → <code>Transform</code> → もう一度 <code>Match Size</code>（Y 方向に乗るように）→ <code>Merge</code> → <code>Color</code> → <code>Mirror</code></li>
+</ul>
+
+<h3>胴体</h3>
+
+<img src="img/sidefx-charcreate-01-prerig-modelling-001750.png" alt="Clip ノードのパラメータパネル。Keep が All Primitives で、Output Groups の Above Primitives に above、Below Primitives に below が入っている">
+
+<pre><code>box16 → group68 → blast151 → matchsize36 → mirror17 → fuse30
+      → transform_from_centroid53 → subdivide36 → clip1 → split1 → color × 2 → merge58</code></pre>
+
+<ol>
+  <li><code>Box</code> を置いて <code>Group</code> と <code>Blast</code> で半分だけにします。ミラーしたときに内側にジオメトリが残らないようにするためです</li>
+  <li><code>Fuse</code> → <code>Transform</code> → <code>Subdivide</code> と整えます</li>
+  <li><strong><code>Clip</code></strong> で上下に分けます</li>
+  <li><code>Split</code> で実際に2つに分けて、それぞれに <code>Color</code> を当ててから <code>Merge</code> します</li>
+</ol>
+
+<p>この <code>Clip</code> の使い方が少し変わっていて面白かったところです。
+通常の <code>Clip</code> は Keep で「平面より上」か「平面より下」のどちらかを残しますが、
+ここでは <strong>Keep を All Primitives にして両方を残し</strong>、
+Output Groups の <strong>Above Primitives に <code>above</code></strong>、
+<strong>Below Primitives に <code>below</code></strong> というグループ名を出力しています。
+こうしておくと、後ろの <code>Split</code> でそのグループを使って上半身と下半身に分けられます。</p>
+
+<h3>腕・手・指・首</h3>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>パーツ</th><th>組み方</th></tr>
+    <tr><td>腕（シャツ部分）</td><td><code>Blast</code> → <code>Resample</code> → <code>Fuse</code> → <code>PolyPath</code> → <code>Carve</code> → <code>Sweep</code> → <code>Color</code></td></tr>
+    <tr><td>腕（素肌部分）</td><td><code>Fuse</code> → <code>PolyPath</code> → <code>Sweep</code></td></tr>
+    <tr><td>手のひら</td><td><code>Edit</code> → <code>Subdivide</code> → <code>Blast</code> → <code>Match Size</code>（Scale to Fit）→ <code>Transform</code></td></tr>
+    <tr><td>指</td><td><code>Blast</code> → <code>Resample</code> → <code>Sweep</code> → <code>Subdivide</code> → <code>Smooth</code> → 手のひらと <code>Merge</code></td></tr>
+    <tr><td>首</td><td><code>Resample</code> → <code>Sweep</code> → <code>Color</code></td></tr>
+  </table>
+</div>
+
+<p>片手ぶんを作ったあと <code>Mirror</code> につなぐと両手になります。
+ここまでで体はひととおり組み上がります。この状態で <code>Edit Skeleton</code> に戻ってプロポーションを変えると、
+モデル全体がそれに追従してくれます。</p>
+
+<h3>顔まわり</h3>
+
+<p>頭は少し込み入っていましたが、やっていること自体はシンプルでした。</p>
+
+<ul>
+  <li>ベースは <code>Edit</code> と <code>Subdivide</code> でこぶを足していく作り。講師の方は ZBrush 出身だそうで、その感覚で盛っているとのことでした</li>
+  <li>耳: ジオメトリを置いて <code>Boolean</code> で耳たぶを作り、<code>Transform</code> → <code>Mirror</code> → <code>Subdivide</code></li>
+  <li>鼻: カーブを <code>Transform</code> → <code>Carve</code> して小鼻を作り、<code>Resample</code> → <code>Sweep</code> → <code>Smooth</code> → <code>Mirror</code>。鼻そのものも <code>Resample</code> + <code>Sweep</code> + <code>Smooth</code></li>
+  <li>口ひげ: カーブ → <code>Resample</code> → <code>Sweep</code>。その上にもう一度 <code>Sweep</code> をかけて少しうねらせています</li>
+  <li>眉: <code>Resample</code> → <code>Mirror</code> → <code>Sweep</code></li>
+  <li>目とまぶた: <code>Copy to Points</code> で頭のジョイントに乗せます。まぶたは <code>Peak</code> → <code>Transform</code> → <code>Clip</code> で上下に分け、<code>Merge</code>。不要な色と名前は <code>Attribute Delete</code> で落とします</li>
+</ul>
+
+<p>顔のパーツはまとめて <code>Copy to Points</code> で頭のジョイントに配置されています。</p>
+
+<h2>5. バラバラのパーツを1つにまとめる</h2>
+
+<p>ここが最後の、そして忘れると詰まるところです。ここまでで作ったパーツは
+<span class="tx-red">それぞれ独立したジオメトリで、つながっていません。</span>
+このままでは全体に対するスキニングができないので、いったん VDB を経由して1つの塊にします。</p>
+
+<img src="img/sidefx-charcreate-01-prerig-modelling-002730.png" alt="VDB from Polygons、VDB Smooth、Convert VDB と続くネットワークと、VDB Smooth のパラメータパネル">
+
+<pre><code>OUT_MODEL → split19 → vdbfrompolygons46 → vdbsmooth22 → convertvdb19 → split4
+                                                      ↓
+                                        jointcapturebiharmonic6 ／ capturepackedgeo
+                                                      ↓
+                                              attribtransfer42 (boneCapture)</code></pre>
+
+<ol>
+  <li><strong><code>VDB from Polygons</code></strong> で全パーツを VDB に変換します。これで1つのボリュームになります</li>
+  <li><strong><code>VDB Smooth</code></strong> でならします。動画では Operation が <code>Mean Value</code>、Filter Voxel Radius が <code>1</code>、Iterations が <code>4</code> でした</li>
+  <li><strong><code>Convert VDB</code></strong> でポリゴンに戻します</li>
+  <li>戻したメッシュに <code>Joint Capture Biharmonic</code> をかけてスキニングします</li>
+  <li>目だけは <code>Capture Packed Geometry</code> で目のジョイントに割り当てます</li>
+  <li>元の（VDB を通していない）ジオメトリを <code>Subdivide</code> し、<code>Attribute Transfer</code> で <code>boneCapture</code> を転送します。少し <code>Smooth</code> もかけています</li>
+  <li><code>Bone Deform</code> につないで、いくつかポーズを取らせて確認します</li>
+</ol>
+
+<p>手順4で作ったウェイトを、手順6で元のジオメトリに転送しているところがポイントだと思います。
+VDB を通したメッシュはウェイトを計算するためだけに使い、実際に表示するのは元のジオメトリ、という分担です。</p>
+
+<p class="tx-muted">なお動画では確認用に <code>Bone Deform</code> を使っていますが、
+ここは APEX のフルリグに置き換えることもできる、と補足されていました。
+この段階では確認できれば十分なので、シンプルな <code>Bone Deform</code> で済ませています。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li>ポイントがそのままジョイントになるので、<code>Line</code> と <code>Resample</code> だけでスケルトンが作れます</li>
+  <li><code>Rig Doctor</code> の <strong>Initialize Transforms</strong> が、線をスケルトンとして機能させる鍵になります</li>
+  <li>体の各パーツは <code>Blast</code> → <code>Resample</code> → <code>Fuse</code> → <code>PolyPath</code> → <code>Sweep</code> というほぼ同じ型の繰り返しで作れます</li>
+  <li><code>PolyPath</code> を省くとポリゴンが分かれてしまい <code>Sweep</code> が意図通りに効きません</li>
+  <li>バラバラのパーツは VDB を経由して1つにまとめ、そこで計算したウェイトを <code>Attribute Transfer</code> で元のジオメトリに戻します</li>
+</ul>
+
+<p>次の第2回は Procedural Modeling Workflows で、シリーズ最長の48分の回になります。
+VDB・Quad Remesh・スカルプトツールまわりが中心のようです。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

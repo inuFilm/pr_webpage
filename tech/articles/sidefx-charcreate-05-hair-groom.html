@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 5 — カーブとマスクでヒゲと髪をグルーミングする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第5回の日本語メモです。Volume Velocity from Curves と Guide Advect でヘアの流れを作る方法、忘れると変形に追従しない Guide Skin Attribute Lookup について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 5 — カーブとマスクでヒゲと髪をグルーミングする</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=1_I1Gl1R50Q">Character Creation 5 | Hair and Groom Workflow</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第5回 / 講師 Roy Kristoffersen さん / Houdini 21 / 14:27 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/1_I1Gl1R50Q"
+          title="Character Creation 5 | Hair and Groom Workflow" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>Crazy Uncle の特徴になっている、あの大きなヒゲと髪と眉を作る回です。
+カーブでヘアの流れを決め、手で塗ったマスクで長さと密度を制御します。</p>
+
+<ul>
+  <li><code>Attribute Paint</code> でマスクを描き、長さと密度に変換する</li>
+  <li>カーブから <code>Volume Velocity from Curves</code> と <code>Guide Advect</code> でヘアの流れを作る</li>
+  <li><code>Guide Skin Attribute Lookup</code>（これが無いと変形に追従しません）</li>
+  <li><code>curveu</code> を <code>pscale</code> に変換して房の太さに変化を付ける</li>
+  <li>髪のために投影用のガイドジオメトリを別に作る</li>
+</ul>
+
+<h2>1. マスクを描く</h2>
+
+<p>すべての出発点は頭のジオメトリです。まず <code>Subdivide</code> でかなり細かく割ります。
+これは <code>Attribute Paint</code> で細かいマスクを塗れるようにするためです。</p>
+
+<p>マスクの塗りは<span class="tx-muted">プロシージャルではなく手作業</span>です。
+講師の方も「ここは手で塗っている」とはっきり言っていました。
+ただし、塗ったあとの処理は毎回同じ型の繰り返しになっています。</p>
+
+<pre><code>Attribute Paint → Attribute Blur → Attribute Remap</code></pre>
+
+<p>この3つ組が、長さ・密度・リフトそれぞれの分だけ並んでいます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>マスク</th><th>用途</th></tr>
+    <tr><td>length</td><td>毛の長さ。あご先を長く、口まわりを短く</td></tr>
+    <tr><td>density</td><td>毛の密度。length から <code>Attribute Remap</code> で作っています</td></tr>
+    <tr><td>lift</td><td>ヒゲをどれだけ持ち上げるか</td></tr>
+    <tr><td>direction（髪）</td><td>前髪用と後ろ髪用の2種類</td></tr>
+  </table>
+</div>
+
+<p><code>Attribute Blur</code> でならしてから <code>Attribute Remap</code> をかけると、
+「ここには長い毛を一切生やさない」といった調整ができます。</p>
+
+<h2>2. カーブでヘアの流れを決める</h2>
+
+<img src="img/sidefx-charcreate-05-hair-groom-000349.png" alt="Guide advection と書かれた付箋の下に volumevelocityfromcurves、guideadvect、hairclump、blendshapes、guideskinattriblookup が並ぶネットワークと、ヒゲの流れを表すカーブ">
+
+<h3>カーブを引く</h3>
+
+<ol>
+  <li><code>Curve</code> でヒゲの流れに沿った線を描きます。
+      <span class="tx-red">このときジオメトリにスナップさせません。</span>
+      スナップすると既存のものを壊してしまうため、とのことです</li>
+  <li><code>Resample</code> で点を整えます</li>
+  <li><code>Transform</code> で少し外側に押し出します</li>
+  <li><code>Ray</code> でジオメトリの上に乗せます</li>
+  <li><code>Mirror</code> で左右に配置します</li>
+</ol>
+
+<h3>Guide Advect のためのセットアップ</h3>
+
+<p>カーブに沿って毛を流すには、いくつか下ごしらえが要ります。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>ノード</th><th>役割</th></tr>
+    <tr><td><code>Volume Velocity from Curves</code></td><td>引いたカーブから速度ボリュームを作ります</td></tr>
+    <tr><td><code>VDB from Polygons</code></td><td>頭のジオメトリから skin VDB（衝突用）を作ります</td></tr>
+    <tr><td><code>Hair Generate</code></td><td>マスクの density に従って毛を生やします</td></tr>
+    <tr><td><code>Guide Process</code></td><td>Set Length で長さを与えます。マスクの length が効きます</td></tr>
+    <tr><td><code>Guide Advect</code></td><td>速度ボリュームに沿って毛を流します</td></tr>
+    <tr><td><code>Hair Clump</code></td><td>毛を房にまとめます</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">この <code>Guide Advect</code> が効いた瞬間に、
+ばらばらだった毛が一斉にカーブの流れに沿います。</span>
+動画でも切り替えて見せていて、ここが一番わかりやすい変化でした。</p>
+
+<h2>3. ブレンドと、忘れると動かない設定</h2>
+
+<img src="img/sidefx-charcreate-05-hair-groom-000600.png" alt="Blend Shapes のパラメータパネルで blend1 が 0.644 になっている。ビューポートには毛の生えたヒゲ">
+
+<p><code>Blend Shapes</code> で、<strong>Advect 前</strong>と<strong>Advect 後</strong>を混ぜています。
+上の画像では入力に <code>guideprocess14</code>（流す前）と <code>hairclump2</code>（流したあと）が並んでいて、
+ブレンド値は 0.644 でした。完全に流しきらず、少し元の向きを残しています。</p>
+
+<h3>Guide Skin Attribute Lookup</h3>
+
+<p><span class="tx-red">ここが一番の落とし穴です。</span>
+<code>Guide Skin Attribute Lookup</code> を通しておかないと、
+<strong>キャラクターが変形したときに毛が付いてきません</strong>。</p>
+
+<p>このノードが <code>skinprim</code> と <code>skinprimuv</code> というアトリビュートを付けてくれて、
+これがあって初めて毛が変形したメッシュに追従します。
+動画でも「これが無いと動かない、とても重要」と2回繰り返して強調していました。</p>
+
+<h2>4. 房の太さに変化を付ける</h2>
+
+<img src="img/sidefx-charcreate-05-hair-groom-000706.png" alt="Attribute Transfer のパラメータパネルで Points に curveu が指定されている。ビューポートには房状にまとまったヒゲ">
+
+<p>ここでも第2回から続く <code>curveu</code> の使い回しが出てきます。</p>
+
+<ol>
+  <li>ガイドから新しく <code>Hair Generate</code> をかけます</li>
+  <li><code>Smooth</code> をかけます</li>
+  <li><code>Curve</code> → <code>Resample</code> で基準になるカーブを作ります</li>
+  <li><code>Attribute Transfer</code> で <code>curveu</code> を毛のカーブに転送します</li>
+  <li><code>Attribute Remap</code> でそれを <code>pscale</code> に変換します</li>
+  <li><code>Sweep</code> に渡します。Apply Scale Along Curve が <code>pscale</code> を拾います</li>
+</ol>
+
+<p>これで<span class="tx-blue">根元と毛先で房の太さが変わり、なめらかに変化します</span>。
+ランプを触れば房のまとまり具合を全体的に調整できます。</p>
+
+<h3>Sweep と Resample の設定</h3>
+
+<p>この <code>Sweep</code> は四角ポリゴンを出しません。<strong>columns</strong> だけを出していて、
+それがそのまま毛になります。</p>
+
+<p>そのあとの <code>Resample</code> で <strong>Subdivision Curves</strong> を選ぶのがポイントでした。
+<span class="tx-muted">Straight Edges のままだと毛がカクカクして先が尖ってしまいますが、
+Subdivision Curves にするとなめらかになります。</span>
+動画では両方を切り替えて違いを見せていました。</p>
+
+<p>最後に <code>Guide Process</code> の Frizz と Set Length を重ねて、
+<code>Color</code> を当てて仕上げます。</p>
+
+<h2>5. 眉毛</h2>
+
+<p>ヒゲとまったく同じ流れです。</p>
+
+<ol>
+  <li>マスクを塗って <code>Attribute Blur</code>、そのあと <code>Attribute Remap</code> で境界をはっきりさせます</li>
+  <li><code>Line</code> を並べて <code>Ray</code> → <code>Mirror</code></li>
+  <li><code>Volume Velocity from Curves</code> → <code>Guide Advect</code></li>
+  <li><code>Blend Shapes</code> で少し外側に持ち上がるように混ぜます</li>
+  <li><code>Guide Skin Attribute Lookup</code> を忘れずに通します</li>
+  <li>Lift を少し足して向きを出します</li>
+  <li>そのガイドから <code>Hair Generate</code> → Frizz → <code>Sweep</code> → <code>Resample</code> → さらに Frizz</li>
+</ol>
+
+<h2>6. 髪 — 投影用のガイドジオメトリを作る</h2>
+
+<img src="img/sidefx-charcreate-05-hair-groom-001210.png" alt="Guide geo for projection of guides と書かれた付箋と、リボン状の2枚のサーフェスが表示されたビューポート">
+
+<p>髪はヒゲより一段込み入っていました。頭の表面に直接カーブを乗せるのではなく、
+<strong>投影用のジオメトリを別に作って、そこにカーブを乗せています</strong>。</p>
+
+<pre><code>Curve → Resample → Sweep → Edit → Thicken → Subdivide</code></pre>
+
+<p>できあがるのが上の画像のリボンのような面です。
+講師の方も「これを見て何だと思うかもしれないが、最後まで見ればわかる」と言っていました。</p>
+
+<p>この面に対してカーブを <code>Ray</code> で乗せると、
+<span class="tx-blue">頭の表面の凹凸に引きずられずに、髪として自然な流れのカーブが作れます</span>。
+あとは同じく <code>Volume Velocity from Curves</code> → <code>Guide Advect</code> →
+<code>Guide Skin Attribute Lookup</code> と流します。</p>
+
+<p class="tx-muted">そこから先は Soft Transform を大量に重ねて形を追い込んでいて、
+「これは細かい調整の積み重ねなので、見てもらったほうが早い」という説明でした。
+最後は <code>Guide Process</code> → <code>Hair Generate</code> → Frizz → <code>Sweep</code> →
+<code>Resample</code> → Frizz → Set Length という、これまでと同じ並びで仕上げています。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li>マスクは <code>Attribute Paint</code> → <code>Attribute Blur</code> → <code>Attribute Remap</code> の3つ組を、用途の数だけ並べます</li>
+  <li>length マスクから <code>Attribute Remap</code> で density を作れば、長さと密度が連動します</li>
+  <li>ヘアの流れは <code>Volume Velocity from Curves</code> + <code>Guide Advect</code> で作ります</li>
+  <li><span class="tx-red"><code>Guide Skin Attribute Lookup</code> を通さないと、変形に毛が追従しません</span>（<code>skinprim</code> / <code>skinprimuv</code>）</li>
+  <li><code>Blend Shapes</code> で Advect の前後を混ぜると、流しすぎを抑えられます</li>
+  <li><code>curveu</code> → <code>pscale</code> → <code>Sweep</code> で房の太さに変化が付きます</li>
+  <li><code>Resample</code> は <strong>Subdivision Curves</strong> にしないと毛がカクつきます</li>
+  <li>髪は頭に直接乗せず、投影用のガイドジオメトリを別に作るときれいに流れます</li>
+</ul>
+
+<p>次の第6回は KineFX Procedural Skinning です。ウェイトを塗らずに済ませるスキニングに入ります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

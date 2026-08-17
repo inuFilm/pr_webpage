@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 3 — 体から服を切り出してパネルとシワを作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第3回の日本語メモです。Labs Box Clip での服の切り出し、UV シームからのパネル分割、Ray でのポケット貼り付け、Vellum ブラシでのシワ作りについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 3 — 体から服を切り出してパネルとシワを作る</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=TERPhgd4sK8">Character Creation 3 | Cloth Modeling Workflows</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第3回 / 講師 Roy Kristoffersen さん / Houdini 21 / 20:55 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-charcreate-02-procedural-modeling.html">第2回 VDB と Quad Remesher</a>、シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/TERPhgd4sK8"
+          title="Character Creation 3 | Cloth Modeling Workflows" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>体のジオメトリを起点にして、服をプロシージャルに作る回です。
+体のプロポーションが変われば服も追従するので、キャラクターを作り替えても使い回せます。</p>
+
+<ul>
+  <li><code>Labs Box Clip</code> で体から服の形を切り出す</li>
+  <li>UV シームからパネルとステッチを作る</li>
+  <li>カーブからポケットを作り、<code>Ray</code> で服に貼り付ける</li>
+  <li>Vellum ブラシでシワを描く</li>
+  <li><code>Hair Generate</code> で布の毛羽立ちを出す</li>
+</ul>
+
+<h2>1. 体から服を切り出す</h2>
+
+<p>出発点は完成した体のスカルプトです。<code>Object Merge</code> で読み込み、
+<code>Attribute Delete</code> で掃除してから本題に入ります。</p>
+
+<img src="img/sidefx-charcreate-03-cloth-modeling-000125.png" alt="Labs Box Clip のパラメータパネルと、体を囲む赤いバウンディングボックスが表示されたビューポート">
+
+<p>ここで使うのが <strong><code>Labs Box Clip</code></strong> です。
+<span class="tx-muted">SideFX Labs のノードなので、インストールされていない場合は入れる必要があります。
+Labs 自体は SideFX から提供されているものです。</span></p>
+
+<p>全方向に対してクリップしてくれるノードで、
+<span class="tx-blue">このボックスの大きさがそのままシャツの範囲になります</span>。
+パラメータは Size と Center、Uniform Scale、それに Bounding Axis の
+±X / ±Y / ±Z のチェックボックスです。</p>
+
+<blockquote>講師の方は「ZBrush ならペンでマスクを塗って押し出すところを、
+これならプロシージャルにできる」と説明していました。
+ボックスを動かすだけで服の範囲が変わるので、あとから何度でも調整できます。</blockquote>
+
+<h3>首まわりの穴をあける</h3>
+
+<ol>
+  <li><code>Labs Box Clip</code> で切り出します</li>
+  <li><code>Peak</code> で体から少し浮かせて、服らしい厚みの位置にします</li>
+  <li><code>Smooth</code> をかけます</li>
+  <li>別系統で <code>Tube</code> を作り、<code>Transform from Centroid</code> で首の位置に置きます</li>
+  <li><code>Boolean</code> の Subtract で首まわりを抜きます</li>
+</ol>
+
+<p><code>Boolean</code> では出力プリミティブグループを全部出しておき、
+<code>Blast</code> で <code>A outside B</code> を消します。これで首の穴があいたシャツになります。</p>
+
+<h2>2. 襟を作る</h2>
+
+<p><code>Boolean</code> をかけると、2つの面が交差したところに <strong>AB シーム</strong>のグループが自動で作られます。
+これを襟の元にします。</p>
+
+<ol>
+  <li><code>edgegroup_to_curve</code> でシームのグループからカーブを取り出します</li>
+  <li><code>Carve</code> で必要な範囲だけにします</li>
+  <li>そのままだと形が汚いので <code>Resample</code> できれいにします</li>
+  <li><code>Transform</code> を複数重ねて、襟の断面になる位置にカーブを並べます</li>
+  <li><code>Merge</code> でまとめて <code>Skin</code> をかけます</li>
+</ol>
+
+<p><span class="tx-red">ここに落とし穴があります。</span>
+<code>Skin</code> は入力されたカーブの順番どおりに面を張るので、
+<strong><code>Merge</code> につなぐ順番が正しくないとねじれた形になります</strong>。
+下から順に1番目、2番目、3番目…と並べる必要があり、
+動画では順番を入れ替えて実際に崩れる様子を見せていました。</p>
+
+<p>そのあと <code>Subdivide</code> と <code>Reverse</code> をかけて、<code>UV Flatten</code> まで通します。</p>
+
+<h2>3. UV シームからパネルを作る</h2>
+
+<p>ここがこの回の中心になる考え方です。実際の服が布のパネルを縫い合わせてできているように、
+モデルもパネルに分割します。その分割に <strong>UV のシームをそのまま使います</strong>。</p>
+
+<img src="img/sidefx-charcreate-03-cloth-modeling-000539.png" alt="Exploded View のパラメータパネルで Piece Attribute が class になっている。ビューポートではシャツが前身頃・後身頃・袖に分解されている">
+
+<ol>
+  <li><code>Group Create</code> で Group Type を Edges にして、シームにしたいエッジを選びます。グループ名は <code>seams</code></li>
+  <li><code>UV Flatten</code> で展開します</li>
+  <li><strong><code>Connectivity</code></strong> を UV アトリビュート基準で実行します。これで UV アイランドごとに <code>class</code> が振られます</li>
+  <li><strong><code>Exploded View</code></strong> の Piece Attribute に <code>class</code> を指定します</li>
+</ol>
+
+<p>これで上の画像のように、シャツが前身頃・後身頃・左右の袖にきれいに分解されます。
+<span class="tx-blue">UV の切れ目がそのまま布のパネルの切れ目になる</span>のが気持ちのいいところです。</p>
+
+<p>分解できたら <code>PolyExtrude</code> で厚みを付けます。すると各パネルの縁が立ち上がって、
+縫い代のようなエッジが出ます。最後に <code>PolyBevel</code> で角を落とし、<code>Fuse</code> でまとめます。</p>
+
+<h2>4. ポケットを作って服に貼り付ける</h2>
+
+<img src="img/sidefx-charcreate-03-cloth-modeling-000642.png" alt="pockets と書かれた付箋の下に curve、resample、exoside_quadremesher、ray、polyextrude、polybevel が並ぶネットワークと、ポケット形のカーブ">
+
+<ol>
+  <li><code>Curve</code> で閉じたカーブを描きます。これがポケットの外形です</li>
+  <li><code>Resample</code> で点を整えます</li>
+  <li><code>Labs Exoside QuadRemesher</code> で四角ポリゴンの面にします</li>
+  <li><code>Transform from Centroid</code> で服の少し手前に移動します</li>
+  <li><strong><code>Ray</code></strong> で服の表面に貼り付けます</li>
+  <li><code>Smooth</code> → <code>PolyExtrude</code> → <code>PolyBevel</code> → <code>Mirror</code></li>
+  <li><code>UV AutoSeam</code> → <code>UV Flatten</code> で UV を付けます</li>
+</ol>
+
+<p><span class="tx-blue"><code>Ray</code> の設定を Project Rays ではなく <strong>Minimum Distance</strong> にするのがポイントです。</span>
+こうしておくと、ポケットを服の上のどこに動かしても、そのまま表面に吸い付いてくれます。
+動画でも実際にポケットを動かして見せていて、どこに置いても服に沿っていました。</p>
+
+<p class="tx-muted">胸ポケットのフタも同じ作り方で、最後に <code>Mirror</code> して両側に付けています。</p>
+
+<h2>5. 色付け</h2>
+
+<p>第2回と同じ組み合わせがそのまま使われています。</p>
+
+<ol>
+  <li><code>Line</code> → <code>Resample</code>（Curve U Attribute を作る）→ <code>Match Size</code></li>
+  <li><code>Attribute Transfer</code> で <code>curveu</code> を服に転送します</li>
+  <li><code>Color</code> を Ramp from Attribute にして、ランプで色の変化を作ります</li>
+  <li>Physical Ambient Occlusion → <code>Attribute Remap</code> → <code>Attribute Combine</code> で陰影を混ぜます</li>
+  <li><code>Subdivide</code> と <code>Time Shift</code> で仕上げます</li>
+</ol>
+
+<h2>6. Vellum ブラシでシワを描く</h2>
+
+<p>シワは手でモデリングせず、Vellum の布シミュレーションをブラシで直接触って作ります。</p>
+
+<img src="img/sidefx-charcreate-03-cloth-modeling-000906.png" alt="Vellum Constraints のパラメータパネルと、remesh から vellumcloth、vellumbrush、vellumpostprocess へ続くネットワーク。Vellum brush と point deform original geo to vellum brush geo の付箋が見える">
+
+<h3>下ごしらえ</h3>
+
+<ol>
+  <li>シャツを <code>Remesh</code> でかなり細かく割ります。シワを出すには密度が要ります</li>
+  <li><code>Fuse</code> で点をつなげます</li>
+  <li>体側から衝突用オブジェクトを作ります。<code>VDB from Polygons</code> → <code>VDB Smooth</code> でなめらかにしたものを使います</li>
+</ol>
+
+<h3>ブラシで描く</h3>
+
+<ol>
+  <li><code>Vellum Cloth</code>（Vellum Constraints、Constraint Type = Cloth）を作ります</li>
+  <li><strong><code>Vellum Brush</code></strong> でシワを直接描きます</li>
+  <li><code>Vellum Post Process</code> を通します</li>
+  <li><code>Time Shift</code> で結果を固定します</li>
+</ol>
+
+<p class="tx-muted">Vellum Constraints の設定は Stretch Type が Distance Along Edges、
+Bend Type が Angle、Density 0.01、Edge Length Scale 0.05、
+Normal Drag 10 / Tangent Drag 0.1 になっていました。
+ブラシ側の設定は数が多いので、動画では「自分で触ってみてほしい」と省略されています。</p>
+
+<h3>元の形とブレンドする</h3>
+
+<p>Vellum の結果をそのまま使うのではなく、元のスカルプトと混ぜています。</p>
+
+<pre><code>Attribute Paint → Attribute Remap → Attribute Blur → Blend Shapes</code></pre>
+
+<p><code>Attribute Paint</code> でマスクを塗り、それを <code>Blend Shapes</code> に渡します。
+こうすると<span class="tx-blue">場所によってシワの効き具合を変えられます</span>。
+動画では、裾のあたりは動かさず上のほうだけシワを効かせる、という使い方をしていました。</p>
+
+<h3>Point Deform で本番ジオメトリに移す</h3>
+
+<p>ここまでの作業は <code>Remesh</code> で細かく割ったジオメトリの上で行われています。
+このままでは使えないので、第2回と同じく <code>Point Deform</code> を使います。</p>
+
+<p>ネットワークにも<strong>「point deform original geo to vellum brush geo」</strong>という付箋が貼られていました。
+Quad Remesher で整えたシャツに、Vellum ブラシで作ったシワだけを移す、という使い方です。
+これで<span class="tx-blue">トポロジーはきれいなまま、シワだけが乗ります</span>。</p>
+
+<h2>7. 毛羽立ちを出す</h2>
+
+<img src="img/sidefx-charcreate-03-cloth-modeling-001149.png" alt="Guide Process のパラメータパネルで Operation が Set Length になっている。fuzz generation の付箋と、毛羽立ったシャツのビューポート">
+
+<ol>
+  <li>シャツのスカルプトを <code>Hair Generate</code> に入れます</li>
+  <li><code>Guide Process</code> で <strong>Set Length</strong> を使い、長さを調整します。
+      動画では Min Length 0.0005 / Max Length 0.01 で、Randomize を有効にしていました</li>
+  <li>もう一段 <code>Guide Process</code> を足して <strong>Frizz</strong> でばらつかせます</li>
+  <li><code>Attribute Transfer</code> で服の色を毛にも転送します</li>
+  <li><code>Attribute Delete</code> で不要なアトリビュートを落とし、<code>Name</code> を付けて <code>Merge</code> します</li>
+</ol>
+
+<p>ズボン側では <code>Attribute Paint</code> で塗ったマスクを毛の density に使って、
+毛羽立たせる場所を限定していました。</p>
+
+<h2>8. ボタン</h2>
+
+<p>ボタンも一つ一つモデリングせずに作られています。</p>
+
+<ol>
+  <li><code>Tube</code> を置いて <code>Transform</code> します</li>
+  <li>穴の位置になる4点を作り、<code>Copy to Points</code> で円柱を配置します</li>
+  <li><code>Boolean</code> で穴をあけます</li>
+  <li>糸はカーブを <code>Resample</code> → <code>Sweep</code> で作り、<code>Transform</code> と回転で2本に複製します</li>
+  <li><code>Merge</code> → <code>Transform</code> → <code>Match Size</code> → <code>PolyBevel</code> → 色 → UV</li>
+</ol>
+
+<p>できたボタンを <code>Copy to Points</code> でシャツに並べ、
+シャツと同じ <code>Point Deform</code> を通して、シワに追従させています。</p>
+
+<h2>9. ズボンとベルト</h2>
+
+<p>ズボンもシャツと同じ流れです。<code>Attribute Delete</code> → <code>Labs Box Clip</code> → <code>Peak</code> から始まります。</p>
+
+<ul>
+  <li>グループを作って <code>Group Promote</code> と Soft Transform を重ね、折り目を作ります</li>
+  <li>シームを引いて <code>Connectivity</code> → <code>Exploded View</code> でパネルに分解します</li>
+  <li>ファスナー部分の切れ込みを作り、全体を <code>PolyExtrude</code> します</li>
+  <li>ポケットの穴をあけます</li>
+</ul>
+
+<h3>ベルトループ</h3>
+
+<ol>
+  <li><code>Circle</code> → <code>Resample</code> → <code>Transform</code> でループの元を作ります</li>
+  <li><code>Ray</code> でズボンの表面に貼り付けます</li>
+  <li><code>Transform</code> で位置を整え、必要な数だけ <code>Ray</code> を繰り返します</li>
+  <li><code>Skin</code> をかけます。<span class="tx-muted">Skin には行・列・その両方という設定があり、ここでは列を選んでいました</span></li>
+  <li><code>Resample</code> を2回かけてから <code>Sweep</code> → <code>Thicken</code></li>
+</ol>
+
+<p>ベルト本体も同じ作り方で、最後に穴をあけて <code>PolyExtrude</code> と <code>PolyBevel</code> で仕上げています。
+体にぴったり沿った形になります。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li><code>Labs Box Clip</code> で体から服の形を切り出せば、体を変えても服が追従します</li>
+  <li><code>Boolean</code> が作る AB シームのグループから <code>edgegroup_to_curve</code> でカーブを取れば、襟が作れます</li>
+  <li><code>Skin</code> は <code>Merge</code> の順番が結果を左右します。順番が違うとねじれます</li>
+  <li>UV シーム → <code>UV Flatten</code> → <code>Connectivity</code> → <code>Exploded View</code>（Piece Attribute = <code>class</code>）で布のパネルに分解できます</li>
+  <li><code>Ray</code> を <strong>Minimum Distance</strong> にすると、ポケットをどこに動かしても服に吸い付きます</li>
+  <li>シワは <code>Vellum Brush</code> で描き、<code>Point Deform</code> できれいなトポロジーのほうに移します</li>
+  <li>毛羽立ちは <code>Hair Generate</code> + <code>Guide Process</code>（Set Length / Frizz）で出せます</li>
+</ul>
+
+<p>次の第4回は Blendshapes で、プロシージャルなブレンドシェイプの作り方に入ります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

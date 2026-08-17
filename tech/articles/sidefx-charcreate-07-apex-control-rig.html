@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 7 — APEX AutoRig Builder でコントロールリグを組む | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第7回の日本語メモです。APEX が要求する Pack Folder の構成、groom の間引きと width での補い方、AutoRig Builder のコンポーネントについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 7 — APEX AutoRig Builder でコントロールリグを組む</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=QkS62ZygAzw">Character Creation 7 | Control Rig Using APEX</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第7回 / 講師 Roy Kristoffersen さん / Houdini 21 / 14:26 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/QkS62ZygAzw"
+          title="Character Creation 7 | Control Rig Using APEX" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>いよいよ APEX でコントロールリグを組みます。
+この回は元動画にチャプターが付いているので、それに沿ってまとめます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>時間</th><th>チャプター</th></tr>
+    <tr><td>00:26</td><td>Setup</td></tr>
+    <tr><td>02:10</td><td>Pack Folders</td></tr>
+    <tr><td>03:45</td><td>Sub Network（groom の準備）</td></tr>
+    <tr><td>05:55</td><td>Autorig Builder</td></tr>
+    <tr><td>10:15</td><td>Rig Path</td></tr>
+    <tr><td>12:09</td><td>Auto Rig Builder の実演</td></tr>
+    <tr><td>13:36</td><td>Testing</td></tr>
+  </table>
+</div>
+
+<h2>1. Setup — アニメーション用の軽いメッシュを用意する</h2>
+
+<p>読み込むのは細かくサブディバイドされたメッシュです。そのままではアニメーション作業に重すぎるので、
+軽い版を用意します。</p>
+
+<ol>
+  <li><code>Object Merge</code> → <code>Attribute Delete</code> → <code>Group Delete</code></li>
+  <li><code>Split</code> でヒゲを外します。<span class="tx-muted">ヒゲはあとで groom として別に足すためです</span></li>
+  <li><strong><code>Unsubdivide</code></strong> でポリゴンを減らします</li>
+  <li><code>Switch</code>（ネットワーク上の名前は <code>High_Low</code>）で高解像度と低解像度を切り替えられるようにします</li>
+</ol>
+
+<blockquote>この <code>Unsubdivide</code> の効果が具体的な数字で語られていました。
+<strong>30万プリミティブが8万プリミティブになります。</strong>
+アニメーションシーンで動かすものとしては、この差はかなり大きいと思います。
+<code>Switch</code> を 1 にすると低解像度、0 にすると高解像度です。</blockquote>
+
+<h3>忘れると groom が動かない設定</h3>
+
+<p><span class="tx-red"><code>PolyFrame</code> をかけて、全プリミティブに normal と <code>tangentu</code> を付ける必要があります。</span>
+ネットワーク上でもノード名が <code>polyframe_For_Groom</code> になっていて、
+これが無いと後段の Add Groom が機能しません。</p>
+
+<p>そのあと <code>Time Shift</code> を通します。スケルトン側は <code>Blast</code> で整理して root にまとめ、
+<code>Merge</code> してから <code>Parent Joints</code> で親子付けします。</p>
+
+<h2>2. Pack Folders — これが無いと APEX は動かない</h2>
+
+<img src="img/sidefx-charcreate-07-apex-control-rig-000314.png" alt="Pack Folder のパラメータパネルに Base/shp、Base/skel、Sliders/shp の3行が設定されている">
+
+<p><strong><code>Pack Folder</code></strong> で、シェイプとスケルトンを決まった名前で詰めます。
+講師の方は<span class="tx-red">「これが無いと APEX システムは動かない」</span>とはっきり言っていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Name</th><th>Type</th><th>中身</th></tr>
+    <tr><td><code>Base</code></td><td><code>shp</code></td><td>ベースのシェイプ（メッシュ）</td></tr>
+    <tr><td><code>Base</code></td><td><code>skel</code></td><td>スケルトン</td></tr>
+    <tr><td><code>Sliders</code></td><td><code>shp</code></td><td>ブレンドシェイプ用のスライダー（<a href="sidefx-charcreate-04-blendshapes.html">第4回</a>で作ったもの）</td></tr>
+  </table>
+</div>
+
+<p>この <code>Base.shp</code> / <code>Base.skel</code> / <code>Sliders.shp</code> という名前が、
+そのまま APEX 側から参照されます。</p>
+
+<h2>3. Sub Network — groom を軽くして持ち込む</h2>
+
+<img src="img/sidefx-charcreate-07-apex-control-rig-000452.png" alt="Resample のパラメータパネルで Curve U Attribute に curveu が指定されている。ビューポートにはヒゲのカーブ">
+
+<p>ヒゲと髪をアニメーション用のリグに載せるためのサブネットワークです。
+そのままでは重すぎるので、ここでも減らします。</p>
+
+<ol>
+  <li><code>Time Shift</code> → <code>Split</code> で髪だけにします</li>
+  <li><code>Attribute Delete</code> で掃除します</li>
+  <li><code>Connectivity</code> でカーブごとに番号を振ります</li>
+  <li><strong><code>Group by Range</code></strong> で <span class="tx-blue">40本のうち39本を選びます</span></li>
+  <li><code>Blast</code> でそれを消します。つまり<strong>40本に1本だけ残します</strong></li>
+  <li><code>Group Delete</code> → <code>Resample</code> で点数を減らします</li>
+</ol>
+
+<p><code>Resample</code> の前後で <strong>10万点が6.2万点</strong>になります。
+それでも見た目は十分に使える、とのことでした。</p>
+
+<h3>curveu を width にする</h3>
+
+<p>本数を40分の1に減らすと、当然スカスカに見えます。それを太さで補います。</p>
+
+<ol>
+  <li><code>Resample</code> の <strong>Curve U Attribute</strong> を有効にして <code>curveu</code> を作ります（上の画像）</li>
+  <li><code>Attribute Remap</code> で <code>curveu</code> を <strong><code>width</code></strong> にリマップします</li>
+</ol>
+
+<p><span class="tx-blue"><code>width</code> アトリビュートがあると、Houdini はカーブをその太さで描画します。</span>
+本数を大幅に減らしても、ビューポート上ではちゃんとヒゲらしく見えます。
+太さはパラメータで調整できます。</p>
+
+<p>最後に <code>Switch</code>（メッシュ側の High/Low と連動）を通して、
+<strong><code>Add Groom</code></strong> ノードに渡します。このノードは groom shape と groom skeleton を出力します。</p>
+
+<p class="tx-muted">動画では「なぜかこの時点では表示されないが、そういうもの。
+最後に Scene Animate を足せば見えるようになる」と補足されていました。</p>
+
+<h2>4. APEX AutoRig Builder</h2>
+
+<img src="img/sidefx-charcreate-07-apex-control-rig-000628.png" alt="APEX AutoRig Builder のパラメータパネルに root、spine、legL、legR、footL、footR が並び、ビューポートには Component Catalog のパネルが開いている">
+
+<p><strong><code>APEX AutoRig Builder</code></strong> でリグのコンポーネントを組み立てます。
+パラメータの上部で Rig に <code>Base.rig</code>、Skeleton に <code>Base.skel</code>、Shape に <code>Base.shp</code> を指定します。</p>
+
+<h3>Component Catalog</h3>
+
+<p>ビューポートに出ている Component Catalog から部品を選んで足していきます。
+用意されているコンポーネントはこれだけありました。</p>
+
+<p><code>Add Control</code> / <code>Arm</code> / <code>Arm Clavicle</code> / <code>Delta Mush</code> /
+<code>Fk Chain</code> / <code>Foot</code> / <code>Hand Meta</code> / <code>Hand Simple</code> /
+<code>Input</code> / <code>Leg</code> / <code>Limb</code> / <code>Multi IK</code> /
+<code>Multi IK Skel</code> / <code>Neck Head</code> / <code>Root</code> / <code>Spine</code></p>
+
+<p>Build タブに追加したコンポーネントが並びます。動画の実演では
+<strong>spine → leg（左右）→ arm with clavicle → foot（左右）→ head → meta arms</strong>
+の順に足していました。各コンポーネントには色が割り当てられていて、
+ビューポート上のコントローラーもその色で表示されます。</p>
+
+<h3>足りないところを補う</h3>
+
+<p>Auto Rig Builder だけでは足りない部分を、APEX AutoRig Component ノードで補っています。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>ノード</th><th>やっていること</th></tr>
+    <tr><td><code>FK</code></td><td>目の Look At が promote されていなかったので、joint group を使って transform / rotation / scale を promote しています</td></tr>
+    <tr><td><code>LookAtEyes</code></td><td>目がコントローラーを追いかけるようにします</td></tr>
+    <tr><td><code>Groom</code></td><td>groom を見た目として追加します</td></tr>
+  </table>
+</div>
+
+<h3>コントロールシェイプを整える</h3>
+
+<p>そのあと <code>Configure Controls</code> がいくつも並んでいて、
+部位ごとにコントローラーの見た目を調整しています
+（<code>configurecontrols_Import</code> / <code>_Eyes</code> / <code>_FK</code> / <code>_IK</code> / <code>_Quirks</code>）。</p>
+
+<ul>
+  <li>カスタムのコントロールシェイプを読み込み、<code>Attribute Create</code> で <code>width</code> を設定しています</li>
+  <li>Shape Override で、アニメーターが選びにくい形のコントローラーを扱いやすい形に差し替えます</li>
+</ul>
+
+<p>動画では head のコントローラーで Shape Override をオフにして、
+「これではアニメーターが掴みにくい」と実際に見せてから、
+扱いやすい形に差し替えていました。
+<span class="tx-blue">下流に行くほどリグが整理されて、見た目がすっきりしていきます。</span></p>
+
+<h2>5. Rig Path とキャラクターの確定</h2>
+
+<p><code>Configure Character</code> で Rig Path に Base Rig を指定します。
+ここが<strong>ragdoll・ミラーリング・モーションミックスなどを足す場所</strong>でもある、
+と説明されていました。今回のキャラクターでは使っていません。</p>
+
+<p>名前（<code>Crazy_Uncle</code>）を付けて <code>OUT_Char_Rig</code> に出し、
+<code>Scene Add Character</code> → <code>Scene Animate</code> でポーズを付けられる状態になります。
+<span class="tx-muted">この状態でのフレームレートはかなり良好でした。</span></p>
+
+<h2>6. Solaris へ渡す</h2>
+
+<img src="img/sidefx-charcreate-07-apex-control-rig-001122.png" alt="APEX Scene Invoke のパラメータパネルと、sceneanimate から sceneinvoke、unpackGeo、OUT_SCENEINVOKE、OUT_SCENEINVOKE_UNREAL、OUT_Char_FBX と分岐するネットワーク">
+
+<p>最後に <strong><code>APEX Scene Invoke</code></strong> でシーンに展開します。
+Output は <code>Packed Geometry</code>、Extra Outputs に <code>Base.shp</code> と <code>Groom.skel</code> を
+指定していました。</p>
+
+<p><span class="tx-red">ここで <code>Unpack Folder</code> によるアンパックが必要です。</span>
+これをやらないと、マテリアルまわりがうまく動かない、とのことでした。</p>
+
+<p>出力は3系統に分かれています。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>出力</th><th>行き先</th></tr>
+    <tr><td><code>OUT_SCENEINVOKE</code></td><td>Solaris へ（<a href="sidefx-charcreate-08-karma-lighting.html">第8回</a>のライティングとレンダリング）</td></tr>
+    <tr><td><code>OUT_SCENEINVOKE_UNREAL</code></td><td>Unreal 連携用（第9回）</td></tr>
+    <tr><td><code>OUT_Char_FBX</code></td><td>FBX 書き出し用</td></tr>
+  </table>
+</div>
+
+<p>ここがリグとして配布する地点でもあります。書き出したリグを読み込んで、
+テストアニメーションを付けて動作を確認する、という流れが紹介されていました。</p>
+
+<h2>7. Testing</h2>
+
+<p>Auto Rig Builder の良いところとして挙げられていたのが、
+<strong>組みながら横でリグをテストできる</strong>点でした。
+コンポーネントを足すたびに結果がすぐ見えるので、
+おかしいところや足りないところがその場でわかります。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li><code>Unsubdivide</code> でアニメーション用の軽いメッシュを用意します（30万→8万プリミティブ）</li>
+  <li><span class="tx-red"><code>PolyFrame</code> で normal と <code>tangentu</code> を付けないと Add Groom が動きません</span></li>
+  <li><code>Pack Folder</code> で <code>Base.shp</code> / <code>Base.skel</code> / <code>Sliders.shp</code> を詰めます。これが APEX の前提です</li>
+  <li>groom は <code>Group by Range</code> + <code>Blast</code> で40本に1本まで間引き、<code>curveu</code> → <code>width</code> で太さを補います</li>
+  <li><code>APEX AutoRig Builder</code> の Component Catalog から部品を選んで組み立てます</li>
+  <li>足りない部分は APEX AutoRig Component（FK / LookAtEyes / Groom）で補います</li>
+  <li><span class="tx-red"><code>APEX Scene Invoke</code> のあと <code>Unpack Folder</code> でアンパックしないと、マテリアルが正しく動きません</span></li>
+</ul>
+
+<p>次の第8回は Lighting and Rendering in Karma です。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

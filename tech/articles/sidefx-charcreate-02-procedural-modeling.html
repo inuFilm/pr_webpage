@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 2 — VDB と Quad Remesher でプロシージャルにモデリングする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第2回の日本語メモです。指の線から爪を生やす VDB Combine の使い方、Convert VDB の Adaptivity、Point Deform でスカルプトの差分を伝える方法について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 2 — VDB と Quad Remesher でプロシージャルにモデリングする</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=Ri8HCky5M28">Character Creation 2 | Procedural Modeling Workflows</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第2回 / 講師 Roy Kristoffersen さん / Houdini FX 21.0.586 / 48:17 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-charcreate-01-prerig-modelling.html">第1回 プリリグでモデルを駆動する</a>、シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/Ri8HCky5M28"
+          title="Character Creation 2 | Procedural Modeling Workflows" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>シリーズ最長の48分の回です。前回作ったプロキシジオメトリを、実際に使えるモデルに仕上げていきます。</p>
+
+<ul>
+  <li>VDB を使ったモデリングと、ポリゴンのブーリアンより VDB が楽な理由</li>
+  <li>指の線から<strong>爪をプロシージャルに生やす</strong>手順</li>
+  <li>Quad Remesher で変形に耐えるトポロジーを作る</li>
+  <li>Houdini 内でのスカルプトと、ZBrush との往復</li>
+  <li><code>Point Deform</code> でスカルプトの差分を別パーツに伝える</li>
+  <li>頭・歯・歯茎・舌・目の作り方</li>
+</ul>
+
+<h2>1. Sweep の Apply Scale Along Curve</h2>
+
+<p>前回は <code>Sweep</code> をそのまま使っていましたが、この回では <code>Sweep</code> の Scale セクションにある
+<strong>Apply Scale Along Curve</strong> を有効にして、Scale Ramp で太さの変化を付けています。</p>
+
+<p>これを使うと、実際にメッシュをスカルプトする前の段階で
+<span class="tx-blue">カーブに沿った「プロシージャルなスカルプト」</span>ができます。
+脚・腕・指のすべてでこの形が使われていました。</p>
+
+<p>胴体はもう少し手が加えられていて、<code>Subdivide</code> と Soft Transform でお腹のふくらみを作っています。
+どこをふくらませるかは <code>Group Create</code> の Keep in Bounding Regions（Bounding Box）で決めていて、
+バウンディングボックスを動かすとふくらみの位置が動きます。背中側も同じ作りでした。</p>
+
+<h2>2. 指から爪をプロシージャルに生やす</h2>
+
+<p>この回でいちばん面白かったところです。爪を別途モデリングするのではなく、
+<strong>指を作っている線そのものから爪を生成</strong>します。</p>
+
+<img src="img/sidefx-charcreate-02-procedural-modeling-000755.png" alt="Nails と書かれた付箋の下に carve、resample、sweep、vdbfrompolygons、vdbsdfsubtract、exoside_quadremesher が並ぶネットワークと、VDB Combine のパラメータパネル">
+
+<h3>手順</h3>
+
+<ol>
+  <li>指の線に <code>Carve</code> をかけます。これで線の長さを調整でき、爪を置きたい範囲だけを取り出せます</li>
+  <li><code>Resample</code> → <code>Sweep</code> → <code>Transform</code> で爪の形のジオメトリを作ります</li>
+  <li><code>VDB from Polygons</code> で VDB にします</li>
+  <li>指本体の VDB から <strong><code>VDB Combine</code></strong> で引き算します。これで<strong>爪が入る溝</strong>ができます</li>
+  <li>爪そのものは、同じように作った VDB を <code>VDB Combine</code> の <strong>SDF Intersection</strong> で交差させて作ります</li>
+  <li><code>Merge</code> → <code>VDB Smooth</code> → <code>Convert VDB</code> → <code>Transform</code></li>
+  <li><code>Exoside QuadRemesher</code> → <code>Delete Small Parts</code> → <code>Peak</code> → <code>Smooth</code> → <code>Color</code> → <code>Mirror</code></li>
+</ol>
+
+<p>ネットワーク上のノード名は <code>vdbsdfsubtract10</code> のようになっていますが、
+実体は <strong><code>VDB Combine</code></strong> です。上の画像のパラメータパネルで
+Collation が <code>Combine A/B Pairs</code>、Operation が <code>SDF Intersection</code> になっているのが見えます。
+溝を掘るときは Operation を差分側にします。</p>
+
+<blockquote>ここで嬉しいのは、あとから指を長くしたり短くしたりしても
+<strong>爪が自動的に付いてくる</strong>ことです。動画でも実際に指を伸ばして見せていて、
+爪と溝の両方がそのまま追従していました。爪だけ作り直す必要がありません。</blockquote>
+
+<h2>3. VDB と Convert VDB の Adaptivity</h2>
+
+<p>VDB はジオメトリをボリュームに変換したものです。バラバラのポリゴンを全部まとめて
+1つの塊にしてくれるので、パーツを個別に作ってから統合する、という進め方ができます。
+サンプリングサイズを変えると粗さが変わります。</p>
+
+<img src="img/sidefx-charcreate-02-procedural-modeling-001242.png" alt="Convert VDB のパラメータパネルで Convert To が Polygons、Adaptivity が 0.01 になっている。ネットワークは vdbfrompolygons から vdbsmooth、convertvdb、exoside_quadremesher と続く">
+
+<pre><code>merge46 → color9 → vdbfrompolygons8 → vdbsmooth4 → convertvdb6
+        → exoside_quadremesher15 → attribdelete60 → OUT_BODY_PRERIG</code></pre>
+
+<p><code>Convert VDB</code> の <strong>Adaptivity</strong> がポリゴン数を大きく左右します。
+動画で実演されていた数字はこうでした。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Adaptivity</th><th>結果</th></tr>
+    <tr><td>0</td><td>200〜300万ポリゴン程度。かなり密になります</td></tr>
+    <tr><td>0.1</td><td>45〜47万ポリゴン程度</td></tr>
+  </table>
+</div>
+
+<p class="tx-muted">講師の方は「Houdini にとって300万ポリゴンは大したことない」と言いつつ、
+実際には 0.1 に落として進めていました。ポリゴン数の確認は <code>D</code> キーからガイド表示の
+Draw Time と Geometry を Always On にすると見られます。</p>
+
+<h3>Quad Remesher について</h3>
+
+<p>使われているのは <strong>Exoside QuadRemesher</strong> です。
+<span class="tx-muted">有料プラグインで100ドルほど。講師の方は「その価値は十分ある」と言っていました。</span>
+SideFX 内蔵の Quad Remesh でも同じことができる、とのことです。</p>
+
+<p>ここまでで「VDB でざっくり形を作って、Quad Remesher できれいな四角ポリゴンに張り替える」という
+ZBrush の Dynamesh に近い流れが Houdini 内で完結します。</p>
+
+<h2>4. Houdini の中でスカルプトする</h2>
+
+<p>張り替えたメッシュに対して、Houdini のスカルプトツールで直接形を整えていきます。</p>
+
+<ul>
+  <li><code>P</code> キーで対称（ストロークのミラー）を切り替えます</li>
+  <li>主に Move ブラシと、少しスムースをかける程度で進めていました</li>
+  <li>操作感は ZBrush や Maya のスカルプトとよく似ている、とのことです</li>
+</ul>
+
+<p>数百万ポリゴンを飛び回らせるような ZBrush 的な超高密度スカルプトは
+「まだ試していないので分からない」と正直に話されていました。
+ただ大きな形を作る範囲では十分実用的だそうです。</p>
+
+<p>より作り込みたい場合は <strong>GoZ</strong> で ZBrush に送って戻すこともできます。
+GoZ の書き出しと読み込みはとても良くできていて、Maya で使っていたときより
+Houdini のほうが具合が良い、という話でした。今回のプロジェクトでは Houdini 内で完結させています。</p>
+
+<h2>5. 足を接地させる Detangle と、マスクでのブレンド</h2>
+
+<p>足の裏が床に対して平らになるように接地させています。<code>Detangle</code> を使うのですが、
+ここで面白いのは<strong>その後の処理</strong>です。</p>
+
+<img src="img/sidefx-charcreate-02-procedural-modeling-002154.png" alt="detangle から attribremap、attribblur、blendshapes へ続くネットワークと、curveu を転送された脚が虹色に表示されたビューポート">
+
+<ol>
+  <li><code>Detangle</code> をかけます。これは <code>changed</code> というアトリビュートを出してくれます</li>
+  <li><code>Attribute Remap</code> でその <code>changed</code> を <code>mask</code> に変換します</li>
+  <li><code>Attribute Blur</code> でマスクをぼかします</li>
+  <li><code>Blend Shapes</code> で、元の形と接地させた形をそのマスクで混ぜます</li>
+</ol>
+
+<p><span class="tx-blue">同じことは <code>Flatten</code> でもできますが、結果が完全に平らになってしまいます。</span>
+<code>Detangle</code> 経由でマスクを作ってブレンドすると、もう少し自然な接地になる、というのが
+ここでの狙いです。</p>
+
+<h3>Shrinkwrap と Soft Peak の組み合わせ</h3>
+
+<p>同じ画像の左上に見えている <code>shrinkwrap1</code> → <code>maskfromgeometry1</code> → <code>softpeak1</code> の並びは、
+服と体が当たっているところにマスクを作って、体側をわずかに凹ませる仕掛けです。</p>
+
+<p><code>Mask from Geometry</code> で当たり判定からマスクを作り（半径と強度を調整できます）、
+それを <code>Soft Peak</code> に渡します。ここでも嬉しいのは、
+<strong>パンツを短くして半ズボンにしたとしても、Shrinkwrap が自動で更新され、
+マスクも Soft Peak の効き方もそれに合わせて動く</strong>ことです。</p>
+
+<h2>6. curveu アトリビュートで色のグラデーションを作る</h2>
+
+<p>上の画像のビューポートで脚が虹色になっているのがこれです。
+0 から 1 に変化するアトリビュートを作って、それをランプで色に変換しています。</p>
+
+<ol>
+  <li><code>Line</code> を上向きに置きます</li>
+  <li><code>Resample</code> で十分な解像度にします。このとき <strong>Curve U のアトリビュート</strong>を作らせます</li>
+  <li><code>Match Size</code> で、色を付けたい範囲の長さに合わせます</li>
+  <li><code>Attribute Transfer</code> でそのアトリビュートをキャラクターに転送します</li>
+  <li><code>Color</code> の設定を <code>Constant</code> ではなく <strong>Ramp from Attribute</strong> にして、
+      そのアトリビュートを指定します</li>
+</ol>
+
+<p>これでランプを触るだけで色の変化を自由に作れます。腕・爪・歯など、いろいろな場所で
+同じ仕掛けが使い回されていました。</p>
+
+<h3>グループを別ジオメトリから作る</h3>
+
+<p>爪の色分けでは、リグからカーブを取って <code>Carve</code> で端点だけにし、
+<code>Copy to Points</code> で球を配置してからグループを作っています。</p>
+
+<p>ここで使うのが <code>Group Create</code> の <strong>Keep in Bounding Regions</strong> です。
+ポイントを Bounding Box ではなく <strong>Bounding Object</strong> にして、
+さらに <strong>Points or Vertices Only</strong> を選ぶと、
+<span class="tx-blue">第2入力に挿したジオメトリの形でグループを作ってくれます</span>。
+色の境目がガタつくので、最後に <code>Attribute Blur</code> でならしていました。</p>
+
+<h2>7. アンビエントオクルージョンを色に混ぜる</h2>
+
+<p>陰影を色に焼き込む定番の組み方として紹介されていた手順です。</p>
+
+<ol>
+  <li>Physical Ambient Occlusion をかけます。これは <code>AO mask</code> というアトリビュートを作ります</li>
+  <li><code>Attribute Remap</code> で <code>AO mask</code> を <code>Cd</code> に変換します</li>
+  <li><code>Attribute Combine</code> で元の色と掛け合わせます</li>
+</ol>
+
+<p>掛ける強さを 5 くらいにすると AO がかなり強く乗り、動画では控えめに 0.2 程度で使っていました。
+「いつも同じセットアップを使い回している」とのことです。</p>
+
+<h2>8. UV</h2>
+
+<ol>
+  <li><code>Group Create</code> で Group Type を <strong>Edges</strong> にしてシームを選びます。
+      ダブルクリックと Shift でループ選択ができます</li>
+  <li>グループ名は必ず <code>seams</code> にします。<code>UV Flatten</code> がこの名前を見に行くためです</li>
+  <li><code>UV Flatten</code> で展開します</li>
+  <li><code>UV Layout</code> で配置を整えます</li>
+</ol>
+
+<p class="tx-muted">爪などの細かいパーツでは <code>UV AutoSeam</code> → <code>UV Flatten</code> という
+自動化された組み合わせも使われていました。</p>
+
+<h2>9. Point Deform でスカルプトの差分を伝える</h2>
+
+<p>ここは実務でよく効きそうなところです。
+スカルプトする<strong>前</strong>のジオメトリから爪を生成しているので、
+本体をスカルプトすると<span class="tx-red">爪の位置が合わなくなります</span>。
+実際に動画でマージして見せていて、確かに浮いたりめり込んだりしていました。</p>
+
+<img src="img/sidefx-charcreate-02-procedural-modeling-002750.png" alt="Point Deform のパラメータパネルと、object_merge から merge、pointdeform、smooth、uvautoseam、uvflatten と続くネットワーク">
+
+<p>これを <code>Point Deform</code> で解決します。このノードは入力を3つ取ります。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>入力</th><th>渡すもの</th></tr>
+    <tr><td>1. mesh to deform</td><td>変形させたいジオメトリ（ここでは爪）</td></tr>
+    <tr><td>2. rest point lattice</td><td><strong>スカルプト前</strong>のジオメトリ</td></tr>
+    <tr><td>3. deformed point lattice</td><td><strong>スカルプト後</strong>のジオメトリ</td></tr>
+  </table>
+</div>
+
+<p>2 と 3 の差分を計算して、それを 1 に適用してくれます。
+つまり<strong>本体に加えたスカルプトが、そのまま爪にも伝わります</strong>。
+直後は少しガタつくので <code>Smooth</code> をかけていました。</p>
+
+<p class="tx-muted">パラメータは Mode が <code>Capture and Deform</code>、Capture の Radius が 0.01、
+Minimum Points 1 / Maximum Points 100、Pre-Separate Pieces と Recompute Affected Normals が
+オンになっていました。</p>
+
+<h2>10. 頭を作る</h2>
+
+<p>頭も考え方は同じで、単純なジオメトリをたくさん置いてから VDB でまとめ、スカルプトします。
+ZBrush でこぶを盛っていく感覚に近い進め方です。</p>
+
+<p><span class="tx-blue">ポリゴンのブーリアンではなく VDB でブーリアンする</span>のがポイントとして挙げられていました。
+VDB のほうが素直に結果が出る、とのことです。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>パーツ</th><th>作り方</th></tr>
+    <tr><td>あご・下あご</td><td>球から。少しスカルプト</td></tr>
+    <tr><td>口（笑い口）</td><td>カーブ → <code>Resample</code> → <code>PolyPath</code> → <code>Sweep</code> → <code>VDB from Polygons</code>。カーブを変えれば口の大きさもその場で変わります</td></tr>
+    <tr><td>口の中（空洞）</td><td>口のジオメトリに <code>Peak</code> をかけて VDB にし、<code>VDB Combine</code> の差分で頭から引きます</td></tr>
+    <tr><td>後頭部</td><td>スカルプトと <code>Subdivide</code></td></tr>
+    <tr><td>耳</td><td>球3つ。左右対称なので片方だけ作って <code>Mirror</code></td></tr>
+    <tr><td>額</td><td>ボックスから</td></tr>
+    <tr><td>鼻・小鼻</td><td>カーブから。太さやスケールはカーブに沿って調整</td></tr>
+    <tr><td>目の穴</td><td>目を配置してから <code>VDB Combine</code> の差分でくぼみを作ります</td></tr>
+  </table>
+</div>
+
+<p>口の中を空洞にするのは ZBrush だと面倒だったが、VDB なら
+<code>Peak</code> して引き算するだけで済む、という話が印象的でした。</p>
+
+<p>最後に頭全体を首のジョイントに <code>Copy to Points</code> で乗せ、
+首は <code>Resample</code> → <code>Sweep</code> で作り、VDB で統合してから Quad Remesher にかけます。
+そこからスカルプトとカラーリングに入ります。</p>
+
+<p class="tx-muted">ノードをロックしている箇所がありました。ロックしておかないと、
+上流を触ったときに下流が全部影響を受けてしまうためだそうです。</p>
+
+<h2>11. 歯・歯茎・舌・目</h2>
+
+<h3>歯茎と唇</h3>
+
+<p>頭を <code>Object Merge</code> で読み込み、<strong>Edge Group to Poly Lines</strong> で
+エッジからカーブを取り出しています。エッジを Shift で選択して、そこからカーブを作る流れです。
+そのカーブに <code>Skin</code> をかけると口の内側になります。</p>
+
+<p>唇は <code>Fuse</code> → <code>PolyExtrude</code> → <code>Reverse</code> → <code>Subdivide</code> → <code>Smooth</code>。
+すべて頭のスカルプトから派生しているので、頭を直せば唇も付いてきます。</p>
+
+<h3>歯</h3>
+
+<img src="img/sidefx-charcreate-02-procedural-modeling-004250.png" alt="Teeth と書かれた付箋の下に carve、fuse、polypath、curve_resample_by_density と続くネットワークと、歯茎のカーブが表示されたビューポート">
+
+<ol>
+  <li>片側だけ作って <code>Mirror</code> します</li>
+  <li>上の歯を <code>Carve</code> で取り出し、<code>PolyPath</code> → <code>Fuse</code> → もう一度 <code>PolyPath</code></li>
+  <li><code>curve_resample_by_density</code> という名前のノードで、カーブ上の点の分布を調整します。
+      <span class="tx-muted">点を元のパスに沿って動かせるので、歯の並びを整えるのに使っていました</span></li>
+  <li>歯の形は <code>Linear Taper</code> で先細りにし、<code>Subdivide</code> → <code>Mountain</code>（少しでこぼこさせる）→ <code>Subdivide</code></li>
+  <li>色は前述の curveu + <code>Match Size</code>（Scale to Fit / Uniform Scale）+ ランプの組み合わせ</li>
+</ol>
+
+<p>点の密度を変えれば<strong>歯の本数を好きなだけ増やせます</strong>。下の歯も同じ組み方で、
+スケールなどが少し違うだけでした。</p>
+
+<h3>舌</h3>
+
+<img src="img/sidefx-charcreate-02-procedural-modeling-004517.png" alt="Sweep のパラメータパネルで Surface Shape が Second Input Cross Sections、Apply Scale Along Curve がオンになっている。ビューポートには舌のメッシュ">
+
+<p>舌は <code>Sweep</code> の使い方の良い例になっていました。</p>
+
+<pre><code>line27 → transform80 → resample51 → sweep31 → attribtransfer9 (curveu)
+                                      ↑
+                        curve4 → edit14 → transform_from_centroid
+                                （断面カーブ）
+
+→ subdivide22 → mountain18 → fuse17 → Tounge</code></pre>
+
+<p><code>Sweep</code> の <strong>Surface Shape</strong> を <strong>Second Input Cross Sections</strong> にすると、
+第2入力に挿したカーブがそのまま断面になります。
+丸いチューブ・四角いチューブ・リボンといった既製の断面だけでなく、
+<span class="tx-blue">自分で描いたカーブを断面に使えます</span>。
+ここでは <code>Curve</code> → <code>Edit</code> → <code>Transform</code> で舌の断面を作っていました。</p>
+
+<p>同じパネルの Scale セクションに <strong>Apply Scale Along Curve</strong> と Scale Ramp があります。
+これが冒頭から繰り返し出てくる「スケールをカーブに沿って適用する」の正体です。</p>
+
+<h3>目と、Name ノードによる左右のリネーム</h3>
+
+<img src="img/sidefx-charcreate-02-procedural-modeling-004700.png" alt="Name ノードのパラメータパネルで From に *_L、To に *_R が入っている。ネットワークは copytopoints から mirror、reverse、name と続く">
+
+<p>目は球をたくさん置いて <code>Copy to Points</code> → <code>Transform from Centroid</code> → <code>Mirror</code>
+というシンプルな作りですが、講師の方が「これはぜひ紹介したい」と言っていたのが
+<strong><code>Name</code> ノードによるリネーム</strong>です。</p>
+
+<pre><code>merge23 → copytopoints1 → transform_from_centroid89 → mirror4
+        → transform_from_centroid108 → reverse12 → name3 → merge35 → OUT_BOOLEAN</code></pre>
+
+<p><code>Name</code> ノードの Number of Renames を 1 にして、</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>欄</th><th>値</th></tr>
+    <tr><td>From</td><td><code>*_L</code></td></tr>
+    <tr><td>To</td><td><code>*_R</code></td></tr>
+  </table>
+</div>
+
+<p>と入れます。アスタリスクが元の名前の前半にマッチして、そのまま <code>To</code> 側に引き継がれるので、
+<code>eye_white_L</code> が <code>eye_white_R</code> になります。
+<span class="tx-blue">ミラーしたパーツの名前を一括で付け替えられる</span>ので、
+左右対称のものを作るときに便利そうです。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li><code>Sweep</code> の <strong>Apply Scale Along Curve</strong> で、メッシュを触る前に形を作り込めます</li>
+  <li>爪は指の線から <code>Carve</code> → <code>Sweep</code> → <code>VDB Combine</code> で生成できて、指を変えても追従します</li>
+  <li><code>Convert VDB</code> の <strong>Adaptivity</strong> でポリゴン数を調整します（0 で約300万、0.1 で約47万）</li>
+  <li>VDB でざっくり作って Quad Remesher で張り替える流れが、Houdini 内で完結します</li>
+  <li><code>Point Deform</code> は「スカルプト前」と「スカルプト後」を渡すと、その差分を別パーツに伝えてくれます</li>
+  <li><code>Sweep</code> の <strong>Second Input Cross Sections</strong> で、自作カーブを断面にできます</li>
+  <li><code>Name</code> ノードの From <code>*_L</code> / To <code>*_R</code> で左右のリネームが一発で済みます</li>
+</ul>
+
+<p>次の第3回は Cloth Modeling Workflows で、服のモデリングに入ります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

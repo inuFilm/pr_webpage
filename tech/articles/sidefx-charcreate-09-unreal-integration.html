@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 9 — APEX から Unreal Engine へ書き出す | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第9回・最終回の日本語メモです。Configure Clip Anim による FBX 出力、name からのマテリアル一括割り当て、groom_group_id での毛束の分離について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 9 — APEX から Unreal Engine へ書き出す</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=xN9tNPU1jzc">Character Creation 9 | Unreal Integration</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第9回・最終回 / 講師 Roy Kristoffersen さん / Houdini 21 / 13:28 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/xN9tNPU1jzc"
+          title="Character Creation 9 | Unreal Integration" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>シリーズ最終回です。APEX で作ったリグとアニメーションを Unreal Engine に持っていきます。
+この回もチャプターが付いているので、それに沿ってまとめます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>時間</th><th>チャプター</th></tr>
+    <tr><td>00:00</td><td>Overview（APEX → FBX）</td></tr>
+    <tr><td>02:56</td><td>Assign Materials</td></tr>
+    <tr><td>04:53</td><td>Export Unreal Group（groom の書き出し）</td></tr>
+    <tr><td>07:59</td><td>Final Overview（Unreal 側）</td></tr>
+  </table>
+</div>
+
+<h2>1. APEX から FBX へ</h2>
+
+<p><a href="sidefx-charcreate-07-apex-control-rig.html">第7回</a>で作った
+<code>Scene Animate</code> の結果を <code>Scene Invoke</code> に通します。
+Scene Output Path には Crazy Uncle キャラクターの <code>Base.rig</code> の output と
+<code>Base.skel</code> を指定します。</p>
+
+<p>そこから「APEX Animation to Unreal FBX」の処理に入ります。</p>
+
+<ol>
+  <li>ジオメトリを読み込みます</li>
+  <li><strong>ジオ・スケルトン・アニメーションをそれぞれアンパックします</strong></li>
+  <li><code>Attribute Delete</code> で掃除します。
+      <span class="tx-muted">Unreal に送っても動かない余分なアトリビュートを落とすためで、
+      アニメーションが載っているスケルトン側にも同じ処理をします</span></li>
+</ol>
+
+<h3>Configure Clip Anim は必須</h3>
+
+<p><span class="tx-red">ここを通さないと ROP FBX Animation Output が動きません。</span>
+講師の方も「これが無いと動かない」と明言していました。設定するのは次の項目です。</p>
+
+<ul>
+  <li>clip name</li>
+  <li>sample rate</li>
+  <li>clip range</li>
+  <li>source sample rate</li>
+  <li>source clip range</li>
+</ul>
+
+<h3>最後に三角化する</h3>
+
+<p>アンパックしたジオメトリの末尾に <code>Divide</code>（ネットワーク上の名前は <code>tridivide1</code>）を
+入れています。</p>
+
+<blockquote>Unreal に持っていくとき、<strong>四角ポリゴンで問題が出ることがある</strong>ため、
+最後に必ず三角化してから書き出すようにしている、とのことでした。
+「そうしておけば確実に書き出せるとわかるから」という理由です。</blockquote>
+
+<h2>2. 名前でマテリアルを割り当てる</h2>
+
+<img src="img/sidefx-charcreate-09-unreal-integration-000319.png" alt="Attribute Wrangle にマテリアルパスを組み立てる VEX が書かれている。ビューポートのキャラクターは黄・赤・青の派手な色で塗り分けられている">
+
+<p>ここが上手いと思ったところです。マテリアルを手で1つずつ割り当てるのではなく、
+<strong>プリミティブの <code>name</code> からマテリアルのパスを組み立てています</strong>。</p>
+
+<p><code>Attribute Wrangle</code>（ノード名 <code>Attribwrangle_Assign_Materials_FBX</code>、Run Over は Primitives）の中身です。</p>
+
+<pre><code>s@shop_materialpath = "/stage/Crazy_Uncle/sopnet/create/matnet1/" + "s_" + s@name;
+s@fbx_material_name = "s_" + s@name;</code></pre>
+
+<p>これだけで、<code>name</code> が <code>Head</code> のプリミティブには <code>s_Head</code> マテリアルが、
+<code>Vest</code> には <code>s_Vest</code> が割り当たります。
+matnet の中に vest・head・straw・cap・laces といった名前のマテリアルを用意しておけば、
+<span class="tx-blue">名前を揃えるだけで全部つながります</span>。</p>
+
+<h3>なぜ派手な色なのか</h3>
+
+<p>上の画像のとおり、頭が黄色、腕と胴が赤、ズボンが青という強烈な配色になっています。
+これには理由がありました。</p>
+
+<blockquote>マテリアルが正しく割り当たっているかを<strong>目で確認するため</strong>です。
+Houdini 側と Unreal 側で同じ色が同じ場所に出ていれば、
+割り当てが正しく引き継がれたと確信できます。
+Unreal に持っていったあとで作り直す前提の、確認用の色です。</blockquote>
+
+<p>最後に <code>Bone Deform</code> を足して動作を確認してから、ディスクに保存します。</p>
+
+<h2>3. groom を Unreal 用に書き出す</h2>
+
+<img src="img/sidefx-charcreate-09-unreal-integration-000626.png" alt="Split と Attribute Create が5組並び、それぞれ groom_group_id を作っているネットワーク。Groups for material and Groom seperation in Unreal と Scale and transform to Unreal の付箋が見える">
+
+<p>キャラクター本体とは別に、髪とヒゲを Alembic で書き出します。</p>
+
+<h3>UV を揃える</h3>
+
+<ol>
+  <li>キャラクター全体を読み込み、<code>Split</code> で髪とキャラクターを分けます</li>
+  <li><code>Attribute Delete</code> と <code>Group Delete</code> で掃除します</li>
+  <li>ジオ側は必要なものだけ残します。body・head・shirt・pants の4つです</li>
+  <li><strong>キャラクターの UV を <code>Attribute Promote</code> で vertex から primitive に昇格させます</strong></li>
+  <li>それを <code>Attribute Transfer</code> で groom 側に転送します</li>
+</ol>
+
+<p><span class="tx-blue">キャラクターの UV と groom の UV が一致していると、
+Unreal 側で正しく結び付きます。</span>
+ネットワークにも「Uv transfer」という付箋が貼られていました。</p>
+
+<h3>groom_group_id を作る</h3>
+
+<p>Unreal はいくつかのアトリビュートを期待していて、そのひとつが
+<strong><code>groom_group_id</code></strong> です。</p>
+
+<p><code>Split</code> で毛の束を分け、それぞれに <code>Attribute Create</code> で
+<code>groom_group_id</code> を 0、1、2… と振っていきます。
+ネットワークには<strong>「Groups for material and Groom seperation in Unreal」</strong>
+という付箋が貼られていて、実際には5組の Split と Attribute Create が並んでいました。</p>
+
+<p>これをやっておくと、Unreal 側で<span class="tx-blue">束ごとに別のマテリアルを当てたり、
+本数を個別に減らしたりできます</span>。ゲーム用にプロキシ化するときに効いてきます。</p>
+
+<h3>軸とスケールを合わせる</h3>
+
+<ol>
+  <li><code>Merge</code> でまとめて、もう一度 <code>Attribute Delete</code> で掃除します</li>
+  <li><code>Transform</code> でスケールを合わせます</li>
+  <li>もう一段 <code>Transform</code> で <strong>Y 軸と Z 軸の入れ替えと反転</strong>を行います。
+      付箋には「Scale and transform to Unreal」とありました</li>
+  <li><code>width</code> プロパティを設定します</li>
+  <li>Alembic で書き出します</li>
+</ol>
+
+<p class="tx-muted">この段階の Houdini ビューポートでは、軸を入れ替えたせいで
+とても奇妙な向きになります。ただしこれが Unreal では正しい向きになります。</p>
+
+<h2>4. Unreal 側</h2>
+
+<img src="img/sidefx-charcreate-09-unreal-integration-001020.png" alt="Unreal Engine の Groom Asset エディタ。Strands セクションに Group ID 0、Group ID 1、Group ID 2 が並び、それぞれのストランド数とマテリアルが表示されている">
+
+<h3>キャラクター</h3>
+
+<ol>
+  <li>Unreal で Blueprint を作り、スケルタルメッシュを入れます</li>
+  <li>FBX としてインポートします</li>
+  <li>マテリアルは Houdini で付けた派手な色のまま入ってくるので、Unreal 側で作り直します</li>
+</ol>
+
+<p>スキニングは Houdini とまったく同じ状態で入ります。
+<span class="tx-blue">「何も違わない、完全に同じ」</span>と言われていました。</p>
+
+<h3>Groom Asset</h3>
+
+<p>上の画像が Unreal の Groom Asset エディタです。
+Houdini で振った <code>groom_group_id</code> が、そのまま <strong>Group ID 0 / 1 / 2</strong> として
+分かれて入っているのがわかります。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>グループ</th><th>ストランド数</th><th>ポイント数</th></tr>
+    <tr><td>Group ID 0</td><td>21,472</td><td>472,384</td></tr>
+    <tr><td>Group ID 1</td><td>80</td><td>1,360</td></tr>
+    <tr><td>Group ID 2</td><td>60,136</td><td>1,322,807</td></tr>
+  </table>
+</div>
+
+<p>グループごとに Material、Hair Width、Hair Root Scale、Hair Tip Scale、
+Hair Shadow Density などを個別に設定できます。
+Interpolation のタブでは<strong>カーブの間引き</strong>ができるので、
+本数を減らして軽くすることも可能です。</p>
+
+<p>最後に <strong>Binding</strong> を作って、groom と FBX のキャラクターを結び付けます。</p>
+
+<h3>アニメーションを適用する</h3>
+
+<p>Houdini から書き出したアニメーション（動画では <code>crazy uncle pose 3</code>）をインポートして、
+キャラクターに適用します。ポーズでもアニメーションでも同じ手順です。</p>
+
+<p>ライトを組んで Houdini の見た目に近づけたところで、
+<span class="tx-blue">ヒゲが付いたキャラクターがリアルタイムで動く状態</span>になります。</p>
+
+<h2>シリーズを通しての感想</h2>
+
+<p>最終回の締めくくりで、講師の方はこう言っていました。</p>
+
+<blockquote>Houdini なら、アニメーションに関することを全部 Houdini の中でやったうえで、
+ゲームに持っていくか、リアルタイムでレンダリングするか、
+あるいは最高の品質を求めて Karma でレンダリングするか、
+その全部を選べます。これが Houdini のキャラクター制作を
+これほど多様で心地よいものにしている理由です。</blockquote>
+
+<p>また「話が速く進みすぎた部分もあると思うが、HIP ファイルが SideFX からダウンロードできるので、
+ノードを1つずつ辿ってみてほしい」とも言われていました。
+確かに9本で3時間強という尺なので、実際に触るのが一番だと思います。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li><code>Scene Invoke</code> でジオ・スケルトン・アニメーションをアンパックしてから FBX にします</li>
+  <li><span class="tx-red"><code>Configure Clip Anim</code> を通さないと FBX のアニメーション出力が動きません</span></li>
+  <li>Unreal は四角ポリゴンで問題が出ることがあるので、最後に <code>Divide</code> で三角化します</li>
+  <li>マテリアルは <code>name</code> からパスを組み立てて一括で割り当てられます</li>
+  <li>確認用マテリアルをわざと派手な色にして、割り当てが引き継がれたか目で確かめます</li>
+  <li>groom は UV をキャラクターと揃え、<code>groom_group_id</code> で束を分けておくと Unreal 側で個別に扱えます</li>
+  <li>書き出し前に <code>Transform</code> で Y/Z の入れ替えと反転を行います</li>
+</ul>
+
+<p>これでシリーズは完結です。全10回の一覧は<a href="sidefx-charcreate-00-intro.html">第0回のメモ</a>にあります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -251,3 +251,16 @@ details.tech-cat summary {
   padding: 24px 0 40px;
   font-size: 0.85rem;
 }
+
+/* ===== article-editor 拡張（動画・文字色・見出し4-6） ===== */
+.tech-article h4 { font-size: 1.05rem; margin-top: 20px; color: var(--tech-dark); }
+.tech-article h5 { font-size: 1rem; margin-top: 16px; color: var(--tech-dark); }
+.tech-article h6 { font-size: 0.95rem; margin-top: 16px; color: var(--tech-muted); }
+.tech-article .tx-red { color: #e05252; }
+.tech-article .tx-blue { color: var(--tech-accent); }
+.tech-article .tx-green { color: #3fae6a; }
+.tech-article .tx-muted { color: var(--tech-muted); }
+.tech-article .video-wrap { position: relative; aspect-ratio: 16 / 9; margin: 16px 0; }
+.tech-article .video-wrap iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 6px;
+}

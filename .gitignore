@@ -350,5 +350,10 @@ MigrationBackup/
 .ionide/
 *.md
 tools/article-editor
+tools/video2article
 tools/.DS_Store
 .DS_Store
+
+# video2article の中間生成物（動画・WAV・文字起こし・抽出フレーム）
+# 動画そのものは再配布しないため、ここに置いたまま公開サイトには載せない
+work/

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作コース（SideFX 公式）— 全体の構成とリグファーストの考え方 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character（全10本・3時間06分）の日本語学習メモです。第0回は全体の構成とリグファーストの考え方、および全9回へのリンク。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作コース（SideFX 公式）— 全体の構成とリグファーストの考え方</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a>（SideFX 公式チュートリアル / 講師 Roy Kristoffersen・Qvisten Animation / Houdini 21 / 全10本 3時間06分 / 英語）。
+このページは、上記のコースを見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/v_fVQ9fzNvo"
+          title="Character Creation | Introduction" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>このシリーズについて</h2>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>項目</th><th>内容</th></tr>
+    <tr><td>コース名</td><td>Create a Procedural Character（Character Creation in Houdini）</td></tr>
+    <tr><td>講師</td><td>Roy Kristoffersen さん（Qvisten Animation / ノルウェー）</td></tr>
+    <tr><td>対象バージョン</td><td>Houdini 21</td></tr>
+    <tr><td>難易度</td><td>Intermediate</td></tr>
+    <tr><td>本数 / 総尺</td><td>全10本 / 3時間06分</td></tr>
+    <tr><td>公開</td><td>2026-03-24</td></tr>
+    <tr><td>題材</td><td>「Crazy Uncle」というスタイライズドなキャラクター1体</td></tr>
+  </table>
+</div>
+
+<p>何もない状態から、アニメーションできてレンダリングまで通る production-ready なキャラクターを1体仕上げるまでを、
+モデリング・服・ブレンドシェイプ・グルーム・スキニング・リギング・ルックデブ・Unreal 連携まで通しで扱っています。
+これらの工程が Houdini のプロシージャルな仕組みの中でひとつながりになっているところが、このコースの面白いところだと思います。</p>
+
+<h2>核になる考え方: リグファースト</h2>
+
+<p>シリーズ全体を貫いているのが <strong>Rig First</strong>（リグファースト）という進め方です。
+一般的なキャラクター制作では「モデリング → リグ → スキニング」の順に進めることが多いと思いますが、
+このコースではその順序を入れ替えます。</p>
+
+<ol>
+  <li>まず<strong>プリリグ</strong>（ざっくりしたスケルトン）を作ります</li>
+  <li>そのリグで<strong>プロシージャルモデリングを駆動</strong>します。リグを動かすとモデルの形が追従します</li>
+  <li>同じモデリング用リグを<strong>そのままスキニングと最終リグに再利用</strong>します</li>
+</ol>
+
+<p><span class="tx-blue">ポイントは 2 と 3 が同じリグを共有していることです。</span>
+モデリングのために作った仕組みが最後のアニメーション用リグまで一本でつながるので、
+「モデルを直したのでリグを作り直し」という手戻りが起きにくくなります。</p>
+
+<img src="img/sidefx-charcreate-00-intro-000025.png" alt="左が Rig Doctor でスケルトンを表示したビューポート、右が Feet / Legs / Torso / Arms に区分けされた SOP ネットワーク">
+
+<p class="tx-muted">左のビューポートは <code>Rig Doctor</code> でプリリグを表示したところです。
+右の SOP ネットワークは <code>Feet</code> / <code>Legs</code> / <code>Torso</code> / <code>Arms</code> と
+部位ごとにブロック分けされていて、それぞれが <code>sweep</code> / <code>resample</code> / <code>matchsize</code> /
+<code>transform_from_centroid</code> / <code>mirror</code> といったノードで組まれています。
+このネットワークがプリリグの形に追従してくれます。</p>
+
+<h2>全10回の構成</h2>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>#</th><th>タイトル</th><th>尺</th><th>扱う内容</th></tr>
+    <tr><td>0</td><td>Introduction</td><td>2:03</td><td>コース全体の概要（この記事）</td></tr>
+    <tr><td>1</td><td>PreRig Modelling</td><td>28:47</td><td>プリリグを作って、それでモデルを肉付けする</td></tr>
+    <tr><td>2</td><td>Procedural Modeling Workflows</td><td>48:17</td><td>VDB・Quad Remesh・スカルプトツール。最長の回</td></tr>
+    <tr><td>3</td><td>Cloth Modeling Workflows</td><td>20:55</td><td>服のモデリング</td></tr>
+    <tr><td>4</td><td>Blendshapes</td><td>18:46</td><td>プロシージャルなブレンドシェイプ</td></tr>
+    <tr><td>5</td><td>Hair and Groom Workflow</td><td>14:27</td><td>髪とグルームのセットアップ</td></tr>
+    <tr><td>6</td><td>KineFX Procedural Skinning</td><td>16:55</td><td>ウェイトを塗らずに済ませるスキニング</td></tr>
+    <tr><td>7</td><td>Control Rig Using APEX</td><td>14:26</td><td>APEX でコントロールリグを組む</td></tr>
+    <tr><td>8</td><td>Lighting and Rendering in Karma</td><td>7:46</td><td>Solaris でのルックデブとライティング</td></tr>
+    <tr><td>9</td><td>Unreal Integration</td><td>13:28</td><td>Unreal Engine への書き出しとアニメーション連携</td></tr>
+  </table>
+</div>
+
+<h2>最終的に組み上がるもの</h2>
+
+<img src="img/sidefx-charcreate-00-intro-000112.png" alt="完成した Crazy Uncle にポーズを付けているビューポートと、APEX のネットワーク">
+
+<p>最終形では APEX のネットワークがこのような形になります。
+<code>configurecontrols_Import</code> から始まって、<code>_Eyes</code> / <code>_FK</code> / <code>_IK</code> / <code>_Quirks</code> と
+コントロールの種類ごとにノードが並び、<code>Selection_Sets</code> と <code>configurecharacter1</code> を経て
+<code>OUT_Char_Rig</code> に出ています。そこから <code>sceneaddcharacter</code> → <code>sceneanimate</code> →
+<code>sceneinvoke</code> と流れて、出力が <code>OUT_Char_FBX</code> と <code>OUT_SCENEINVOKE_UNREAL</code> の
+2系統に分かれています。<span class="tx-muted">この2系統が第9回の Unreal 連携につながっていきます。</span></p>
+
+<p>左のビューポートは <code>Animate</code> ステートでポーズを付けているところで、
+<code>Pose Tools</code> のショートカット一覧が表示されている状態です。</p>
+
+<h2>用意しておくもの</h2>
+
+<ul>
+  <li><strong>Houdini 21</strong>。APEX と KineFX を中心に使うので、バージョンの差はけっこう効いてきそうです</li>
+  <li>SideFX のコースページから <strong>HIP ファイル</strong>がダウンロードできます（SideFX アカウントが必要です）</li>
+  <li>第9回だけ <strong>Unreal Engine</strong> が必要になります</li>
+</ul>
+
+<h2>このシリーズの日本語メモ</h2>
+
+<p>全10回ぶんのメモです。上から順に読めるようにしてあります。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>#</th><th>メモ</th><th>主な内容</th></tr>
+    <tr><td>1</td><td><a href="sidefx-charcreate-01-prerig-modelling.html">プリリグを先に作ってモデルを駆動する</a></td><td>点はジョイントである / <code>Rig Doctor</code> / VDB で統合</td></tr>
+    <tr><td>2</td><td><a href="sidefx-charcreate-02-procedural-modeling.html">VDB と Quad Remesher でプロシージャルにモデリングする</a></td><td>指から爪を生やす / <code>Point Deform</code> / <code>Sweep</code> の断面</td></tr>
+    <tr><td>3</td><td><a href="sidefx-charcreate-03-cloth-modeling.html">体から服を切り出してパネルとシワを作る</a></td><td><code>Labs Box Clip</code> / UV シームでパネル分割 / Vellum ブラシ</td></tr>
+    <tr><td>4</td><td><a href="sidefx-charcreate-04-blendshapes.html">片側だけ彫れば済むプロシージャルなブレンドシェイプ</a></td><td>命名規則 / ミラー用 VEX / 顔から作るスライダー</td></tr>
+    <tr><td>5</td><td><a href="sidefx-charcreate-05-hair-groom.html">カーブとマスクでヒゲと髪をグルーミングする</a></td><td><code>Guide Advect</code> / <code>Guide Skin Attribute Lookup</code></td></tr>
+    <tr><td>6</td><td><a href="sidefx-charcreate-06-kinefx-skinning.html">ウェイトを塗らずに済ませる KineFX スキニング</a></td><td><code>Attribute Composite</code> でキャプチャを重ねる</td></tr>
+    <tr><td>7</td><td><a href="sidefx-charcreate-07-apex-control-rig.html">APEX AutoRig Builder でコントロールリグを組む</a></td><td><code>Pack Folder</code> / groom の間引き / Component Catalog</td></tr>
+    <tr><td>8</td><td><a href="sidefx-charcreate-08-karma-lighting.html">Solaris と Karma でライティングしてレンダリングする</a></td><td>MaterialX で <code>Cd</code> を拾う / レイヤー分けレンダリング</td></tr>
+    <tr><td>9</td><td><a href="sidefx-charcreate-09-unreal-integration.html">APEX から Unreal Engine へ書き出す</a></td><td><code>Configure Clip Anim</code> / <code>groom_group_id</code></td></tr>
+  </table>
+</div>
+
+<h3>シリーズを通して繰り返し出てくるもの</h3>
+
+<p>9本を通して見ると、同じ道具が形を変えて何度も出てきます。あとから読み返すときの手がかりとして挙げておきます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>道具</th><th>どこで出てくるか</th></tr>
+    <tr><td><code>Sweep</code> の Apply Scale Along Curve</td><td>脚・腕・指（2回）、ヒゲの房（5回）、舌（2回）</td></tr>
+    <tr><td><code>curveu</code> アトリビュート</td><td>色のグラデーション（2・3回）、房の太さ（5回）、groom の <code>width</code>（7回）</td></tr>
+    <tr><td><code>Point Deform</code></td><td>爪への差分伝達（2回）、Vellum のシワの移し替え（3回）</td></tr>
+    <tr><td>VDB での統合とブーリアン</td><td>パーツの統合（1回）、爪と口の中（2回）、スキニング用プロキシ（6回）</td></tr>
+    <tr><td><code>Attribute Paint</code> → <code>Attribute Blur</code> → <code>Attribute Remap</code></td><td>Vellum のブレンド（3回）、グルームのマスク（5回）、ブレンドシェイプのマスク（4回）</td></tr>
+    <tr><td><code>Shrinkwrap</code> + <code>Remesh</code> のプロキシ</td><td>服の当たり（3回）、ヒゲ・歯・靴のスキニング（6回）</td></tr>
+  </table>
+</div>
+
+<h2>訳語について</h2>
+
+<p>ノード名やパラメータ名は、Houdini の UI 表記に合わせて英語のままにしています
+（<code>Quad Remesh</code>、<code>Attach Skin</code>、<code>KineFX</code>、<code>APEX</code> など）。
+検索したときに公式ドキュメントや動画と突き合わせやすいほうがよいかなと思ってそうしました。</p>
+
+<h2>おことわり</h2>
+
+<blockquote>このページは個人的な学習メモで、SideFX 公式の翻訳でも、SideFX に承認されたものでもありません。
+内容は元動画が優先ですので、食い違いがあればそちらが正しいと思ってください。
+元のコースは無料で公開されていますので、よろしければそちらもあわせてご覧ください。</blockquote>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

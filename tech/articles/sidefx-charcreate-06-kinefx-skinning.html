@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 6 — ウェイトを塗らずに済ませる KineFX スキニング | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第6回の日本語メモです。Attribute Composite でスキニングをレイヤーとして重ねる方法と、プロキシメッシュ経由の転送について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 6 — ウェイトを塗らずに済ませる KineFX スキニング</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=ktYCDc2Dsxg">Character Creation 6 | KineFX Procedural Skinning</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第6回 / 講師 Roy Kristoffersen さん / Houdini 21 / 16:55 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/ktYCDc2Dsxg"
+          title="Character Creation 6 | KineFX Procedural Skinning" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>副題が「hopefully never paint a weight again（もう二度とウェイトを塗らずに済みますように）」です。
+ウェイトペイントの代わりに、<strong>マスクで範囲を区切ったキャプチャを何枚も重ねる</strong>という進め方をします。</p>
+
+<ul>
+  <li><code>Joint Capture Biharmonic</code> / <code>Joint Capture Proximity</code> / <code>Capture Packed Geometry</code> の使い分け</li>
+  <li><code>Attribute Composite</code> でスキニングをレイヤーとして重ねる</li>
+  <li>プロキシメッシュを作ってからスキニングを転送する考え方</li>
+  <li><code>Attribute Transfer</code> による仕上げ</li>
+</ul>
+
+<h2>1. 下ごしらえ</h2>
+
+<ul>
+  <li>組み上がったモデルとスケルトンの両方に <code>Time Shift</code> を入れます。
+      <span class="tx-muted">タイムラインを動かすたびに再計算されるのを防ぐためです</span></li>
+  <li>スケルトン側は <code>Transform</code> と、首のところだけ <code>Edit</code> を入れています</li>
+  <li>使うのは <strong>bind skeleton だけ</strong>です。ジオメトリ側のスケルトンにはスキニングに使わない
+      余分なボーンが含まれているためです</li>
+</ul>
+
+<h2>2. キャプチャの3つの使い分け</h2>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>ノード</th><th>使いどころ</th></tr>
+    <tr><td><code>Capture Packed Geometry</code></td><td>目のように<strong>丸ごと1つのジョイントに固定</strong>したいもの。キャプチャしたいジオメトリとジョイントをつなぐだけです</td></tr>
+    <tr><td><code>Joint Capture Biharmonic</code></td><td>体のように<strong>なめらかに変形</strong>してほしいところ</td></tr>
+    <tr><td><code>Joint Capture Proximity</code></td><td>距離ベース。あごや歯など、<strong>近いジョイントに素直に付けたい</strong>ところ</td></tr>
+  </table>
+</div>
+
+<h3>体の下地</h3>
+
+<ol>
+  <li><code>Blast</code> で体だけを取り出します</li>
+  <li><code>VDB from Polygons</code> → <code>VDB Smooth</code> → <code>Convert VDB</code> でひとつながりのメッシュにします</li>
+  <li><code>Joint Capture Biharmonic</code> をかけます</li>
+</ol>
+
+<p>これが土台になります。ただしこのままだと、頭やあごの境目などがうまくいきません。
+そこから先が本題です。</p>
+
+<h2>3. Attribute Composite でスキニングを重ねる</h2>
+
+<img src="img/sidefx-charcreate-06-kinefx-skinning-000507.png" alt="Attribute Composite のパラメータパネルで Blends が 4、blend0 から blend3 まですべて 1 になっている。BoneCapture composite 2 different captures の付箋が見える">
+
+<p>ネットワークには <strong>「BoneCapture composite 2 different captures」</strong>という付箋が貼ってありました。
+これがこの回の中心の考え方です。</p>
+
+<h3>やっていること</h3>
+
+<ol>
+  <li>効かせたい範囲のジオメトリ（頭・あご・鼻など）を用意します</li>
+  <li><code>Mask Along Geometry</code> と <code>Attribute Blur</code> で<strong>マスク</strong>を作ります</li>
+  <li>そのマスクの範囲だけを、狙ったジョイントにキャプチャします</li>
+  <li><code>Smooth</code> で <code>boneCapture</code> をならします</li>
+  <li><code>Attribute Composite</code> に入れて、土台のキャプチャに重ねます</li>
+</ol>
+
+<h3>Attribute Composite の設定</h3>
+
+<p><span class="tx-red">ここは設定を間違えると効きません。</span>動画でも丁寧に説明されていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>項目</th><th>設定</th></tr>
+    <tr><td>Attributes</td><td>Points の <code>boneCapture</code> を指定します</td></tr>
+    <tr><td>Blends</td><td><strong>入力の数だけ必要</strong>です。上の画像では入力が4つなので Blends = 4</td></tr>
+    <tr><td>blend0〜blend3</td><td><strong>すべて 1 に設定します</strong></td></tr>
+    <tr><td>Alpha Attribute</td><td><code>mask</code> を指定します</td></tr>
+  </table>
+</div>
+
+<p>Alpha Attribute にマスクを指定することで、
+<span class="tx-blue">そのマスクが立っているところだけが、土台のスキニングの上に上書きされます</span>。
+レイヤーとして積み上がっていくイメージです。</p>
+
+<h3>部位ごとの実例</h3>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>部位</th><th>作り方</th></tr>
+    <tr><td>頭</td><td>頭のジオメトリから <code>Mask Along Geometry</code> + <code>Attribute Blur</code>。マスクが立っている範囲を首のジョイントへキャプチャ</td></tr>
+    <tr><td>あご</td><td><code>Sphere</code> → <code>Transform</code> → <code>Sculpt</code> → <code>Subdivide</code> → <code>Sculpt</code> で範囲を作り、<code>Mask Along Geometry</code> → <code>Attribute Blur</code> → <code>Joint Capture Proximity</code> → <code>Smooth</code></td></tr>
+    <tr><td>鼻</td><td><code>Transform</code> + <code>Sculpt</code> で範囲を作り、<code>Mask Along Geometry</code> → <code>Attribute Blur</code> → <code>Joint Capture Biharmonic</code>。鼻はなめらかにしたいので Biharmonic</td></tr>
+  </table>
+</div>
+
+<p>あごの範囲を球とスカルプトで作っているのが面白いところでした。
+<span class="tx-muted">ウェイトを塗る代わりに、「ここからここまで」をジオメトリの形で定義しています。</span>
+これなら形をあとから何度でも調整できます。</p>
+
+<h2>4. プロキシから本体へ転送する</h2>
+
+<p>ここまでの作業は VDB を通したプロキシメッシュの上で行われています。
+最後に <code>Attribute Transfer</code> で <code>boneCapture</code> を実際のジオメトリに移します。</p>
+
+<p>そのあと <code>Smooth</code> をかけ、<code>Clip</code> を通します。
+<span class="tx-muted">Clip を入れているのは、足が靴からはみ出さないようにするためだそうです。</span></p>
+
+<h2>5. 密度が高すぎるもののスキニング</h2>
+
+<p>ヒゲ・髪・歯・靴のように、そのままではキャプチャしにくいものは
+<strong>いったん単純なプロキシを作って、そこでスキニングしてから転送します</strong>。</p>
+
+<pre><code>Shrinkwrap → Remesh → Ray → Remesh → VDB from Polygons → VDB Smooth
+→ Convert VDB → Remesh → Joint Capture Proximity → Attribute Transfer</code></pre>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>対象</th><th>やっていること</th></tr>
+    <tr><td>ヒゲ・帽子</td><td>上のプロキシを作り、先に体でスキニングしたものから転送。さらにそれをヒゲ本体へもう一段転送しています</td></tr>
+    <tr><td>髪</td><td>同じ流れ</td></tr>
+    <tr><td>歯</td><td><code>Shrinkwrap</code> → <code>Remesh</code> → <code>Joint Capture Proximity</code> → 元のジオメトリへ転送</td></tr>
+    <tr><td>ストロー</td><td>元のジオメトリが密すぎて先端がうまく付かないため、<code>Rig Doctor</code> → <code>Resample</code> → <code>Sweep</code> でキャプチャ用の単純なジオメトリを作り、そこでスキニングしてから転送</td></tr>
+    <tr><td>服</td><td><code>Blast</code> で服だけにして、体から <code>Attribute Transfer</code> でスキニングを飛ばすだけ</td></tr>
+  </table>
+</div>
+
+<p>ヒゲの場合は<span class="tx-blue">2段階の転送</span>になっているのがポイントです。
+こうしておくと、あごが開いたときにヒゲが元のメッシュとまったく同じ動きをします。</p>
+
+<h3>靴でつまずいた話</h3>
+
+<img src="img/sidefx-charcreate-06-kinefx-skinning-001357.png" alt="Smooth ノードのパラメータパネルで Attributes が boneCapture、Strength が 15 になっている。ビューポートには編み上げのブーツ">
+
+<p>靴も同じくプロキシ方式なのですが、講師の方が実際につまずいた点が共有されていました。</p>
+
+<blockquote>最初は両方の靴をまとめて <code>Shrinkwrap</code> にかけていたが、
+左右が近すぎて<strong>片方の靴のスキニングがもう片方に漏れてしまった</strong>。
+そのため左右を分けて処理することにした。</blockquote>
+
+<p>分けたあとは、それぞれのプロキシから <code>Attribute Transfer</code> で <code>boneCapture</code> を転送し、
+<code>Merge</code> してから <code>Smooth</code> を弱めにかけています。
+上の画像の <code>Smooth</code> は Attributes が <code>boneCapture</code>、Strength が 15 でした。</p>
+
+<h2>6. スキニングの確認</h2>
+
+<img src="img/sidefx-charcreate-06-kinefx-skinning-001427.png" alt="APEX Configure Controls のパラメータパネルと、Animate ステートでコントロールポイントが表示されたキャラクター">
+
+<p>最後に、スキニングがちゃんと効いているかを確認する仕組みが紹介されていました。</p>
+
+<ol>
+  <li>動画で「pack character node」と呼ばれていた新しいノードで、
+      <strong>シェイプ・スケルトン・リグをまとめて1つのノードに詰めます</strong></li>
+  <li><code>APEX Configure Controls</code> を通します。
+      <span class="tx-muted">スケルトンのスケールを小さくしたい場合などに使いますが、今回は特に変更なしとのことでした</span></li>
+  <li>Scene Animate で、実際にポーズを付けてスキニングを確かめます</li>
+</ol>
+
+<p>上の画像がその状態で、キャラクターの上にコントロールポイントが並んでいます。
+<span class="tx-blue">この場でアニメーションを付けて、破綻がないかその場で確認できます。</span></p>
+
+<p class="tx-muted">確認したい部位を変えたいときは <code>Object Merge</code> の参照先を差し替えるだけ、
+という使い方をしていました。髪などジオメトリが重いところは動作が少し重くなるものの、
+問題なく確認できていました。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li>ウェイトを塗る代わりに、<strong>マスクで区切ったキャプチャを <code>Attribute Composite</code> で重ねます</strong></li>
+  <li><code>Attribute Composite</code> は Blends を入力の数だけ用意し、<strong>すべて 1</strong>、Alpha Attribute に <code>mask</code> を指定します</li>
+  <li>マスクの範囲は球やスカルプトで作れるので、あとから何度でも形を直せます</li>
+  <li>目は <code>Capture Packed Geometry</code>、なめらかにしたいところは <code>Joint Capture Biharmonic</code>、素直に付けたいところは <code>Joint Capture Proximity</code></li>
+  <li>密度が高いものは <code>Shrinkwrap</code> + <code>Remesh</code> でプロキシを作り、そこでスキニングして <code>Attribute Transfer</code> で戻します</li>
+  <li><span class="tx-red">左右のパーツが近いと、プロキシ経由でスキニングが混ざります。</span>分けて処理します</li>
+</ul>
+
+<p>次の第7回は Control Rig Using APEX で、いよいよ APEX でコントロールリグを組みます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

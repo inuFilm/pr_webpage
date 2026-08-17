@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini キャラクター制作 8 — Solaris と Karma でライティングしてレンダリングする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式チュートリアル Create a Procedural Character 第8回の日本語メモです。MaterialX Geometry Color で Cd を拾うシンプルなマテリアル、Material Linker での割り当て、レイヤー分けレンダリングについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini キャラクター制作 8 — Solaris と Karma でライティングしてレンダリングする</h1>
+        <p class="tech-meta">houdini-character / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=d60C3n5XeGo">Character Creation 8 | Lighting and Rendering in Karma</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/character-creation/">Create a Procedural Character</a> の第8回 / 講師 Roy Kristoffersen さん / Houdini 21 / 7:46 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体は<a href="sidefx-charcreate-00-intro.html">第0回</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/d60C3n5XeGo"
+          title="Character Creation 8 | Lighting and Rendering in Karma" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>シリーズで最も短い7分46秒の回です。<a href="sidefx-charcreate-07-apex-control-rig.html">第7回</a>で
+Solaris に渡したキャラクターに、マテリアルとライトを当ててレンダリングします。</p>
+
+<ul>
+  <li>SOP Create で Solaris に取り込む</li>
+  <li>MaterialX のシンプルなマテリアルを組む</li>
+  <li><code>Material Linker</code> でマテリアルを割り当てる</li>
+  <li>Karma のレンダー設定とレイヤー分け</li>
+</ul>
+
+<h2>1. Solaris に取り込む</h2>
+
+<p><code>SOP Create</code> を作ると、SOP の中身が自動的に Solaris に入ります。</p>
+
+<ul>
+  <li>キャラクター用の <code>SOP Create</code>。import path prefix に <code>crazy uncle</code> を設定しています</li>
+  <li>地面用の <code>SOP Create</code>。<span class="tx-muted">こちらは単純なグリッドにアトリビュートをいくつか足して bend をかけただけとのことでした</span></li>
+  <li>これらを <code>Merge</code> します</li>
+</ul>
+
+<p>あとは USD 特有の設定として、プリミティブの配置先パス、カメラ、
+<code>Graft Branches</code> によるジオメトリの取り込みが並びます。</p>
+
+<p class="tx-muted">Geometry Spreadsheet を stage 用に開くと中身が確認できます。
+「Maya で普段やっているのと同じような感覚で選べる」という説明でした。
+SOP Create の中で付けた名前がそのまま出てきます。</p>
+
+<h2>2. ライト</h2>
+
+<img src="img/sidefx-charcreate-08-karma-lighting-000438.png" alt="Material Library のパラメータパネルと、Area_Left / Area_Right / Area_Front / Area_Rim のライトが並ぶネットワーク。レンダービューには完成したショット">
+
+<p>ライトの構成はいたってシンプルでした。<code>/shot/lights/</code> の下に
+エリアライトが並んでいます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>ライト</th><th>役割</th></tr>
+    <tr><td><code>Area_Front</code></td><td>正面から</td></tr>
+    <tr><td><code>Area_Left</code> / <code>Area_Left1</code></td><td>左から</td></tr>
+    <tr><td><code>Area_Right</code></td><td>右から</td></tr>
+    <tr><td><code>Area_Rim</code></td><td>リムライト</td></tr>
+  </table>
+</div>
+
+<p>これらを <code>Graft Branches</code> で <code>/shot</code> にまとめています。
+調整するパラメータも scale・translation・配置と、intensity や exposure といった基本的なものだけでした。
+<span class="tx-blue">キャラクターが立って見えるように、必要な角度から当てているだけ</span>という説明です。</p>
+
+<p>確認は Karma CPU に切り替えてビューポートで行っています。
+ライトを1つずつオン・オフして効果を見せていました。</p>
+
+<h2>3. マテリアル</h2>
+
+<img src="img/sidefx-charcreate-08-karma-lighting-000341.png" alt="mtlxgeomcolor から mtlxcolorcorrect を2つ経由して mtlxstandard_surface につながるマテリアルネットワーク">
+
+<p><code>Material Library</code>（Material Path Prefix は <code>/materials/</code>）の中に、
+プロジェクトで使うマテリアルがすべて入っています。
+body・head・eyes・shirt・pants・vest・cap・shoes・straw・wood・beard_hair など、17個ありました。</p>
+
+<h3>body マテリアルの中身</h3>
+
+<p>驚くほど単純でした。</p>
+
+<pre><code>mtlxgeomcolor1 ┬→ mtlxcolorcorrect3 ┐
+               └→ mtlxcolorcorrect4 ┴→ mtlxstandard_surface → Material</code></pre>
+
+<ol>
+  <li><strong><code>MaterialX Geometry Color</code></strong> でジオメトリの色を拾います。
+      <span class="tx-blue">これまでの回で <code>Cd</code> に焼き込んできた色が、ここでそのまま使われます</span></li>
+  <li><code>MaterialX Color Correct</code> で彩度を落としたりガンマを調整したりします</li>
+  <li>それを <code>MaterialX Standard Surface</code> の base color に入れます</li>
+  <li>もう一系統の Color Correct を subsurface color と subsurface radius に入れます</li>
+  <li>Material Output と AOV に出します</li>
+</ol>
+
+<p>displacement とマテリアルプロパティは今回使っていません。
+<span class="tx-muted">「すべてのマテリアルがこの作り方」とのことでした。</span></p>
+
+<blockquote>ここが第2回・第3回で <code>curveu</code> やアンビエントオクルージョンを
+<code>Cd</code> に焼き込んでいた理由だと思います。
+モデリング段階で色を作り込んでおけば、シェーダー側はそれを拾って
+少し補正するだけで済みます。</blockquote>
+
+<h3>Material Linker で割り当てる</h3>
+
+<p>マテリアルをキャラクターに割り当てるのが <strong><code>Material Linker</code></strong> です。
+使い方は単純で、マテリアルを対象にドラッグして割り当てるだけでした。</p>
+
+<p>動画では、サブサーフェススキャタリングが入っているマテリアルと
+入っていないマテリアルを Karma CPU で比較していて、
+<span class="tx-blue">肌の質感に明確な差が出ていました</span>。</p>
+
+<h2>4. Karma のレンダー設定</h2>
+
+<p><code>Karma Render Settings</code> の内容は、ほぼ標準のままとのことでした。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>項目</th><th>設定</th></tr>
+    <tr><td>解像度</td><td>HD（1920 × 1080）</td></tr>
+    <tr><td>カメラ</td><td><code>/shot/cameras/Render_camera</code></td></tr>
+    <tr><td>サンプリング</td><td>1〜9。特別なことはしていません</td></tr>
+    <tr><td>Limits</td><td><strong>diffuse limit を多めに</strong>して、バウンスを多く出しています</td></tr>
+    <tr><td>フレーム</td><td>110〜111</td></tr>
+  </table>
+</div>
+
+<p>XPU 側もほぼ標準のパラメータでした。
+<span class="tx-muted">ここは凝らずに、モデリングとルックの作り込みで見せる方針のようです。</span></p>
+
+<h2>5. レイヤー分けと SlapComp</h2>
+
+<img src="img/sidefx-charcreate-08-karma-lighting-000701.png" alt="Render Geometry Settings のパラメータパネルで Primitives が /shot/geo/crazyUncle になっている。ネットワークに RenderSettings、Scenes、Layers、SlapComp の付箋が見える">
+
+<p>ネットワークには <strong>RenderSettings / Scenes / Layers / SlapComp</strong> という
+付箋で区画が分けられていました。</p>
+
+<pre><code>Configure Layer → Camera Edit → Prune → Render Geometry Settings → USD Render ROP</code></pre>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>ノード</th><th>役割</th></tr>
+    <tr><td><code>Camera Edit</code></td><td>カメラを所定の位置に置きます</td></tr>
+    <tr><td><code>Prune</code></td><td>レイヤーごとに不要なものを除外します</td></tr>
+    <tr><td><code>Render Geometry Settings</code></td><td>Primitives に対象を指定します。上の画像では <code>/shot/geo/crazyUncle</code></td></tr>
+  </table>
+</div>
+
+<p>これを複数系統用意することで<span class="tx-blue">レイヤーに分けてレンダリング</span>できます。
+動画では「地面の影だけ」「キャラクターだけ」という分け方をしていました。</p>
+
+<p>最後に <code>copnet_SlapComp</code> という COP ネットワークがあり、
+ここでガンマなどの画像調整をかけられるようになっています。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li><code>SOP Create</code> を置くだけで SOP の中身が Solaris に入ります</li>
+  <li>ライトはエリアライトを正面・左右・リムに置いた素直な構成です</li>
+  <li>マテリアルは <code>MaterialX Geometry Color</code> で <code>Cd</code> を拾い、
+      <code>Color Correct</code> を通して <code>Standard Surface</code> に入れるだけの単純な作りです</li>
+  <li><span class="tx-blue">モデリング段階で色を <code>Cd</code> に作り込んであるので、シェーダー側が単純で済みます</span></li>
+  <li>割り当ては <code>Material Linker</code>。サブサーフェスの有無で肌の見え方が変わります</li>
+  <li>Karma の設定はほぼ標準。diffuse limit だけ多めにしています</li>
+  <li><code>Camera Edit</code> → <code>Prune</code> → <code>Render Geometry Settings</code> の組でレイヤー分けレンダリングができます</li>
+</ul>
+
+<p>次はいよいよ最終回、第9回 Unreal Integration です。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
