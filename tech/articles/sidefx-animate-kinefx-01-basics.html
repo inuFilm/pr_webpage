@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 1 — リグをノードとして扱う | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。Apex Add Character と Scene Animate だけで始められる手軽さ、config controls での IK/FK 切替、H22 で統合された選択セットパネル、Animation Catalog について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 1 — リグをノードとして扱う</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=SDyjrpW1ZB8">Animate in KineFX | Part I | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.389 / 2026-07-30 収録 / 1:22:20 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/SDyjrpW1ZB8"
+          title="Animate in KineFX | Part I | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>このシリーズについて</h2>
+
+<p>Houdini 22 のアニメーション周りを扱う、全2回のウェビナーです。
+講師は SideFX の社内スペシャリストである Max Rose さん。APEX と KineFX を長く追ってきた方だそうです。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>回</th><th>内容</th></tr>
+    <tr><td>Part I（この記事の元）</td><td>アニメーションの基礎、ragdoll と constraints、H22 の新ツール（secondary motion / set driven key / animation clip / Motion Mixer）</td></tr>
+    <tr><td>Part II</td><td>モーションキャプチャのリターゲット、Motion Mixer での合成、プロシージャルと手付けの組み合わせ</td></tr>
+  </table>
+</div>
+
+<p>APEX について、冒頭でこう説明されていました。</p>
+
+<blockquote>APEX は<strong>リグを事前コンパイルするフレームワーク</strong>で、これによって動作がとても軽快になります。
+ただ APEX 自体は非常に奥が深く、掘っていくとどこまでも続いてしまう領域です。
+このウェビナーでは APEX の内部構造には深入りせず、<strong>実践的な内容に絞ります</strong>。</blockquote>
+
+<p>この回で扱うのは、黄色いロボットのような「Harry」というキャラクターを動かすところまでです。</p>
+
+<h2>1. リグはノードとして存在する</h2>
+
+<img src="img/sidefx-animate-kinefx-part1-000524.png" alt="Animate ステートに入った Harry。コントロールシェイプが表示され、右に APEX Scene Animate の Layers パネル、下に H22 のアニメーションツール群が並んでいる">
+
+<p>まず驚いたのが、アニメーションを始めるまでの手数の少なさです。</p>
+
+<pre><code>harry_rig_v2 → sceneaddcharacter1 → sceneanimate1</code></pre>
+
+<ol>
+  <li>リグの HDA をネットワークに置きます（画像の <code>harry_rig_v2</code>）</li>
+  <li><code>Apex Add Character</code> を足して名前を付けます（ここでは <code>Harry</code>）</li>
+  <li><code>Scene Animate</code> を足して、ビューポート上で <code>Enter</code> を押します</li>
+</ol>
+
+<p>これだけでアニメーションステートに入ります。
+<span class="tx-blue">リグがノードとして存在するので、ファイルを探しに行く必要がありません。</span>
+Houdini の通常のワークフローの中でそのまま完結します。</p>
+
+<h2>2. 操作環境を整える</h2>
+
+<p>アニメーションを始める前に、<code>P</code> キーでパラメータウィンドウを開いて
+インターフェースを調整しています。ここで有効にしていたのが
+<strong>use click and drag</strong> です。</p>
+
+<p>これを入れると、コントロールをクリックしてそのままドラッグを始められます。
+選択してから動かすという2段階が1段階になるので、素早く作業したい場面で効きます。</p>
+
+<h2>3. config controls で IK / FK を切り替える</h2>
+
+<p>Harry の体のあちこちに<strong>歯車のような形のコントロール</strong>が付いています。
+これが config controls で、アニメーターがリグコンポーネントの設定を変えるためのものです。</p>
+
+<p>ここでいうリグコンポーネントは、腕・脚・足・背骨・頭・首といった単位です。
+それぞれが独立したコンポーネントになっていて、
+<span class="tx-blue">AutoRig Builder で組んだリグには、これらの config controls が自動で付いてきます</span>。
+Harry も AutoRig Builder で組まれているそうです。</p>
+
+<p>使い方は単純で、歯車を選んで IK と表示されているところを FK に切り替えるだけです。
+講師の方は「腕は FK で付けるのが好み」ということで、両腕を FK に変更していました。</p>
+
+<h2>4. 選択セット — H22 でパネルが統合された</h2>
+
+<img src="img/sidefx-animate-kinefx-part1-001102.png" alt="左に Animation Catalog パネル（wave と fly_away のサムネイル）、右に Selection Sets パネル（L-arm_fk、GEARS、Eye_blink、HIDE、Fingers、All Controls などの一覧）">
+
+<p>Maya で AnimBot を使って選択セットを作るのと同じことができます。
+<code>G</code> キーでパネルが開きます。</p>
+
+<blockquote>以前のフローティングパネルを知っている方向けの補足として、
+<strong>H22 ではすべてが単一のパネルに統合されました</strong>。
+Layers・Settings・Bake・Constraint がひとつのウィンドウにまとまっているので、
+どこに何があるか把握しやすくなっています。</blockquote>
+
+<h3>作り方と読み込み</h3>
+
+<ul>
+  <li>コントロールを選んで <strong>Create set from selected</strong> で作ります。動画では <code>L_ARM_FK</code> という名前を付けていました</li>
+  <li>既存のセットは <strong>Apex Sets</strong> から一括で読み込めます（Harry Selection Sets → Replace → Accept）</li>
+</ul>
+
+<p>上の画像の右側が実際の一覧です。用途がわかりやすいので書き出しておきます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>セット名</th><th>コントロール数</th><th>用途</th></tr>
+    <tr><td><code>L-arm_fk</code></td><td>3</td><td>左腕の FK</td></tr>
+    <tr><td><code>GEARS</code></td><td>5</td><td>config controls（歯車）</td></tr>
+    <tr><td><code>Eye_blink</code></td><td>2</td><td>まばたき</td></tr>
+    <tr><td><code>HIDE</code></td><td>7</td><td>リギング用のヘルパートランスフォーム。まとめて隠すため</td></tr>
+    <tr><td><code>Wing_ctrls</code> / <code>WingCtrls</code></td><td>6</td><td>翼</td></tr>
+    <tr><td><code>Fingers</code></td><td>16</td><td>指</td></tr>
+    <tr><td><code>Arms_hands</code></td><td>24</td><td>腕と手</td></tr>
+    <tr><td><code>All Controls</code></td><td>120</td><td>全コントロール</td></tr>
+  </table>
+</div>
+
+<p><code>HIDE</code> のようなセットの作り方が実用的だと思いました。
+リギングのために必要だけれどアニメーション中は邪魔になるコントロールを1つのセットにまとめておいて、
+作業開始時にまとめて隠す、という使い方です。</p>
+
+<h2>5. アニメーションを付ける</h2>
+
+<p>キーの打ち方は他のソフトと変わりません。</p>
+
+<ol>
+  <li><code>Ctrl</code>+<code>A</code> で全コントロールを選択</li>
+  <li><code>K</code> で全部にキーを打つ。チャンネルボックスが緑になります</li>
+</ol>
+
+<p>そこからポーズを作っていきます。講師の方が新しいキャラクターを触るときの習慣として、
+「おや、そこにいたのか」という感じで振り向く動きを最初に作る、という話がありました。
+キャラクターの性格が読み取りやすくなるからだそうです。</p>
+
+<blockquote>Unreal でも Maya でも 3ds Max でも、アニメーションをやってきた人なら違和感なく入れます。
+リグ操作の部分は業界標準的な作りにしてあって、車輪の再発明はしていません。
+<span class="tx-muted">（Blender は独自の流儀があるので少し違うかもしれない、という補足付きでした）</span></blockquote>
+
+<h3>画面下のアニメーションツール群</h3>
+
+<p>上の画像の一番下に並んでいるボタン列が、動画中で「animation sliders」と呼ばれているものです。
+中間のポーズを足したりタイミングを調整したりするのに使います。</p>
+
+<p><code>Tweens</code> / <code>Blend to Neighbor</code> / <code>Blend to Frame</code> / <code>Ease</code> /
+<code>Blend to Ease</code> / <code>Pull Push</code> / <code>Noise Wave</code> /
+<code>Blend to Snapshot</code> / <code>Time Offsetter</code> / <code>Time Offsetter Stagger</code> /
+<code>Reduce Resample</code> / <code>Smooth Rough</code> / <code>Reverse</code></p>
+
+<p>動画ではこれで<strong>ムービングホールド</strong>を作り、頭のタイミングを少し早めて
+オーバーラップを付けていました。ポーズ2つに少し手を入れるだけで、動きらしくなります。</p>
+
+<h2>6. Animation Catalog から既存アニメーションを流し込む</h2>
+
+<p>ウェビナーの尺の都合で、講師の方は事前に作ったアニメーションを流し込んでいました。
+そのための仕組みが <strong>Animation Catalog</strong> です。上の画像の左半分がそれです。</p>
+
+<p>サムネイル付きで一覧でき、選ぶと右側に情報が出ます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>項目</th><th>例（<code>wave</code> アニメーション）</th></tr>
+    <tr><td>Name</td><td><code>wave</code></td></tr>
+    <tr><td>Created / Modified</td><td>22 Aug 2025</td></tr>
+    <tr><td>Contains</td><td><strong>210 controls</strong></td></tr>
+    <tr><td>Duration</td><td><strong>150 frames</strong></td></tr>
+    <tr><td>Source</td><td>1 – 150（流し込む範囲）</td></tr>
+    <tr><td>Mode</td><td><code>Replace</code></td></tr>
+    <tr><td>Add to New Layer</td><td>チェックボックス</td></tr>
+  </table>
+</div>
+
+<p>使い方は <strong>Select Controls</strong> でコントロールを選び、<strong>Apply</strong> を押すだけです。
+動画では <code>wave</code>（手を振る）と <code>fly_away</code>（飛び去る）の2つが登録されていて、
+これを繋げて1本のアニメーションにしていました。</p>
+
+<p class="tx-muted">タイムライン上で次のキーフレームに飛ぶには
+<code>Shift</code>+<code>←</code> / <code>Shift</code>+<code>→</code> が使えます。
+2つ目のアニメーションを繋げる位置を探すのに使っていました。</p>
+
+<h2>7. HDA にリグを詰めておく</h2>
+
+<img src="img/sidefx-animate-kinefx-part1-001322.png" alt="翼が付いた Harry と、赤くて丸い形にしてある Scene Animate ノードが2つ並んだネットワーク">
+
+<p>Harry のリグは HDA になっていて、中身は思ったより単純でした。</p>
+
+<ul>
+  <li>複数のリグを読み込む</li>
+  <li>マテリアルを割り当てる</li>
+  <li>両方を <code>Switch</code> ノードに通して出力する</li>
+</ul>
+
+<p>トップレベルにトグルを1つ出してあり、それを切り替えると
+<span class="tx-blue">リグそのものが差し替わります</span>。
+上の画像では翼が付いたバージョンに切り替わっています。</p>
+
+<h3>アニメーションデータは1ノードに乗る</h3>
+
+<p>ここが Houdini らしいところでした。
+<strong>アニメーションのデータはすべて <code>Scene Animate</code> ノード1つに乗っています。</strong>
+つまりノードごとコピーすれば、アニメーションの別バージョンがそのまま手に入ります。</p>
+
+<p>動画では「監督が翼をやめてほしいと言った」という想定で、
+ノードをコピーして3つ目のバージョンを作り、そこから作業を続けていました。
+<span class="tx-blue">ファイルを別名保存してイテレーションを増やす必要がありません。</span></p>
+
+<h3>赤い丸ノードにしておく</h3>
+
+<p>細かい話ですが、真似したくなった工夫です。
+講師の方は <code>Scene Animate</code> ノードを<strong>赤くして丸い形に変える</strong>そうです。</p>
+
+<blockquote>ネットワークビューにノードがたくさんあるとき、ズームアウトしても
+アニメーションのノードがどこにあるかすぐわかるようにするためです。</blockquote>
+
+<p>上の画像でも、2つの <code>sceneanimate</code> が赤い丸になっています。</p>
+
+<h3>発想としての使い方</h3>
+
+<p>HDA なので、もっと広い使い方もできると話されていました。
+マテリアルを変える、キャラクターを変える、あるいは
+<strong>キャラクターパイプライン全体をひとつのマスター HDA に入れておいて、
+トグルでキャラクターを選び、順に取り出してシーンに並べる</strong>——といった具合です。</p>
+
+<h2>8. 抽象コントロールにスライダーが付いた</h2>
+
+<p>HDA の中には抽象的なコントロール（体の一部ではない、値を操作するためのコントロール）があります。
+<span class="tx-blue">H22 ではこれにスライダーが付きました。</span></p>
+
+<p>以前はスライダーが無く、float 値が今どこにあるのか見えませんでした。
+GUI が付いたことで、リグ内の float 値に繋いでそのままアニメーションできます。</p>
+
+<h2>この回のまとめ</h2>
+
+<ul>
+  <li>リグはノードとして置けるので、<code>Apex Add Character</code> → <code>Scene Animate</code> → <code>Enter</code> だけでアニメーションを始められます</li>
+  <li><code>P</code> キーの <strong>use click and drag</strong> で、クリックからそのままドラッグできます</li>
+  <li>歯車型の <strong>config controls</strong> で IK / FK を切り替えます。AutoRig Builder で組めば自動で付いてきます</li>
+  <li><code>G</code> キーの選択セットパネルは <strong>H22 で単一パネルに統合</strong>されました</li>
+  <li><code>HIDE</code> のようなセットを作って、作業の邪魔になるコントロールをまとめて隠せます</li>
+  <li><strong>Animation Catalog</strong> から既存アニメーションをコントロール単位で流し込めます</li>
+  <li>アニメーションデータは <code>Scene Animate</code> 1ノードに乗るので、<strong>ノードのコピーがバージョン管理になります</strong></li>
+</ul>
+
+<p>次は Ragdoll と Shot Sculpt で、キャラクターに乱暴な退場をしてもらいます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

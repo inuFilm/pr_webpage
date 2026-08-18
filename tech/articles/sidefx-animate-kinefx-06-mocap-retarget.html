@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 6 — モーキャプを自作キャラにリターゲットする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part II の日本語メモです。Biped Setup のマッピングテンプレート、青いジョイントだけ押せば済む手動マッピング、キャラクター系ノード共通の3入力3出力の規則について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 6 — モーキャプを自作キャラにリターゲットする</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=TIi2KAlkT_M">Animate in KineFX | Part II | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.394 / 1:01:45 / 英語）の 00:00〜19:00 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+Part I は<a href="sidefx-animate-kinefx-01-basics.html">第1回</a>から始まります。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/TIi2KAlkT_M"
+          title="Animate in KineFX | Part II | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>Part II について</h2>
+
+<p>Part I ではアニメーションの基礎とセカンダリモーションを扱いました。
+Part II のテーマは<strong>「レベルアップ」</strong>で、モーションキャプチャのワークフローと、
+もう少し踏み込んだ手法を扱います。</p>
+
+<p>題材は <strong>Electra</strong> という赤いロボット風の女性キャラクターです。</p>
+
+<h2>1. 今回の主役は3つのノード</h2>
+
+<p>Houdini 22 で新しくなった biped 系のノードが3つ紹介されました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>ノード</th><th>役割</th></tr>
+    <tr><td><code>Biped Setup</code></td><td>骨格を biped の標準形にマッピングする</td></tr>
+    <tr><td><code>Biped Retarget</code></td><td>マッピングした骨格同士でアニメーションを移す</td></tr>
+    <tr><td><code>Apex Animation from Skeleton</code></td><td>骨格のアニメーションをリグのコントロールに乗せる</td></tr>
+  </table>
+</div>
+
+<h2>2. 手っ取り早い方法 — Apex Retarget to Rig</h2>
+
+<img src="img/sidefx-animate-kinefx-part2-000223.png" alt="Electra のキャラクターと、APEX Unpack Character から biped_setup_target、biped_setup_s（Mixamo）、biped_retarget、SKIN_PREVIEW へ続くネットワーク">
+
+<p>結論から言うと、<strong><code>Apex Retarget to Rig</code></strong> を置くだけで必要なものが一式そろいます。</p>
+
+<blockquote>これは<strong>レシピ</strong>です。レシピとは、<strong>ノードのまとまりを保存しておいて、
+いつでも呼び出せるようにしたもの</strong>です。各ノードのパラメータも設定できます。</blockquote>
+
+<p>中身は上の画像のようになっています。</p>
+
+<pre><code>APEX_SCENE (Apex Unpack Character) ┐
+                                   ├→ biped_setup_target ┐
+fbx_animation (FBX Animation Import)                     ├→ biped_retarget → SKIN_PREVIEW
+                                   └→ biped_setup_s (Mixamo) ┘</code></pre>
+
+<p><code>Apex Unpack Character</code> のパラメータを見ると、
+Character Name が <code>electra</code>、Shape Path が <code>/Base.shp</code>、
+Skeleton Path が <code>/Base.skel</code>、Rig Path が <code>/Base.rig</code> になっています。
+<a href="sidefx-animate-kinefx-05-props-and-quick-rig.html">前回</a>の <code>Pack Folder</code> と同じ命名です。</p>
+
+<h3>SKIN_PREVIEW についての注意書き</h3>
+
+<p>ネットワークに貼られていた付箋に、こう書かれていました。</p>
+
+<blockquote><code>SKIN_PREVIEW</code> のスキン変形は<strong>あくまで簡易プレビュー用</strong>で、
+最終的なスキン変形とは異なる場合があります。</blockquote>
+
+<p>ここで見えている変形をそのまま最終品質だと思わないほうがよさそうです。</p>
+
+<h3>Apex Animation from Skeleton が何をしているか</h3>
+
+<p>このノードは焼くのに少し時間がかかります。何をしているかというと、</p>
+
+<blockquote>モーションクリップのデータを全部<strong>チャンネルプリミティブに変換</strong>しています。
+これが APEX の求める形式で、<span class="tx-blue">すべてを APEX が読める形に変えている</span>わけです。</blockquote>
+
+<p>変換が終わると、リグのコントロールにアニメーションが乗った状態になります。
+あとは <code>Scene Animate</code> を置いて入れば、
+<span class="tx-blue">全コントロールにキーが打たれた状態からアニメーション作業を始められます。</span></p>
+
+<h2>3. 手動で組んでみる</h2>
+
+<p>「中で何が起きているか見せたい」ということで、同じことを手で組む手順も示されました。
+自作キャラクターで独自の biped setup を作りたい場合の流れです。</p>
+
+<ol>
+  <li><code>Apex Scene Add Character</code> でシーンに追加し、<code>Electra</code> と名付けます</li>
+  <li><strong><code>Unpack Apex Character</code></strong> でアンパックして骨格を取り出します。キャラクター名の指定を忘れずに</li>
+  <li>取り出した骨格を <strong><code>Biped Setup</code></strong> に繋ぎます</li>
+</ol>
+
+<p>繋いだ瞬間、ノードに <code>SideFX</code> という表示が出ます。
+<strong>マッピングが自動で設定された</strong>という意味です。</p>
+
+<h3>マッピングテンプレート</h3>
+
+<img src="img/sidefx-animate-kinefx-part2-000538.png" alt="Biped Setup の Mapping ドロップダウンが開き、Auto / Custom / File / SideFX / Mixamo / Unreal Mannequin / Rokoko / HumanIK / CMU が並んでいる。ビューポートには2体の骨格と Generated T-Pose の表示">
+
+<p>ドロップダウンには次のテンプレートが用意されていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>テンプレート</th><th>備考</th></tr>
+    <tr><td><code>Auto</code></td><td>自動判別</td></tr>
+    <tr><td><code>Custom</code></td><td>自分でマッピングする</td></tr>
+    <tr><td><code>File</code></td><td>保存したマッピングファイルを読み込む</td></tr>
+    <tr><td><code>SideFX</code> / <code>Mixamo</code> / <code>Unreal Mannequin</code> / <code>Rokoko</code> / <code>HumanIK</code> / <code>CMU</code></td><td>既製のテンプレート</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">独自のキャラクター体系がある場合は、マッピングを作ってファイルに保存し、
+あとから読み込んで使い回せます。</span></p>
+
+<h3>Custom で手動マッピングする</h3>
+
+<img src="img/sidefx-animate-kinefx-part2-000622.png" alt="Biped Setup のマッピングステート。2体の骨格が並び、マップ済みのジョイントが色付きの線で結ばれている">
+
+<p><code>Custom</code> に切り替えると何も設定されていないのでエラーになります。
+ノードを選んで <code>Enter</code> を押し、ステートに入ります。</p>
+
+<p>ビューポートに<strong>骨格が2体</strong>出てきます。片方が Electra の骨格、
+もう片方がマッピング先となる biped の標準骨格です。あとはジョイントをクリックしていくだけです。</p>
+
+<blockquote><span class="tx-blue">青いジョイントをマッピングするだけで、赤いジョイントは自動で設定されます。</span>
+このノードは本当に賢くて、かなりのことを自動でやってくれます。</blockquote>
+
+<p>注意点として、Electra には<strong>ツイストジョイント</strong>があるので、
+腕は<strong>ツイストではなく lower arm のジョイント</strong>を選ぶ必要があります。</p>
+
+<p>ある程度クリックしていくと、<strong>ノードのほうが「もう十分」と判断します</strong>。
+残っていた首と頭を足せば完了です。
+<span class="tx-muted">画面のパラメータ欄には <code>R_upperarm</code> や <code>R_hand</code> といった
+実際のジョイント名が入っていきます。</span></p>
+
+<h2>4. モーキャプ側を繋ぐ</h2>
+
+<ol>
+  <li><code>FBX Animation Import</code> でモーキャプを読み込みます</li>
+  <li>もう1つ <code>Biped Setup</code> を置いて繋ぎます</li>
+  <li><span class="tx-blue">Mixamo のリグだと自動判別され、設定が丸ごと自動で入ります</span></li>
+  <li>両方の <code>Biped Setup</code> が <strong>T-Pose を生成</strong>します（画面に「Generated T-Pose」と出ます）</li>
+  <li>2つを <code>Biped Retarget</code> に繋げば、Electra の骨格にモーションが移ります</li>
+</ol>
+
+<h2>5. 覚えておくと迷わない規則 — 3入力3出力</h2>
+
+<p>これは知っておくと効く話でした。</p>
+
+<blockquote>Houdini でキャラクターに関わるノードは、<strong>すべて入力3つ・出力3つ</strong>です。
+順番はこうです。</blockquote>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>順番</th><th>内容</th></tr>
+    <tr><td>1</td><td>skinning geometry（スキニング用ジオメトリ）</td></tr>
+    <tr><td>2</td><td>rest skeleton（レスト骨格）</td></tr>
+    <tr><td>3</td><td>animated skeleton（アニメーション済み骨格）</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">この順番どおりに繋げば、だいたい動きます。</span></p>
+
+<p class="tx-muted">例外は <code>Unpack Character</code> で、1つ目の出力だけは APEX リグそのものになります。
+それ以外は上のパターンに従います。</p>
+
+<h3>すぐ結果を見たいとき</h3>
+
+<p><code>Apex Animation from Skeleton</code> は焼くのに数秒かかります。
+<strong>結果をすぐ確認したいだけなら <code>Bone Deform</code> に繋ぐ</strong>のが早い、と紹介されていました。</p>
+
+<h2>6. レストポーズを直す</h2>
+
+<p>リターゲットした結果を見て「頭が下を向いていて、なんだか申し訳なさそうに見える」ということで、
+初期ポーズを調整していました。</p>
+
+<blockquote>いまはまだ KineFX の領域です。<strong>アニメーションするために必ず APEX に行く必要はありません。</strong>
+KineFX の中でできることもたくさんあります。</blockquote>
+
+<p><code>Biped Setup</code> のノードステートに入ると、レストポーズを直接編集できます。
+これがほぼ<strong>全身 FK のような操作感</strong>で、いじると変換が全部追従して更新されます。</p>
+
+<p>気に入らなければ <code>Match Pose</code> で全部クリアしてやり直せます。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>新しい biped ノードは <code>Biped Setup</code> / <code>Biped Retarget</code> / <code>Apex Animation from Skeleton</code> の3つ</li>
+  <li>手っ取り早く済ませたいなら<strong>レシピの <code>Apex Retarget to Rig</code></strong> を置くだけです</li>
+  <li>マッピングテンプレートは <strong>SideFX / Mixamo / Unreal Mannequin / Rokoko / HumanIK / CMU</strong> が既製で、自作もファイル保存できます</li>
+  <li>手動マッピングは<strong>青いジョイントを押すだけ</strong>。赤いジョイントは自動で決まります</li>
+  <li>腕は<span class="tx-red">ツイストジョイントではなく lower arm</span>を選びます</li>
+  <li>キャラクター系ノードは<strong>3入力3出力（skinning geometry / rest skeleton / animated skeleton）</strong>で統一されています</li>
+  <li>すぐ確認したいときは <code>Bone Deform</code>、<code>SKIN_PREVIEW</code> の変形は<strong>最終品質ではありません</strong></li>
+</ul>
+
+<p>次はリターゲットしたモーションを Motion Mixer で複数組み合わせます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 5 — 小物を Prop として足す／3点の線から IK リグを作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part I の Q&amp;A から。Apex Scene Add Prop での小物の追加と child→parent の拘束、Line から Rig Doctor と AutoRig Component だけで IK リグを組む最短手順について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 5 — 小物を Prop として足す／3点の線から IK リグを作る</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=SDyjrpW1ZB8">Animate in KineFX | Part I | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.389 / 1:22:20 / 英語）の Q&amp;A 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-animate-kinefx-04-secondary-motion-mixer.html">Secondary Motion と Motion Mixer</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/SDyjrpW1ZB8?start=3166"
+          title="Animate in KineFX | Part I | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>本編のあと30分以上にわたって質疑応答が続き、その場で実演された内容がいくつかありました。
+そのうち<strong>まとまった手順として使える2つ</strong>を取り上げます。</p>
+
+<ol>
+  <li>キャラクターの一部ではない小物（靴など）を <strong>Prop として足して、体に追従させる</strong></li>
+  <li><strong>3点の線から IK リグを作る</strong>最短手順</li>
+</ol>
+
+<h2>1. 小物を Prop として足す</h2>
+
+<p>「ハイヒールをキャラクターの一部としてモデリングするのではなく、
+小物としてシーンに置いて、その上にキャラクターを立たせたい」という質問への回答です。</p>
+
+<h3>Prop を作って追加する</h3>
+
+<img src="img/sidefx-animate-kinefx-part1-005414.png" alt="Harry の足が灰色のくさび形の小物の上に乗っている。ネットワークには box1、edit1、name1 から sceneaddprop1、sceneanimate5 と続く流れが見える">
+
+<p>小物自体は普通のジオメトリで構いません。動画では
+<code>Box</code> → <code>Edit</code> → <code>Name</code> という最小構成で、くさび形のものを作っていました。
+<span class="tx-muted">「これを靴だと思ってください」という説明つきです。</span></p>
+
+<p>それを <strong><code>Apex Scene Add Prop</code></strong> に渡します。入力は2つです。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>入力</th><th>渡すもの</th></tr>
+    <tr><td>1</td><td>キャラクターのシーン（シーン全体）</td></tr>
+    <tr><td>2</td><td>作った Prop のジオメトリ</td></tr>
+  </table>
+</div>
+
+<p>Prop には <code>Static</code> / <code>Animated</code> / <code>Deforming</code> の指定があり、
+どう扱うかを決められます。そのあとに <code>Scene Animate</code> を繋げば、
+シーンの中に Prop が入った状態でアニメーションステートに入れます。</p>
+
+<h3>足に追従させる — 順番に注意</h3>
+
+<p>置いただけでは、Prop はただ置いてあるだけです。
+<strong>この Prop で足の IK を動かしたい</strong>ので、ステートの中で拘束を作ります。</p>
+
+<blockquote>順番をいつも忘れるのですが、<strong>child、parent の順</strong>だったと思います。
+そう選んでから <code>H</code> を押します。</blockquote>
+
+<p>つまり<span class="tx-blue">動かされる側（足の IK）を先に、動かす側（Prop）を後に選んで <code>H</code></span> です。
+これでハイヒールを履いたような姿勢が、その場で作れます。</p>
+
+<p class="tx-muted">講師の方も「ちょっと台本から外れますが、うまくいくか試してみます」と言いながらの実演でした。
+アニメーションステートの中で簡単なリギングができてしまう、という例になっています。</p>
+
+<h3>おまけ — キャラクターのジオメトリを後から差し替える</h3>
+
+<p>質問者の本題は「キャラクター側のジオメトリも一緒に変わってほしい」というものでした。
+その答えが Houdini らしくて面白かったので書き残します。</p>
+
+<ol>
+  <li><strong><code>Unpack Character</code></strong> でキャラクターをアンパックします</li>
+  <li>中のジオメトリを自由に編集します
+      <span class="tx-muted">（動画では Harry に歯を生やして怒った顔にしていました。symmetrical をオンにして）</span></li>
+  <li><strong>もう一度パックし直します</strong></li>
+  <li>元の場所に繋ぎ直します</li>
+</ol>
+
+<p>これだけで、新しいジオメトリがそのままリグに乗った状態になります。</p>
+
+<blockquote>これがプロシージャルということの意味です。
+<strong>どこでも、いつでも、何でも変更できて、それでもちゃんと動くものが出てきます。</strong></blockquote>
+
+<h2>2. 3点の線から IK リグを作る</h2>
+
+<p>最後の質問は「APEX で、1本の線から動く IK リグを作る一番手っ取り早い方法は？」でした。
+これに対する回答が非常にコンパクトだったので、そのまま手順としてまとめます。</p>
+
+<img src="img/sidefx-animate-kinefx-part1-012105.png" alt="3点の線でできた簡素なリグと、APEX AutoRig Component の Component Source が FK Transform になっているパネル。ネットワークは rigdoctor1、attribadjusttags1、packfolder1、autorigcomponent1 と続く">
+
+<p>まず前提として、こう説明されていました。</p>
+
+<blockquote>KineFX ではすべてがポイントです。Houdini ではすべてがポイントです。</blockquote>
+
+<h3>手順</h3>
+
+<pre><code>line → rigdoctor1 → attribadjusttags1 → packfolder1 → autorigcomponent1 (FK Transform)
+                                                     → autorigcomponent2 (Multi IK)</code></pre>
+
+<ol>
+  <li><code>Line</code> を置いて<strong>ポイントを3つ</strong>にします</li>
+  <li><strong><code>Rig Doctor</code></strong> で <strong>Initialize Transforms</strong> を有効にします。
+      <span class="tx-blue">これでポイントがジョイントになります</span></li>
+  <li><strong><code>Attribute Adjust Tags</code></strong> でタグを付けます。
+      Number of Entries を設定し、値を <code>arm</code> にします</li>
+  <li><strong><code>Pack Folder</code></strong> で APEX が理解できる形式にします。
+      <span class="tx-muted">画面のパネルでは Guide Skeleton が <code>Base.skel</code> になっています</span></li>
+  <li><strong><code>AutoRig Component</code></strong> を足し、Component Source を
+      <strong><code>FK Transform</code></strong> にします。これでリグが初期化され、素朴な FK リグができます</li>
+  <li>もう1つ <code>AutoRig Component</code> を足し、今度は <strong><code>Multi IK</code></strong> を選びます</li>
+  <li>その <code>Driven</code> に、手順3で付けたタグ <strong><code>arm</code></strong> を入れます</li>
+</ol>
+
+<p><span class="tx-blue">これで IK が動くようになります。</span>
+<code>Multi IK</code> はタグを見て対象を探すので、
+<strong>手順3のタグ付けと手順7の指定が一致していることが肝</strong>です。</p>
+
+<p class="tx-muted">上の画像のパネルでは、Rig が <code>Base.rig</code>、Guide Skeleton が <code>Base.skel</code>、
+Shape が <code>Base.shp</code> になっています。
+<a href="sidefx-charcreate-07-apex-control-rig.html">別シリーズの APEX の回</a>で出てきた
+<code>Pack Folder</code> の命名規則と同じものです。</p>
+
+<h2>おわりに</h2>
+
+<p>ウェビナーの締めくくりで、司会の方がこう言っていました。</p>
+
+<blockquote>リギングのウェビナーをやってほしいという要望がとても多いので、
+このシリーズはパート3、4、5 とやることになりそうです。</blockquote>
+
+<p>アセットは SideFX の Content Library から入手できるとのことでした。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>小物は <code>Apex Scene Add Prop</code> に「キャラクターのシーン」と「小物のジオメトリ」を渡して追加します</li>
+  <li>追従させるには、アニメーションステートで <strong>child → parent の順に選んで <code>H</code></strong></li>
+  <li><code>Unpack Character</code> でジオメトリを編集し、パックし直せば、リグを組み直さずに見た目を差し替えられます</li>
+  <li>最短の IK リグは <strong><code>Line</code>（3点）→ <code>Rig Doctor</code> → <code>Attribute Adjust Tags</code> → <code>Pack Folder</code> → <code>AutoRig Component</code></strong></li>
+  <li><code>Rig Doctor</code> の <strong>Initialize Transforms</strong> がポイントをジョイントに変えます</li>
+  <li><code>Multi IK</code> は<strong>タグで対象を探します</strong>。タグ名（<code>arm</code>）を一致させます</li>
+</ul>
+
+<p>Part I はここまでです。次からは Part II のモーションキャプチャ編に入ります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 8 — Path Deform で蛇に木を登らせる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part II 最終回の日本語メモです。Bezier Curve のスナップ、Path Deform で骨格をカーブに乗せる方法、Animation from Skeleton でプロシージャルな動きをレイヤーとして扱う考え方について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 8 — Path Deform で蛇に木を登らせる</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=TIi2KAlkT_M">Animate in KineFX | Part II | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.394 / 1:01:45 / 英語）の 42:23〜終わりまで。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-animate-kinefx-07-motion-mixer-export.html">Motion Mixer でモーキャプを合成して書き出す</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/TIi2KAlkT_M?start=2543"
+          title="Animate in KineFX | Part II | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>シリーズの締めくくりです。<strong>プロシージャルな動きと手付けのアニメーションを組み合わせる</strong>という、
+Houdini ならではの解き方が示されます。</p>
+
+<p>お題はこうです。</p>
+
+<blockquote>蛇に木を登らせたい。ただ登るだけでなく、<strong>幹に何度も巻き付きながら</strong>登り、
+最後は枝の先でリンゴを食べようとしているところで終わってほしい。</blockquote>
+
+<p class="tx-muted">使う蛇のリグについて、講師の方は
+「この点を示すために急いで作ったもので、正直かなり雑です」と前置きしていました。</p>
+
+<h2>1. パスを作る</h2>
+
+<img src="img/sidefx-animate-kinefx-part2-004501.png" alt="曲がりくねった木と赤いリンゴが表示されたビューポート。ネットワークには Snake_Rig、sceneaddcharacter2、unpackcharacter2 と、curve_forsnake_01.bgeo を読む file1 が並んでいる">
+
+<p>蛇が通る道を用意します。</p>
+
+<ol>
+  <li><code>Bezier Curve</code> を置きます</li>
+  <li><code>Enter</code> でステートに入り、<strong><code>X</code> を押します</strong></li>
+  <li>これで<span class="tx-blue">木のポイントにスナップしながら</span>カーブを引けます</li>
+</ol>
+
+<p>幹に巻き付く軌道を、木そのものの形に沿って描けるわけです。</p>
+
+<p class="tx-muted">動画では「料理番組と同じで、あらかじめ作っておいたものがあります」ということで、
+<code>curve_forsnake_01.bgeo</code> を <code>File</code> ノードで読み込んでいました。</p>
+
+<h2>2. 蛇の骨格を取り出す</h2>
+
+<ol>
+  <li><code>Apex Scene Add Character</code> でシーンに追加し、<code>snake</code> と名付けます</li>
+  <li><code>Unpack Character</code> で骨格を取り出します</li>
+</ol>
+
+<p class="tx-muted">ここで講師の方は、シーンへの追加を飛ばしてしまって
+「注意深く見ていた方は気づいたと思いますが、また間違えました。蛇をシーンに追加していませんでした」
+と戻る場面がありました。<code>Unpack Character</code> の前に
+<code>Scene Add Character</code> が要る、という順番の確認になります。</p>
+
+<h2>3. Path Deform で骨格をカーブに乗せる</h2>
+
+<p>ここが仕掛けの中心です。使うのは <strong><code>Path Deform</code></strong> という、
+アニメーション専用ではない普通の SOP です。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>入力</th><th>渡すもの</th></tr>
+    <tr><td>1</td><td>蛇の骨格</td></tr>
+    <tr><td>2</td><td>作ったカーブ</td></tr>
+  </table>
+</div>
+
+<p>これだけで蛇の骨格がカーブに沿って曲がります。あとは進む量にキーを打つだけです。</p>
+
+<ul>
+  <li>フレーム 0 でキー</li>
+  <li>フレーム 100 あたりでキーを打ち、カーブに沿って進ませます</li>
+</ul>
+
+<blockquote><span class="tx-blue">ここで一番上まで登り切らせないのがコツです。</span>
+少し手前で止めておくことで、<strong>アニメーターが手を入れる余地を残します。</strong></blockquote>
+
+<p>そのあと <code>Animation Editor</code> でカーブを整えます。動画ではトゥイーンで詰めて、
+<strong>着地をやわらげて</strong>いました。素早く登ってから、ふわりと止まる感じです。</p>
+
+<h2>4. APEX に戻す</h2>
+
+<img src="img/sidefx-animate-kinefx-part2-004747.png" alt="木の枝に巻き付いてリンゴに向かう蛇。レイヤーパネルに animation、animationfromskeleton2、BaseAnimation の3層が並び、ネットワークは pathdeform から animationfromskeleton2、sceneanimate1 へ続く">
+
+<p>ここから先は、これまでと同じパターンです。</p>
+
+<pre><code>unpackcharacter2 → null4 → pathdeform → animationfromskeleton2 → sceneanimate1</code></pre>
+
+<p><code>Animation from Skeleton</code> を通すと、骨格の動きがリグのコントロールに乗ります。
+そこに <code>Scene Animate</code> を足せば、<strong>アニメーターとして作業できる状態</strong>になります。</p>
+
+<h3>レイヤーが3層になる</h3>
+
+<p>上の画像のレイヤーパネルを見ると、下から順にこうなっています。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>レイヤー</th><th>中身</th></tr>
+    <tr><td><code>BaseAnimation</code></td><td>ベース</td></tr>
+    <tr><td><code>animationfromskeleton2</code></td><td><strong>プロシージャルに作った登る動き</strong></td></tr>
+    <tr><td><code>animation</code></td><td><strong>手で足した調整</strong></td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">プロシージャルな動きがレイヤーとして扱えるので、
+上から手付けを重ねられますし、ブレンドで出し入れもできます。</span></p>
+
+<p>仕上げは <code>Shift</code>+<code>T</code> です。
+<span class="tx-muted">（蛇の制御がスプラインなので、回転ではなく移動のキーを打ちます）</span>
+最後にリンゴへ向かう頭の動きを付けて完成でした。</p>
+
+<h2>5. この手法が示していること</h2>
+
+<p>講師の方がこの回で一番伝えたかったのは、手順そのものより考え方のようでした。</p>
+
+<blockquote>技術者の帽子をかぶって<strong>いったん Scene Animate の外に出て</strong>、
+キャラクターをアンパックし、SOP の基本的なオペレータで
+ジョイント（というよりポイント）を操作する方法を少し覚えるだけで、
+<span class="tx-blue">できることはほとんど無限に広がります。</span></blockquote>
+
+<p>そして、外でやったことは <code>Animation from Skeleton</code> で APEX に戻せます。
+<strong>複雑な問題を、素直な方法で解ける</strong>のがこの組み合わせの強みです。</p>
+
+<p>「蛇を木に登らせたい、でも同時にあの複雑なリグにもアクセスしたい」という要求に対して、
+Bezier Curve と Path Deform という基本的な道具だけで答えを出しているのが、その実例になっています。</p>
+
+<h2>シリーズ全体のまとめ</h2>
+
+<p>ウェビナーの最後に、2回分の内容がこう振り返られていました。</p>
+
+<ul>
+  <li><strong>基本的な操作</strong> — リグを掴んで動かす、慣れ親しんだやり方</li>
+  <li><strong>あまり馴染みのないもの</strong> — アニメーションステートの中で使える Ragdoll やセカンダリモーション</li>
+  <li><strong>モーキャプ</strong> — Houdini 22 でリターゲット周りが刷新され、格段に扱いやすくなった</li>
+  <li><strong>Motion Mixer</strong> — 1つのシーンに複数クリップを持ち、その場で編集し、書き出してリアルタイムエンジンへ</li>
+  <li><strong>プロシージャルとの組み合わせ</strong> — Houdini の本領。数式で動かしたものを、そのままアニメーションとして扱える</li>
+</ul>
+
+<p>リギングのウェビナーを望む声が多かったそうで、
+<strong>パート3・4・5 が続く見込み</strong>とのことでした。
+アセットは SideFX の Content Library から入手できます。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>パスは <code>Bezier Curve</code> のステートで <strong><code>X</code> を押すと対象にスナップ</strong>できます</li>
+  <li><code>Unpack Character</code> の前に <strong><code>Scene Add Character</code> が必要</strong>です</li>
+  <li><strong><code>Path Deform</code></strong> に「骨格」と「カーブ」を渡すだけで、骨格がカーブに沿います</li>
+  <li><span class="tx-blue">最後まで動かし切らず、アニメーターが手を入れる余地を残します</span></li>
+  <li><code>Animation from Skeleton</code> で APEX に戻せば、<strong>プロシージャルな動きがレイヤーになります</strong></li>
+  <li>その上に手付けのレイヤーを重ね、ブレンドで出し入れできます</li>
+  <li>APEX の外に出て SOP でポイントを操作し、また戻す——これが応用の幅を広げます</li>
+</ul>
+
+<p>全8回のメモはこれで終わりです。第1回は<a href="sidefx-animate-kinefx-01-basics.html">リグをノードとして扱う</a>から。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

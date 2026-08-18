@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 3 — Set Driven Key でびっくり箱の仕掛けを作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。APEX の Set Driven Key がアニメーション全体を駆動する仕組み、APEX Rig Pose でのレイヤー作成、fit min/max での範囲調整について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 3 — Set Driven Key でびっくり箱の仕掛けを作る</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=SDyjrpW1ZB8">Animate in KineFX | Part I | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.389 / 1:22:20 / 英語）の 27:13〜37:20 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-animate-kinefx-02-ragdoll-shotsculpt.html">Ragdoll と Shot Sculpt</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/SDyjrpW1ZB8?start=1633"
+          title="Animate in KineFX | Part I | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>題材が Harry から <strong>Jack in the Box</strong>（びっくり箱）に変わります。
+レバーを回すと箱が開いて人形が飛び出す、という定番の動きを作るのですが、
+その<strong>仕掛けの部分を Set Driven Key で自動化しておく</strong>のがこの回の主題です。</p>
+
+<p>一度仕掛けを作ってしまえば、あとはいつでも好きなときにアニメーションできる、という発想です。</p>
+
+<h2>1. リグは意図的にシンプル</h2>
+
+<img src="img/sidefx-animate-kinefx-part1-003013.png" alt="APEX Rig Pose のパネルと、赤い道化師の人形が乗った Jack in the Box。ネットワークには character、APEX_Rig_Pose、SetDrivenKeys が並ぶ">
+
+<p>Jack in the Box のリグは驚くほど単純でした。</p>
+
+<ul>
+  <li>バネの部分は<strong>3つのコントロールを持つスプライン1本</strong>だけ</li>
+  <li>人形の残りの部分は<strong>すべて FK</strong></li>
+</ul>
+
+<p>凝った仕掛けは何も入っていません。講師の方も
+「やろうと思えばスプライン周りにもっとコントロールを足せますが、
+今回の目的にはこれで十分でした」と話していました。</p>
+
+<p><code>Apex Add Character</code> で <code>Jack_in_the_Box</code> と名付け、
+<code>Scene Animate</code> を繋ぐところは前回と同じです。</p>
+
+<h2>2. APEX の Set Driven Key は「アニメーション全体」を駆動する</h2>
+
+<p>ここが他のソフトと違う、と強調されていた点です。</p>
+
+<blockquote>APEX の Set Driven Key は、<strong>1つのコントロールが1つのパラメータを動かす</strong>という
+よくある形ではありません。<strong>何かが「アニメーション全体」を駆動します。</strong>
+極端な話、<span class="tx-blue">歩行サイクルまるごとを Set Driven Key に差し込むこともできます。</span></blockquote>
+
+<p>今回でいえば「レバーの回転」が「箱が開くアニメーション」を駆動します。
+必要なのは次の2つです。</p>
+
+<ol>
+  <li>人形を箱に詰め込むための<strong>レストポーズ</strong></li>
+  <li>箱の蓋を開ける<strong>メカニズム</strong></li>
+</ol>
+
+<h2>3. APEX Rig Pose でアニメーションレイヤーを作る</h2>
+
+<p>使うのは <strong><code>APEX Rig Pose</code></strong> です。
+<span class="tx-muted">KineFX の Rig Pose とは別物で、こちらは APEX 用です。</span>
+操作感はアニメーションステートによく似ています。</p>
+
+<p>上の画像がそのパネルです。できることがいくつか紹介されていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>項目</th><th>内容</th></tr>
+    <tr><td><code>Update Rest</code></td><td>キャラクターのレスト位置を更新します（今回は使わず）</td></tr>
+    <tr><td><code>Source Type</code></td><td><code>Apex Character</code> と <code>Skeleton</code> を切り替えられます</td></tr>
+    <tr><td>ジョイントの昇格</td><td>元々コントロールが無かったジョイント位置を昇格できます。今回は不要なスパイラルジョイントが出てきたので消していました</td></tr>
+  </table>
+</div>
+
+<h3>1つ目のレイヤー: 人形を畳む</h3>
+
+<ol>
+  <li>箱のコントロールを隠し、人形のコントロールをすべて選択します</li>
+  <li>新しいレイヤーを作り、<strong><code>doll_close</code></strong> と名前を付けます</li>
+  <li><code>Ctrl</code>+<code>R</code> を押してフレーム24へ移動します</li>
+  <li>鎖骨・首・腕などを畳んで、箱に詰め込める姿勢にします</li>
+</ol>
+
+<p><span class="tx-red">このレイヤー名がそのまま Set Driven Key の名前になります。</span>
+あとで AutoRig Component から参照するので、名前は意味のあるものにしておく必要があります。</p>
+
+<h3>2つ目のレイヤー: 箱を開ける</h3>
+
+<p>次に箱の蓋を回転させるコントロールを触ろうとすると、
+<strong>「control not added to active layer」</strong>という警告が出ます。
+いま <code>doll_close</code> レイヤーがアクティブだからです。</p>
+
+<p>そこで<strong>create layer from selected controls</strong> のボタンを押して、
+そのコントロール用に新しいレイヤーを作り、<code>box_open</code> と名付けます。</p>
+
+<ul>
+  <li><code>Shift</code>+<code>R</code> で回転にキーを打ちます</li>
+  <li>フレーム12あたりまでで開き切るようにします</li>
+  <li>少し行き過ぎてから戻る<strong>フォロースルー</strong>を付けて、勢いよく開くようにします</li>
+</ul>
+
+<p class="tx-muted">人形側のアニメーションは表示していると邪魔なので、
+一時的にオフにしながら作業していました。</p>
+
+<h2>4. AutoRig Component に登録する</h2>
+
+<img src="img/sidefx-animate-kinefx-part1-003420.png" alt="APEX AutoRig Component SetDrivenKeys のパネル。Setups が 2 で、doll_close（0-24）と box_open（0-21）が登録されている">
+
+<p>作った2つのレイヤーを、<code>APEX AutoRig Component</code> の
+<strong><code>SetDrivenKeys</code></strong> に登録します。</p>
+
+<p>上の画像がその設定です。<code>Setups</code> を 2 にして、それぞれこう入れます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Setup</th><th>Animation Layer</th><th>Start Frame</th><th>End Frame</th></tr>
+    <tr><td>1</td><td><code>doll_close</code></td><td>0</td><td><strong>24</strong></td></tr>
+    <tr><td>2</td><td><code>box_open</code></td><td>0</td><td><strong>21</strong></td></tr>
+  </table>
+</div>
+
+<p>Clip Path はどちらも <code>rig/animation/default.clip/</code> のままです。
+各 Setup には <code>Settings</code> / <code>Driven</code> / <code>Driver</code> / <code>Parent</code> /
+<code>Tags</code> / <code>Shape</code> のタブがあります。</p>
+
+<p class="tx-muted">ネットワークには、この手順を書いた付箋が貼られていました。
+「driven するコントロールを新しいアニメーションレイヤーに追加する」から
+「driver のチャンネル名も忘れずに追加する」まで、5ステップにまとめられています。</p>
+
+<h3>結果</h3>
+
+<p>コンポーネントに入ると<strong>歯車のコントロールが1つ生えます</strong>。
+これを選ぶと、少し考えたあとに<strong>スライダーが2本</strong>出てきます。
+<code>box open</code> と <code>doll close</code> です。</p>
+
+<p>この時点で、スライダーを動かせば箱が開き、人形が畳まれるようになりました。</p>
+
+<h2>5. レバーの回転に繋ぐ</h2>
+
+<p>スライダーのままでも動きますが、<span class="tx-blue">実際にレバーを回して開いてほしい</span>ので、
+クランクのコントロールを driver に指定します。</p>
+
+<h3>コントロールのパスを取得する小技</h3>
+
+<blockquote>コントロールの名前を目で見て覚えて手で入力する、ということをしなくて済みます。
+<strong>Current Selection の項目を <code>Shift</code> を押しながら選択すると、
+選択中のコントロールが取れます。</strong>そのまま <code>Ctrl</code>+<code>C</code> でコピーして貼り付けられます。</blockquote>
+
+<p>貼り付けたあと、駆動に使うチャンネルとして <strong><code>RX</code></strong>（Rotate X）を指定します。
+これでクランクの回転Xチャンネルがアニメーションを駆動するようになります。</p>
+
+<h3>回転量の範囲を決める — fit min / fit max</h3>
+
+<p>そのまま繋ぐと問題が起きます。</p>
+
+<p><strong>レバーを少し回しただけで箱が開き切ってしまいます。</strong>
+Rotate X の値が 0 から 1 の範囲にすぐ到達してしまうためです。
+やりたいのは「何回もぐるぐる回して、それから開く」という動きです。</p>
+
+<ol>
+  <li>実際にレバーを何回転か回してみて、そのときの数値を選択します</li>
+  <li>その値を <strong><code>fit min</code></strong> に貼り付けます</li>
+  <li>さらに少し回して、その値を <strong><code>fit max</code></strong> に貼り付けます</li>
+</ol>
+
+<p>これで回転量の範囲が決まり、
+<span class="tx-blue">何回転かさせてから箱が開く、という自然な動きになりました。</span></p>
+
+<p class="tx-muted">動画では貼り付けた数値がたまたま 666 になっていて、
+「縁起が悪いので消しておきます」と言って直していました。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>APEX の Set Driven Key は<strong>アニメーション全体を駆動できます</strong>。1コントロール対1パラメータではありません</li>
+  <li>駆動させたいアニメーションは <code>APEX Rig Pose</code> で<strong>アニメーションレイヤーとして</strong>作ります</li>
+  <li><span class="tx-red">レイヤー名がそのまま Set Driven Key の名前になります</span>ので、意味のある名前を付けます</li>
+  <li>別のコントロールを触ろうとして「control not added to active layer」が出たら、<strong>create layer from selected controls</strong> で新しいレイヤーを作ります</li>
+  <li><code>AutoRig Component</code> の <code>SetDrivenKeys</code> に、レイヤー名とフレーム範囲を登録します</li>
+  <li>driver のパスは <strong>Current Selection を <code>Shift</code> 選択して <code>Ctrl</code>+<code>C</code></strong> で取れます</li>
+  <li>効きが速すぎるときは <strong><code>fit min</code> / <code>fit max</code></strong> に実際の回転値を入れて範囲を決めます</li>
+</ul>
+
+<p>次はいよいよ Secondary Motion で人形をぐにゃぐにゃ動かし、Motion Mixer で仕上げます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

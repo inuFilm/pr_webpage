@@ -11,6 +11,62 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "sidefx-animate-kinefx-01-basics",
+    "title": "Houdini 22 KineFX アニメーション 1 — リグをノードとして扱う",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。Apex Add Character と Scene Animate だけで始められる手軽さ、config controls での IK/FK 切替、H22 で統合された選択セットパネル、Animation Catalog について。"
+  },
+  {
+    "slug": "sidefx-animate-kinefx-02-ragdoll-shotsculpt",
+    "title": "Houdini 22 KineFX アニメーション 2 — Ragdoll で引きずり出して Shot Sculpt で盛る",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。Ragdoll を焼く前に必要な Texas switch、locator と tether constraint、Shot Sculpt の World Space 設定について。"
+  },
+  {
+    "slug": "sidefx-animate-kinefx-03-set-driven-key",
+    "title": "Houdini 22 KineFX アニメーション 3 — Set Driven Key でびっくり箱の仕掛けを作る",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。APEX の Set Driven Key がアニメーション全体を駆動する仕組み、APEX Rig Pose でのレイヤー作成、fit min/max での範囲調整について。"
+  },
+  {
+    "slug": "sidefx-animate-kinefx-04-secondary-motion-mixer",
+    "title": "Houdini 22 KineFX アニメーション 4 — Secondary Motion と Motion Mixer で仕上げる",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。spring を translate と rotation で使い分ける、二重適用の罠、New Clip と Motion Mixer、Apex Scene 出力への切り替えについて。"
+  },
+  {
+    "slug": "sidefx-animate-kinefx-05-props-and-quick-rig",
+    "title": "Houdini 22 KineFX アニメーション 5 — 小物を Prop として足す／3点の線から IK リグを作る",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part I の Q&A から。Apex Scene Add Prop での小物の追加と child→parent の拘束、Line から Rig Doctor と AutoRig Component だけで IK リグを組む最短手順について。"
+  },
+  {
+    "slug": "sidefx-animate-kinefx-06-mocap-retarget",
+    "title": "Houdini 22 KineFX アニメーション 6 — モーキャプを自作キャラにリターゲットする",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part II の日本語メモです。Biped Setup のマッピングテンプレート、青いジョイントだけ押せば済む手動マッピング、キャラクター系ノード共通の3入力3出力の規則について。"
+  },
+  {
+    "slug": "sidefx-animate-kinefx-07-motion-mixer-export",
+    "title": "Houdini 22 KineFX アニメーション 7 — Motion Mixer でモーキャプを合成して書き出す",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part II の日本語メモです。Match Joint での足の接地、weight を音量のように扱うブレンド、Motion Mixer 内での直接アニメーション、FBX 書き出し時のアンパックの落とし穴について。"
+  },
+  {
+    "slug": "sidefx-animate-kinefx-08-snake-procedural",
+    "title": "Houdini 22 KineFX アニメーション 8 — Path Deform で蛇に木を登らせる",
+    "category": "houdini-animation",
+    "date": "2026-08-18",
+    "description": "SideFX 公式ウェビナー Animate in KineFX Part II 最終回の日本語メモです。Bezier Curve のスナップ、Path Deform で骨格をカーブに乗せる方法、Animation from Skeleton でプロシージャルな動きをレイヤーとして扱う考え方について。"
+  },
+  {
     "slug": "sidefx-charcreate-00-intro",
     "title": "Houdini キャラクター制作コース（SideFX 公式）— 全体の構成とリグファーストの考え方",
     "category": "houdini-character",

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 7 — Motion Mixer でモーキャプを合成して書き出す | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part II の日本語メモです。Match Joint での足の接地、weight を音量のように扱うブレンド、Motion Mixer 内での直接アニメーション、FBX 書き出し時のアンパックの落とし穴について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 7 — Motion Mixer でモーキャプを合成して書き出す</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=TIi2KAlkT_M">Animate in KineFX | Part II | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.394 / 1:01:45 / 英語）の 19:20〜30:00 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-animate-kinefx-06-mocap-retarget.html">モーキャプを自作キャラにリターゲットする</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/TIi2KAlkT_M?start=1160"
+          title="Animate in KineFX | Part II | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>リターゲットしたモーキャプを Motion Mixer で組み合わせ、
+手で修正を入れて、最後に FBX として書き出すところまでです。</p>
+
+<h2>1. クリップを並べる</h2>
+
+<img src="img/sidefx-animate-kinefx-part2-002136.png" alt="Motion Mixer に track0 と track1 の2本のトラックが並び、青いクリップが重なっている。Catalog には hip_hip_dance、rest、slam_dance が見える">
+
+<p>Catalog に入っているクリップはこうなっていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Name</th><th>Character</th><th>Length</th></tr>
+    <tr><td><code>slam_dance</code></td><td>electra</td><td>134</td></tr>
+    <tr><td><code>hip_hip_dance</code></td><td>electra</td><td>399</td></tr>
+    <tr><td><code>rest</code></td><td>electra</td><td>0（Pose）</td></tr>
+  </table>
+</div>
+
+<p>まず <code>slam_dance</code> を置き、続けて <code>hip_hop_dance</code> を置いて重ねると、
+Part I のびっくり箱と同じようにブレンドされます。</p>
+
+<p>ただし<span class="tx-red">足が滑ります。</span>2つのクリップで足の位置が違うためです。</p>
+
+<h2>2. Match Joint で足を接地させる</h2>
+
+<p>これが今回の目玉のひとつでした。特定のジョイントを基準にクリップを合わせられます。</p>
+
+<ol>
+  <li>合わせたいクリップ（ここでは hip hop dance）を選択します</li>
+  <li><code>Edit</code> → <strong><code>Match Joint</code></strong></li>
+  <li>矢印ボタンからジョイントを選びます。<strong>フィルタに <code>L foot</code> と入れる</strong>と候補が絞れます</li>
+  <li><code>L foot ankle IK</code> を選んで <code>Accept</code></li>
+  <li><strong><code>Match All</code></strong> を押します。位置と向きの両方を合わせます</li>
+</ol>
+
+<p>これで<span class="tx-blue">足が接地したまま次のポーズへ移る</span>ようになります。
+クリップ同士を繋ぐときの滑りは、この手順で潰せます。</p>
+
+<h2>3. ブレンドをやわらげる — weight を音量のように扱う</h2>
+
+<p>クリップを重ねただけだと<strong>リニアなブレンド</strong>になります。
+もう少しなめらかにしたい、ということで、新しいトラックを使います。</p>
+
+<ol>
+  <li>新しいトラックを作り、クリップをドラッグします</li>
+  <li>上のトラックが下のトラックを上書きします</li>
+  <li>トラックの <strong>weight</strong> にキーを打って、効き具合を時間で変えます</li>
+</ol>
+
+<blockquote>DAW（Ableton のようなデジタルオーディオワークステーション）を触ったことがあれば、
+<strong>この weight を音量のように考えてもらえればわかりやすい</strong>と思います。</blockquote>
+
+<p>weight を下げたキーと上げたキーを足すだけで、
+リニアではないなめらかな移り変わりになりました。</p>
+
+<h2>4. Motion Mixer の中でそのままアニメーションできる</h2>
+
+<p>ここが Part I からの改善点です。</p>
+
+<blockquote>変更を加えたくなっても、<strong>前回のように Motion Mixer Fetch へ出す必要はありません。
+Motion Mixer の中で直接アニメーションできます。</strong></blockquote>
+
+<ol>
+  <li>新しいトラックを追加して <code>animation</code> などと名付けます</li>
+  <li>そのトラックに <strong><code>animate</code> エフェクト</strong>を追加します</li>
+  <li>トラックの横にあるボタンを押すと、<strong>アニメーションステートに入ります</strong></li>
+</ol>
+
+<p>あとは通常のアニメーション作業と同じです。
+下地のモーキャプの上に、レイヤーで修正を乗せていけます。</p>
+
+<p>動画では腕が脚に食い込んでいたので、2点にキーを打って当たらないように直していました。
+<span class="tx-blue">モーキャプの上に手作業の修正を重ねる、という流れがそのまま Motion Mixer 内で完結します。</span></p>
+
+<h2>5. 書き出す</h2>
+
+<img src="img/sidefx-animate-kinefx-part2-002640.png" alt="Motion Mixer Fetch のパラメータ（Mixer Path と Output Mode = Skeletons）と、motionmixerfetch1 から unpack1、bonedeform1 へ続くネットワーク">
+
+<p>他のパッケージ（Unreal など）に持っていく手順です。</p>
+
+<h3>Motion Mixer Fetch でシーンから取り出す</h3>
+
+<ol>
+  <li><code>Motion Mixer Fetch</code> を置き、<strong>Mixer Path</strong> に Motion Mixer を指定します
+      <span class="tx-muted">（画面では <code>../motionmixer1</code>、Output Mode は <code>Skeletons</code>）</span></li>
+  <li>これでアニメーション済みの骨格が出てきます</li>
+</ol>
+
+<h3>ここが落とし穴</h3>
+
+<blockquote><span class="tx-red">Motion Mixer Fetch から出てくるものは、骨格ではあるものの<strong>まだパックされています。</strong></span>
+APEX の形式のままです。ポイント数を見ると、原点に<strong>1点しかありません</strong>。</blockquote>
+
+<p>そのため <code>Unpack</code> を通す必要があります。上の画像でも
+<code>motionmixerfetch1</code> → <code>unpack1</code> → <code>bonedeform1</code> と繋がっています。</p>
+
+<h3>足りないものを揃える</h3>
+
+<p>書き出しには<strong>レスト骨格とジオメトリ</strong>も要ります。これは
+別途 <code>Unpack Character</code> を置いて Electra から取り出します。
+配線が混乱しないよう、別に置くのがおすすめとのことでした。</p>
+
+<p>3つ揃ったら <code>Bone Deform</code> に繋いで、正しく動いているか確認します。</p>
+
+<h3>ROP FBX Character Output</h3>
+
+<p><code>ROP FBX Character Output</code> に繋ぎます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>入力</th><th>渡すもの</th><th>必須</th></tr>
+    <tr><td>1</td><td>ジオメトリ</td><td>必須</td></tr>
+    <tr><td>2</td><td>レスト骨格</td><td>必須</td></tr>
+    <tr><td>3</td><td>アニメーション</td><td>任意</td></tr>
+  </table>
+</div>
+
+<p>3つ目にアニメーションを入れれば1ファイルにまとまりますが、
+講師の方の好みは<strong>キャラクターとアニメーションを別々に書き出す</strong>方式でした。</p>
+
+<blockquote>キャラクターは<strong>レスト骨格付きのスキンキャラクター</strong>として1つ書き出し、
+アニメーションは<strong>アニメーションクリップ</strong>として別に書き出しておきます。
+そうすれば<span class="tx-blue">好きなときに好きなクリップを使えます。</span></blockquote>
+
+<p>アニメーション側は <code>ROP FBX Animation Output</code> を使います。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>クリップを重ねると足が滑ります。<strong><code>Edit</code> → <code>Match Joint</code> → <code>Match All</code></strong> で接地させます</li>
+  <li>ジョイント選択は<strong>フィルタ（<code>L foot</code> など）で絞る</strong>と早いです</li>
+  <li>リニアなブレンドが気に入らなければ、<strong>トラックの weight を音量のように</strong>キーで制御します</li>
+  <li><span class="tx-blue">Motion Mixer の中に <code>animate</code> エフェクトのトラックを足せば、そのまま手直しできます</span>（Fetch に出す必要なし）</li>
+  <li><span class="tx-red"><code>Motion Mixer Fetch</code> の出力はまだパックされています。</span><code>Unpack</code> が必要です</li>
+  <li>レスト骨格とジオメトリは別途 <code>Unpack Character</code> から取ります</li>
+  <li><code>ROP FBX Character Output</code> はジオメトリとレスト骨格が必須。アニメーションは3つ目の任意入力です</li>
+</ul>
+
+<p>次はいよいよ最終回、プロシージャルと手付けを組み合わせて蛇に木を登らせます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

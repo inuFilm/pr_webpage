@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 2 — Ragdoll で引きずり出して Shot Sculpt で盛る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。Ragdoll を焼く前に必要な Texas switch、locator と tether constraint、Shot Sculpt の World Space 設定について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 2 — Ragdoll で引きずり出して Shot Sculpt で盛る</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=SDyjrpW1ZB8">Animate in KineFX | Part I | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.389 / 1:22:20 / 英語）の 14:54〜26:20 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-animate-kinefx-01-basics.html">リグをノードとして扱う</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/SDyjrpW1ZB8?start=894"
+          title="Animate in KineFX | Part I | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>前回作った「手を振って飛び去る」アニメーションに対して、監督から2つ注文が入った、という設定で進みます。</p>
+
+<ol>
+  <li>「翼をやめて、もっと不格好に退場してほしい」→ <strong>Ragdoll</strong> で足を掴んで引きずり出します</li>
+  <li>「カートゥーンなんだからスカッシュ＆ストレッチが欲しい」→ リグに無いので <strong>Shot Sculpt</strong> で足します</li>
+</ol>
+
+<p>前回の「アニメーションデータは <code>Scene Animate</code> 1ノードに乗る」という性質が効いてきます。
+ノードをコピーするだけで3つ目のバージョンができるので、ファイルを増やさずに作り直せます。</p>
+
+<h2>1. Ragdoll に入る</h2>
+
+<p>アニメーションステートの中で <code>C</code> キーを押すと<strong>サブステート</strong>の一覧が出ます。
+ここから Ragdoll を選ぶと、ヘッダーの表示が <code>Animate: Ragdoll</code> に変わります。</p>
+
+<p>この状態で再生すると、Harry はいきなり崩れ落ちます。やりたいことは合っていますが、
+<span class="tx-blue">崩れてほしいのはフレーム150からです。</span></p>
+
+<h3>いつ崩れるかを決める</h3>
+
+<ol>
+  <li>選択セットのパネルを開き、Harry の横にあるロケーター型のアイコンをクリックして<strong>コントロールを隠します</strong>。ragdoll だけに集中できます</li>
+  <li>選択セットで ragdoll をすべて選びます</li>
+  <li><strong>active ボタンをオフ</strong>にして無効化します。これで元のアニメーションが再生されます</li>
+  <li>フレーム150に移動して、<strong>もう一度 active をオン</strong>にします</li>
+</ol>
+
+<p>これでフレーム150から崩れ落ちるようになります。
+ただ最初はかなり暴れるので、<strong>stiffness を 25 くらいまで上げる</strong>と落ち着いた動きになります。</p>
+
+<p class="tx-muted">小ネタとして、矢印キーの下を押すとアニメーションが逆再生され、上を押すと順再生されるそうです。
+動画中でも逆再生になっていて「あ、逆でした」という場面がありました。</p>
+
+<img src="img/sidefx-animate-kinefx-part1-002050.png" alt="Animate: Ragdoll ステート。Selection / Layers / Settings と Handles / Bake / Constraint / Ragdoll のタブが並び、Display Mode が Collision Shapes になっている">
+
+<p>上の画像が Ragdoll の設定パネルです。パネルの構成はこうなっていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>階層</th><th>タブ</th></tr>
+    <tr><td>上段</td><td><code>Controls</code> / <code>Parms</code></td></tr>
+    <tr><td>その下</td><td><code>Controls</code> / <code>Constraint</code> / <code>Ragdoll</code></td></tr>
+    <tr><td>下段</td><td><code>Selection</code> / <code>Layers</code> / <code>Settings</code></td></tr>
+    <tr><td>さらに下</td><td><code>Handles</code> / <code>Bake</code> / <code>Constraint</code> / <code>Ragdoll</code></td></tr>
+  </table>
+</div>
+
+<p>画像では <code>Display Mode</code> が <code>Collision Shapes</code> になっているため、
+Harry が黒い衝突形状の表示になっています。</p>
+
+<h2>2. Texas switch — IK に焼くための仕込み</h2>
+
+<p><span class="tx-red">ここが一番重要な下ごしらえです。</span>
+Ragdoll のデータをリグに焼くとき、<strong>IK コントロールに焼く必要があります</strong>。
+そのままだと FK 側に入ってしまい、正しく焼けません。</p>
+
+<p>そこで、Ragdoll が始まるフレーム150の直前で IK に切り替えておきます。</p>
+
+<ol>
+  <li>フレーム150に移動して、config control を <strong>FK</strong> に切り替えます。IK が FK の位置に合わせようとします</li>
+  <li><strong>1フレーム戻って</strong>、IK-FK blend を <strong>1 まで戻します</strong></li>
+  <li>反対側の腕も同じようにします</li>
+</ol>
+
+<blockquote>講師の方はこれを<strong>「Texas switch」</strong>と呼んでいました。
+1フレームだけ素早く IK に戻す小技です。
+この瞬間に小さなスナップが起きますが、
+<span class="tx-blue">Ragdoll から焼いてしまえば目立たなくなる</span>ので問題ない、とのことでした。</blockquote>
+
+<h2>3. Locator と tether constraint で引っ張る</h2>
+
+<p>足を掴んで引きずり出すために、引っ張る先となる locator を作ります。</p>
+
+<ol>
+  <li>locator のサブステートに入り、<code>H</code> を押して locator を作ります</li>
+  <li><code>animate</code> に戻り、Harry の右足あたりに locator を移動します</li>
+  <li>フレーム150で <code>Shift</code>+<code>T</code> を押して位置にキーを打ちます
+      <span class="tx-muted">（<code>Shift</code>+<code>R</code> が回転、<code>Shift</code>+<code>T</code> が移動のキー）</span></li>
+  <li>フレーム180に移動して、locator を画面外まで引っ張ります</li>
+</ol>
+
+<h3>結ぶ</h3>
+
+<p>Ragdoll に戻ります。ここで<span class="tx-red">重要な注意点</span>がありました。</p>
+
+<blockquote>Ragdoll に影響を与えるために locator を使うとき、
+<strong>locator は active にしてはいけません。</strong>
+これは RBD オブジェクトではないからです。</blockquote>
+
+<p>active をオフにしたうえで、フレーム150に移動し、
+<strong>右足と locator を選択して <code>H</code> を押します</strong>。
+これで <strong>tether constraint</strong> が張られます。</p>
+
+<p>講師の方の説明では「Harry の足首から locator にロープを結んだようなもの」。
+再生すると、Harry がフレーム150で崩れ、そのまま足を引っ張られて画面外へ持っていかれます。</p>
+
+<h2>4. 焼く</h2>
+
+<p>Ragdoll の結果をリグのコントロールに焼き込みます。</p>
+
+<ol>
+  <li><strong>ragdoll をすべて選択します</strong>（これを忘れると焼けません）</li>
+  <li><code>Settings</code> → <code>Bake</code> タブへ</li>
+  <li>フレーム範囲を <strong>150 – 200</strong> に設定</li>
+  <li><span class="tx-red">新しいレイヤーに焼きます。base animation を上書きしません</span></li>
+  <li><code>Bake Keys</code> を実行</li>
+</ol>
+
+<h3>焼いたあとの手直し</h3>
+
+<p>焼いた結果を見ると、Harry の目が閉じてしまっていました。原因は面白いものでした。</p>
+
+<blockquote>実は<strong>正しくシミュレートされている</strong>のです。
+目も RBD オブジェクトなので、引っ張られた勢いで閉じてしまっているだけです。</blockquote>
+
+<p>不要なので、目のキーフレームを削除します。
+さらに <code>fix</code> という名前で新しいレイヤーを作り、
+引っ張られ方が気に入らなかった頭の動きを手で直していました。
+<span class="tx-blue">レイヤーを分けておけば、元の結果を壊さずに上から直せます。</span></p>
+
+<h2>5. Shot Sculpt でスカッシュ＆ストレッチを足す</h2>
+
+<p>リグにスカッシュ＆ストレッチのコントロールが入っていないので、
+メッシュを直接触って足します。講師の方いわく<strong>「個人的に一番好きなツール」</strong>だそうです。</p>
+
+<h3>下ごしらえ — Scene Invoke</h3>
+
+<p>そのままではキャラクターを選択できません。パックされたままで、
+アンパックされたジオメトリになっていないためです。</p>
+
+<p><strong><code>Scene Invoke</code></strong> を通してアンパックします。</p>
+
+<blockquote>評価済みの APEX グラフを直接使う方法もありますが、
+<strong>そちらは動作が少し遅くなります。</strong>
+Scene Invoke でシーンを呼び出したほうが速く動きます。</blockquote>
+
+<h3>忘れると結果が読めなくなる設定</h3>
+
+<img src="img/sidefx-animate-kinefx-part1-002447.png" alt="Shot Sculpt のブラシ設定パネルとホットキー一覧。右側の Defaults タブに Edit Reference Frame = World Space が見えている">
+
+<p><span class="tx-red">Shot Sculpt を置いたら、まず Defaults を <code>World Space</code> にします。</span>
+上の画像の右側、<code>Defaults</code> タブの <code>Edit Reference Frame</code> がそれです。</p>
+
+<p>講師の方の言葉では「これでずっと予測しやすい結果になる」。デフォルトのままだと
+意図しない方向にスカルプトが乗ってしまうということだと思います。</p>
+
+<h3>ブラシ</h3>
+
+<p><code>Animation</code> → <code>Shot Sculpt</code> でパネルを開き、<code>B</code> キーでステートに入ります。
+<code>G</code> でブラシ設定が開きます。画面左に出るホットキー一覧が親切でした。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>キー</th><th>操作</th></tr>
+    <tr><td><code>G</code></td><td>Open Brush Settings</td></tr>
+    <tr><td><code>F</code></td><td>Open Tween Sliders</td></tr>
+    <tr><td><code>1</code>–<code>0</code></td><td>ブラシの切り替え</td></tr>
+    <tr><td><code>Q</code> / <code>W</code></td><td>Shape の切り替え</td></tr>
+    <tr><td><code>Ctrl</code>+<code>Shift</code>+ドラッグ</td><td>Brush Radius / Strength（左右）/ Falloff（上下）</td></tr>
+    <tr><td><code>Y</code> / <code>K</code> / <code>L</code> / <code>P</code></td><td>Enable Mask / Clear Mask / Invert Mask / Paint Mask Brush</td></tr>
+  </table>
+</div>
+
+<p>ブラシ設定には <code>Brush</code> / <code>Stroke</code> / <code>Mask</code> / <code>Symmetry</code> のタブがあり、
+Stroke には Lazy Mouse・Distance・Speed といった項目が並んでいます。</p>
+
+<p>デフォルトのブラシは <code>Clay</code> ですが、
+<strong><code>3</code> を押して <code>Move</code> ブラシに切り替えます。</strong>
+講師の方は「Shot Sculpt では90%これを使う」と言っていました。</p>
+
+<h3>スカルプトするとクリップができる</h3>
+
+<img src="img/sidefx-animate-kinefx-part1-002516.png" alt="Shot Sculpt のタイムラインに、なだらかな山型のブレンドを持つクリップが1つ作られている">
+
+<p><code>Shift</code>+<code>Ctrl</code>+ドラッグで頭を引っ張り出すと、
+<span class="tx-blue">その場でタイムラインにクリップが自動生成されます。</span></p>
+
+<p>上の画像の下半分がそれです。山型の曲線がブレンドの効き方を表しています。</p>
+
+<ul>
+  <li>クリップには<strong>イン点とアウト点</strong>があり、ベジェ補間で滑らかに入って抜けます</li>
+  <li>右側のパネルで <code>Blend In</code> / <code>Blend Out</code> がどちらも <code>Smooth</code> の <code>25</code> になっています</li>
+  <li>イン点を動かせば、効き始めるタイミングを後ろにずらせます</li>
+  <li>白い線が、実際にスカルプトしたトラックの位置を示します</li>
+</ul>
+
+<p><strong>スカルプトは積み重ねられます。</strong>
+動画では頭を引っ張ったあと、さらに体を少しカーブさせるスカルプトを追加していました。
+不要になったら個別にオフにできます。</p>
+
+<p>最後に <code>Cache</code> に繋いでキャッシュすれば、リアルタイムで再生して確認できます。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li><code>C</code> キーでサブステートに入り、Ragdoll に切り替えます</li>
+  <li>崩れ始めるタイミングは <strong>active のオン／オフ</strong>で決めます。暴れすぎるときは stiffness を上げます</li>
+  <li><span class="tx-red">焼く前に「Texas switch」で IK に戻しておきます。</span>これを忘れると IK コントロールに焼けません</li>
+  <li>引っ張るには locator を作り、<strong>active はオフのまま</strong>足と一緒に選んで <code>H</code> で tether constraint</li>
+  <li>Bake は <strong>ragdoll を全選択してから、新しいレイヤーへ</strong>。base animation は上書きしません</li>
+  <li>目が閉じるのはバグではなく、目も RBD として正しくシミュレートされているためです</li>
+  <li>Shot Sculpt は <code>Scene Invoke</code> でアンパックしてから。<strong>Defaults を <code>World Space</code> に</strong>するのを忘れずに</li>
+  <li>スカルプトすると自動でクリップができ、ブレンドのイン／アウトを調整できます</li>
+</ul>
+
+<p>次は Jack in the Box を題材に、Set Driven Key の作り方に入ります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

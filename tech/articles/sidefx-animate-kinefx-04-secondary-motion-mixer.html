@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 KineFX アニメーション 4 — Secondary Motion と Motion Mixer で仕上げる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式ウェビナー Animate in KineFX Part I の日本語メモです。spring を translate と rotation で使い分ける、二重適用の罠、New Clip と Motion Mixer、Apex Scene 出力への切り替えについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 KineFX アニメーション 4 — Secondary Motion と Motion Mixer で仕上げる</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=SDyjrpW1ZB8">Animate in KineFX | Part I | Max Rose | Houdini Illume</a>
+（SideFX 公式ウェビナー / 講師 Max Rose さん / Houdini FX 22.0.389 / 1:22:20 / 英語）の 39:02〜50:30 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-animate-kinefx-03-set-driven-key.html">Set Driven Key でびっくり箱の仕掛けを作る</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/SDyjrpW1ZB8?start=2342"
+          title="Animate in KineFX | Part I | Max Rose | Houdini Illume" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>前回の仕掛けを使って、キーをほんの数個打っただけの素朴なアニメーションができています。
+ここに<strong>セカンダリモーション</strong>で動きの気持ちよさを足し、
+最後に <strong>Motion Mixer</strong> で2つのアニメーションを繋いで仕上げます。</p>
+
+<h2>1. Secondary Motion に入る</h2>
+
+<p>画面上部の pose tools の中にあります。並んでいるのは
+Full Body IK、Full Body IK Posing、Ragdoll、Locators、Dynamic Motion といったもので、
+<strong>Secondary Motion は一番最後</strong>です。</p>
+
+<p>クリックすると<span class="tx-blue">すべてのコントロールが灰色になります。</span>
+これは「どのコントロールにセカンダリモーションを付けますか」と待っている状態です。
+付いたコントロールは<strong>金色</strong>に変わるので、見た目で判別できます。</p>
+
+<img src="img/sidefx-animate-kinefx-part1-003956.png" alt="Animate: Secondary Motion ステート。Transform Multiplier の Translate / Rotate / Scale と Strength の設定が見える">
+
+<h3>3種類の効果</h3>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>効果</th><th>性質</th></tr>
+    <tr><td><code>lag</code></td><td>遅れて追従する</td></tr>
+    <tr><td><code>jiggle</code></td><td>ぷるぷる揺れる</td></tr>
+    <tr><td><code>spring</code></td><td>バネのように弾む</td></tr>
+  </table>
+</div>
+
+<p>びっくり箱のバネなので <code>spring</code> を選びます。対象は spline coil のコントロールです。</p>
+
+<blockquote><span class="tx-red">重要なのは、<strong>translate</strong> に効かせることです。rotation ではありません。</span>
+バネが上下に伸び縮みしてほしいので、位置に効かせます。</blockquote>
+
+<p>プラスボタンを押すと、そのコントロールにセカンダリモーションが追加されます。
+<strong>たった1つのキーフレームから</strong>、バネらしい動きが生まれます。</p>
+
+<p>効果が強すぎたので、effect options で <strong>4</strong> に下げていました。
+パネルには Transform Multiplier（Translate / Rotate / Scale）と Strength があり、
+細かく調整できます。</p>
+
+<h3>焼く</h3>
+
+<p>Ragdoll のときと同じ流れです。</p>
+
+<ol>
+  <li>フレーム範囲 <strong>1 – 100</strong></li>
+  <li><strong>Additive Layer</strong> にチェック</li>
+  <li><strong>新しいレイヤーに焼く</strong></li>
+  <li><code>Bake Keys</code></li>
+</ol>
+
+<p class="tx-muted">セカンダリモーションの良いところとして、
+<strong>キーフレームが焼き上がるのがとても速い</strong>と言われていました。</p>
+
+<h2>2. 二重適用の罠</h2>
+
+<p>次は人形自体をぐにゃぐにゃさせます。
+ここで<span class="tx-red">つまずきポイントがありました。</span></p>
+
+<p>もう一度 Secondary Motion ステートに入ると、<strong>何かが飛び跳ねます。</strong>
+原因は、<code>spline coil</code> のコントロールに<strong>まだセカンダリモーションが付いたままだから</strong>です。</p>
+
+<blockquote>すでに焼いたセカンダリモーションの上に、
+生きたセカンダリモーションがもう一度乗っているので、<strong>二重に効いてしまいます。</strong>
+付いているコントロールは金色（緑色）になっているので見分けられます。
+選んで<strong>削除すれば</strong>元に戻ります。</blockquote>
+
+<h3>人形に付ける</h3>
+
+<ol>
+  <li>箱のコントロールは不要なので隠します</li>
+  <li>人形のコントロールをすべて選択します</li>
+  <li><span class="tx-red">root コントロールだけは外します。</span>
+      <span class="tx-muted">残すと変換が二重にかかっておかしくなるためです</span></li>
+  <li>今度は <strong>rotation</strong> チャンネルに <code>spring</code> を効かせます</li>
+</ol>
+
+<p>プラスを押した直後は「完全にぐちゃぐちゃ」でした。
+講師の方も「これは誰も見たくない動き」と言っていました。そこで strength で制御します。</p>
+
+<ol>
+  <li>strength を<strong>いったん 0 まで下げます</strong></li>
+  <li>効かせ始めたいフレームで <code>Alt</code>+クリックしてパラメータにキーを打ちます（緑になります）</li>
+  <li>矢印キーで進み、人形が飛び出した頂点あたりで strength を上げます</li>
+</ol>
+
+<p>これで<span class="tx-blue">飛び出した瞬間だけ大きく揺れる</span>という動きになりました。
+最後に 1 – 100 で新しいレイヤーに焼きます。</p>
+
+<h2>3. もう1本のアニメーションをクリップとして作る</h2>
+
+<p>いまある動きは「人形が飛び出して揺れる」ところだけです。
+その前の<strong>「レバーを回して箱が開く」という予備動作</strong>が足りません。</p>
+
+<p>作り方は何通りかあります。</p>
+
+<blockquote>別の <code>Scene Animate</code> を作ってアニメーションをコピーし、Motion Mixer に入れる方法もありますが、
+<strong>必要なのはもう1つクリップを作ることだけです。</strong>
+だったら同じ <code>Scene Animate</code> の中に作ってしまえばいい。</blockquote>
+
+<ol>
+  <li><code>Animation</code> タブを開きます</li>
+  <li><strong><code>New Clip</code></strong> をクリックし、<code>box_open</code> と名付けます</li>
+  <li>空のクリップができ、ドロップダウンで <code>default</code> と <code>box_open</code> を切り替えられるようになります</li>
+</ol>
+
+<p>新しいクリップにはアニメーションレイヤーが無い、まっさらな状態です。
+そこで人形を畳んで箱に詰め、クランクにキーを打って120フレームあたりまで回します。</p>
+
+<p><span class="tx-blue">これで1つの <code>Scene Animate</code> に2本のアニメーションが入りました。</span></p>
+
+<h2>4. Motion Mixer で繋ぐ</h2>
+
+<img src="img/sidefx-animate-kinefx-part1-004632.png" alt="Motion Mixer の Catalog タブ。box_open が 119 フレーム、default が 99 フレームの Clip、rest が Pose として並んでいる">
+
+<p><code>Motion Mixer</code> を置くと、少し時間がかかります。
+クリップを Motion Mixer のシーケンサーで扱える形式に変換しているためです。
+イン点とアウト点を調べて、並べたりブレンドしたりできるクリップに直しています。</p>
+
+<p><code>Catalog</code> タブに変換された結果が並びます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>Name</th><th>Character</th><th>Length</th><th>Type</th><th>Used</th></tr>
+    <tr><td><code>box_open</code></td><td>JackInThebox</td><td>119</td><td>Clip</td><td>0</td></tr>
+    <tr><td><code>default</code></td><td>JackInThebox</td><td>99</td><td>Clip</td><td>0</td></tr>
+    <tr><td><code>rest</code></td><td>JackInThebox</td><td>0</td><td>Pose</td><td>0</td></tr>
+  </table>
+</div>
+
+<p><code>default</code> は名前を付けていなかったクリップで、中身は人形が飛び出して揺れるアニメーションです。
+<code>Used</code> 列で使用回数も見えます。</p>
+
+<p>あとはタイムラインにドラッグして並べるだけです。
+<code>box_open</code> を先に、<code>default</code> を後ろに置き、
+箱が開いた瞬間に人形が飛び出すよう<strong>2つを重ねてブレンド</strong>します。</p>
+
+<h2>5. Apex Scene に戻して手直しする</h2>
+
+<img src="img/sidefx-animate-kinefx-part1-004816.png" alt="Motion Mixer の Settings タブ。Output の Mode が Shapes になっており、Start Frame 1 / End Frame 400 / Rate 24 が見える">
+
+<p>ブレンドした結果を見ると、人形と箱が少し貫通していました。
+直すにはアニメーションステートに戻る必要があります。</p>
+
+<p>Motion Mixer には<strong>出力モード</strong>があり、これを切り替えます。</p>
+
+<ol>
+  <li><code>Settings</code> タブの <code>Output</code> にある <strong><code>Mode</code></strong> を、
+      <code>Shapes</code> から <strong><code>Apex Scene</code></strong> に変更します</li>
+  <li>変換に少し時間がかかります（APEX シーンとして使える形に組み直しています）</li>
+  <li><strong><code>Motion Mixer Fetch</code></strong> を置いて、Motion Mixer を参照させます</li>
+  <li>その先に <code>Scene Animate</code> を置きます</li>
+</ol>
+
+<p class="tx-muted">上の画像では Output の Start Frame が 1、End Frame が 400、Rate が 24 になっています。</p>
+
+<p>これで<span class="tx-blue">Motion Mixer で組み立てた結果を、そのままアニメーションステートで触れます。</span>
+ベースアニメーションの上に <code>fix</code> レイヤーを足し、貫通していた部分に回転のキーを打って直せば完成です。</p>
+
+<p class="tx-muted">講師の方はここでも <code>Scene Animate</code> を赤い丸ノードにしていました。
+「Scene Animate は必ずこうしないと気が済まない」とのことです。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>Secondary Motion は pose tools の<strong>一番最後</strong>。灰色＝未適用、金色＝適用済みで見分けます</li>
+  <li>効果は <code>lag</code> / <code>jiggle</code> / <code>spring</code> の3種類</li>
+  <li><span class="tx-red">バネは <strong>translate</strong>、人形の体は <strong>rotation</strong></span> と、効かせるチャンネルを使い分けます</li>
+  <li>人形に付けるときは <strong>root コントロールを外します</strong>。変換が二重にかかります</li>
+  <li><span class="tx-red">焼いたあとに同じコントロールへ再度付けると二重に効きます。</span>金色のものを削除してから進めます</li>
+  <li>強すぎるときは strength を 0 にしてキーを打ち、効かせたい瞬間だけ上げます</li>
+  <li>もう1本アニメーションが要るときは、<strong>同じ <code>Scene Animate</code> 内に New Clip</strong> を作れば済みます</li>
+  <li>Motion Mixer で繋いだあと、<strong>Output Mode を <code>Apex Scene</code></strong> にして <code>Motion Mixer Fetch</code> 経由で戻せば、そのまま手直しできます</li>
+</ul>
+
+<p>Part I の本編はここまでです。次はこのあと30分以上続いた Q&amp;A から、実演付きで出てきた小ネタをまとめます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
