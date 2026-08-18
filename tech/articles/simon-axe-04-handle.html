@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 4 — ハンドルの稜線とグリップ | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Cube を45度回して Boolean Intersection で断面の稜線を作る方法、Collision and Limits 付きのベベル、グリップのくぼみについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 4 — ハンドルの稜線とグリップ</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=bIGOF5nvPtA">Axe modeling || Houdini tutorial</a>
+（Simon Houdini さん / 1:07:59 / 英語）の 40:50〜52:38 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-03-plates.html">ざっくり描いて引き算で揃える</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/bIGOF5nvPtA?start=2450"
+          title="Axe modeling || Houdini tutorial" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>斧の柄（ハンドル）とグリップを作ります。
+チャプターでいうと <code>Create Handle shape</code> と
+<code>Define handle shape and grip</code>（9分の長い節）にあたります。</p>
+
+<h2>1. ハンドルの輪郭</h2>
+
+<p>作り方は<a href="simon-axe-03-plates.html">前回</a>とまったく同じです。</p>
+
+<blockquote>また同じことをします。<strong>ざっくりカーブを描いて、他の形状で引き算する</strong>ので、
+正確に描く必要はありません。</blockquote>
+
+<p>大まかに描いて周りをぐるっと囲めば、あとは引き算で刃の形に合わせてくれます。
+細かい修正は後回しで構いません。</p>
+
+<h2>2. 断面に稜線を作る — Cube を45度回して交差させる</h2>
+
+<img src="img/simon-axe-modeling-004340.png" alt="Transform ノードのパラメータパネル。Rotate が 0 / -45 / 14.7509 になっている。ビューポートには参照写真のハンドルと、位置合わせ用の斜めの線">
+
+<p>参照写真を見ると、ハンドルの断面は真ん中が盛り上がった<strong>三角形に近い形</strong>をしています。
+この稜線を作る方法が面白いところでした。</p>
+
+<ol>
+  <li><code>PolyExtrude</code> で<strong>大きめに</strong>押し出します</li>
+  <li><code>Cube</code> を1つ置きます。デフォルトのサイズでメッシュより大きいので都合が良いです</li>
+  <li>Cube を<strong>45度回転</strong>させ、参照写真の稜線に合わせます</li>
+  <li><code>Boolean</code> を <strong><code>Intersection</code></strong> にして、重なった部分だけを残します</li>
+</ol>
+
+<p>上の画像の <code>Transform</code> パネルで実際の値が見えています。
+<strong>Rotate が Y に <code>-45</code>、Z に <code>14.7509</code></strong>。
+45度の回転に加えて、ハンドルの傾きに合わせた微調整が入っています。</p>
+
+<p class="tx-muted">位置合わせのときは <code>M</code> キーで<strong>ピボットのモードを切り替える</strong>と扱いやすくなります。
+動画でも何度も <code>M</code> を押しながら、伸ばしたり回したりしていました。</p>
+
+<p>Intersection の結果を見ながら形を追い込みます。
+<span class="tx-blue">ここが調整のしどころで、Cube を動かすだけで稜線の位置と角度が変わります。</span></p>
+
+<h2>3. 側面のベベル</h2>
+
+<img src="img/simon-axe-modeling-004910.png" alt="Box ノードのパラメータパネル。Primitive Type が Polygon Mesh、Uniform Scale が 0.36 になっている">
+
+<p>参照を見ると、ハンドルの側面はかなり大きく面取りされています。</p>
+
+<ol>
+  <li><code>2</code> キーで点、<code>3</code> キーでエッジのモードに切り替えます</li>
+  <li>側面のエッジを選択します</li>
+  <li><strong><code>C</code> キーを押しながら Bevel モード</strong>に入ります</li>
+  <li>ドラッグして面取りの量を決めます</li>
+</ol>
+
+<h3>Collision and Limits</h3>
+
+<p>ベベルのオプションに <strong><code>Collision and Limits</code></strong> というものがあり、
+これを使うと<span class="tx-blue">ジオメトリの形に応じて、ベベルできる限界を自動的に尊重してくれます</span>。</p>
+
+<p>大きくベベルしたときに他の面を突き抜けてしまう、といった破綻を防げます。
+「大きなベベルである必要はなく、あとでスムーズをかければいい」という方針でした。</p>
+
+<h2>4. グリップのくぼみ</h2>
+
+<p>握る部分の指がかりを作ります。ここも引き算です。</p>
+
+<ol>
+  <li><code>Tube</code> を置きます。ポリゴン数は多めに（動画では <strong>50</strong>）、形は閉じておきます</li>
+  <li>90度回転させます</li>
+  <li><code>Transform from Centroid</code> を使います。
+      <span class="tx-muted">あとで潰したくなったときに扱いやすいため、とのことでした</span></li>
+  <li>ハンドルの中ほどに置いてスケールを詰め、形に沿うよう回転させます</li>
+  <li><strong>潰して</strong>から <code>Boolean</code> の Subtract で引きます</li>
+</ol>
+
+<p>くぼみの深さと形は、スケールと潰し具合で決まります。
+動画でも「もう少し小さく」「潰しすぎた」と行き来しながら追い込んでいました。</p>
+
+<p>複数のくぼみを並べるときは、前回と同じく <code>Duplicate</code> が使えます。</p>
+
+<h2>5. 端の処理</h2>
+
+<p>ハンドルの上端と下端も整えます。</p>
+
+<ol>
+  <li><code>Cube</code> を端の位置に置きます</li>
+  <li><code>3</code> キーでエッジモードにして、<strong>下側のエッジを選んでベベル</strong>します</li>
+  <li>ベベルの入り方が気に入らなければ、Cube 自体を動かします。
+      <code>3</code> を押してから <code>V</code> キーでエッジを動かすこともできます</li>
+  <li>下端も同様に。ここでも <code>Transform from Centroid</code> を使っていました</li>
+</ol>
+
+<blockquote>Cube はいろいろな方向に回せるので、<strong>狙った形になるまで動かせばいい</strong>という発想です。
+引き算する側の形を触るだけで結果が変わります。</blockquote>
+
+<h2>6. 貫通する穴を忘れずに</h2>
+
+<p>ハンドルにも大きな穴が開いています。
+<a href="simon-axe-02-main-shape.html">2回目</a>で作った穴の形状を、
+<strong>この <code>Merge</code> にも参照させます</strong>。</p>
+
+<p><span class="tx-blue">同じ形を使い回しているので、穴のサイズを変えれば全パーツに一度で反映されます。</span></p>
+
+<p>最後に <code>Match Size</code> で全体の位置を合わせれば、ハンドルは完成です。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>ハンドルの輪郭も<strong>ざっくり描いて引き算</strong>。同じ手法の反復です</li>
+  <li>断面の稜線は <strong><code>Cube</code> を45度回して <code>Boolean</code> の <code>Intersection</code></strong> で作れます</li>
+  <li>実際の回転値は <strong>Y に -45度、Z に 14.75度</strong>でした</li>
+  <li>位置合わせは <code>M</code> キーで<strong>ピボットモードを切り替える</strong>と楽になります</li>
+  <li>ベベルは <code>C</code> キーを押しながら。<strong><code>Collision and Limits</code></strong> が破綻を防いでくれます</li>
+  <li>グリップのくぼみは <code>Tube</code> を潰して引き算。<code>Duplicate</code> で並べられます</li>
+  <li>共通の穴は<strong>同じ形状を <code>Merge</code> に参照させる</strong>ことで、一度の修正が全体に効きます</li>
+</ul>
+
+<p>次は最終回。ボルトを大量に配置する仕組みと、ハイポリ／ローポリの書き出しです。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

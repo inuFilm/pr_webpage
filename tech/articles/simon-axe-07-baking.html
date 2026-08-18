@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 7 — ケージを作ってマップをベイクする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。Normal と Peak で作るケージ、Edge マップの設定、Cd をカスタムアトリビュートとして焼く方法、UV の縁を消す処理について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 7 — ケージを作ってマップをベイクする</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=ZcXKWAUx2fE">Axe Texturing: full breakdown of COPs texturing in Houdini</a>
+（Simon Houdini さん / 1:04:35 / 英語）の 7:18〜20:40 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-06-copernicus-setup.html">Copernicus でテクスチャリングを始める</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/ZcXKWAUx2fE?start=438"
+          title="Axe Texturing: full breakdown of COPs texturing in Houdini" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>ベイクの精度を上げる工程です。ワークライトを整え、<strong>ケージ</strong>を作り、
+必要なマップを選んで焼きます。最後に<strong>UV の縁が出る問題</strong>を解決します。</p>
+
+<h2>1. ワークライト</h2>
+
+<p>ビューポートで右クリックすると、表示の設定が出てきます。</p>
+
+<ul>
+  <li><strong>Ambient Occlusion</strong> — 有効にすると見栄えがよくなります</li>
+  <li><strong>Shadows</strong> — 用途によっては強すぎることがあります。
+      <span class="tx-muted">動画では切っていました</span></li>
+</ul>
+
+<h3>Dome Light Setup</h3>
+
+<p>採用されていたのは <strong>Dome Light Setup</strong> です。
+プロパティを開くと <strong>HDR マップ</strong>が必要になります。
+他のレンダリングソフトと同じく、環境マップで照らす方式です。</p>
+
+<p>メニューを開くと <strong>Houdini 標準の HDRI</strong> が並んでいるので、そこから選べます。
+マップを切り替えると設定項目がさらに増える、いわば隠しメニューのような領域もあるとのことでした。</p>
+
+<p class="tx-muted">Physical Sky Light に切り替えると、また違う見え方になります。
+好みで選べばよさそうです。</p>
+
+<h2>2. ケージを作る</h2>
+
+<img src="img/simon-axe-texturing-001310.png" alt="Peak ノードのパラメータパネル。Distance が 0.2、Recompute Point Normals が有効。ネットワークは Axe_low.fbx から normal1、peak1 を経て CAGE の Null へ続く">
+
+<p>ベイクがうまくいかないとき——動画の言葉では「当たったり外れたり」する状態のとき——に使うのが
+<strong>ケージ</strong>です。ベイクノードの設定を <code>Cage Mesh</code> に切り替えて使います。</p>
+
+<h3>その前に確認すること</h3>
+
+<blockquote>あまり触れられていない点ですが、<strong>スケールの違い</strong>には注意が必要です。
+モデルを読み込んだとき、スケールが合っているか確かめてください。</blockquote>
+
+<h3>ケージとは</h3>
+
+<p>ケージは<strong>モデルより少しだけ大きい形</strong>です。
+「モデルの周りに少し縁がある」くらいの膨らみを持たせます。</p>
+
+<h3>簡単な作り方</h3>
+
+<p>上の画像のネットワークがその手順です。</p>
+
+<pre><code>file1 (Axe_low.fbx) → normal1 → peak1 → CAGE (Null)
+                    └→ LOW (Null)</code></pre>
+
+<ol>
+  <li><strong><code>Normal</code></strong> で法線を再計算します。
+      <span class="tx-blue">このとき、頂点（vertex）ではなく<strong>ポイント</strong>単位で計算するのが肝です</strong></span></li>
+  <li><strong><code>Peak</code></strong> で法線方向に膨らませます</li>
+</ol>
+
+<p><code>Peak</code> のパラメータで重要なのは2つです。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>パラメータ</th><th>設定</th></tr>
+    <tr><td><code>Distance</code></td><td>膨らませる量。画面では <code>0.2</code></td></tr>
+    <tr><td><code>Recompute Point Normals</code></td><td>有効</td></tr>
+  </table>
+</div>
+
+<blockquote>ここは<strong>行ったり来たりして探る部分</strong>です。
+0.2 を試して「これは効きますね」、次に 0.4 を試して
+「私の場合はこれが良さそうです」という進め方をしていました。
+<span class="tx-muted">モデルによって適切な値は変わります。</span></blockquote>
+
+<p>できたケージをベイクノードの cage 入力に繋ぐと、結果が変わります。
+<span class="tx-red">良くなる場合も悪くなる場合もある</span>ので、
+プレビューしながら判断することになります。</p>
+
+<h2>3. 必要なマップだけ焼く</h2>
+
+<img src="img/simon-axe-texturing-001640.png" alt="Bake Geometry Textures のパラメータパネル。Tangent Space / World Space / Geometry の各セクションが展開され、Edge の設定が Edge Samples 64、Mode Concave and Convex、Radius 0.375、Cusp Angle 30 になっている。ビューポートには白いエッジが浮かび上がった斧">
+
+<p>ベイクノードには多くの出力がありますが、
+<span class="tx-blue">既定では<strong>ほとんどがオフ</strong>になっています。</span>
+計算時間を節約するためで、必要なものだけ有効にします。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>セクション</th><th>主な項目</th></tr>
+    <tr><td>Tangent Space</td><td>Alignment（<code>Green Down</code>）／Tangent Normal ／ Rounded Edge Normal</td></tr>
+    <tr><td>World Space</td><td>Alignment（<code>Right-Handed (Y-Up)</code>）／World Normal（Offset 0 to 1）／Position（Relative・Fit to Bounding Box）</td></tr>
+    <tr><td>Geometry</td><td>Ambient Occlusion ／ Curvature ／ <strong>Edge</strong> ／ Cavity ／ Thickness ／ Height ／ Alpha</td></tr>
+  </table>
+</div>
+
+<h3>Edge マップの設定</h3>
+
+<p>上の画像で Edge の設定が読み取れます。ビューポートに白いエッジが浮かび上がっているのがその結果です。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>パラメータ</th><th>値</th></tr>
+    <tr><td>Edge Samples</td><td><code>64</code></td></tr>
+    <tr><td>Mode</td><td><code>Concave and Convex</code></td></tr>
+    <tr><td>Radius</td><td><code>0.375</code></td></tr>
+    <tr><td>Cusp Angle</td><td><code>30</code></td></tr>
+  </table>
+</div>
+
+<p><strong>Radius</strong> を上げるとエッジが太くなります。
+<strong>Cusp Angle</strong> はメッシュの角度が基準で、
+<span class="tx-blue">下げる（例: 11）とより多くのエッジを拾います。</span></p>
+
+<p><code>Convex</code> と <code>Concave</code> を分けて使うこともできます。</p>
+
+<blockquote>Curvature マップと似ていますが、違うものです。
+<strong>Curvature に慣れているなら Curvature を使えばいい</strong>と思います。
+これから何をするかによって、どちらが便利かは変わります。</blockquote>
+
+<p>AO は既定でオンです。サンプル数と距離を調整できます。</p>
+
+<h2>4. カスタムアトリビュートを焼く — 色分けをマップにする</h2>
+
+<p><a href="simon-axe-05-bolts-highpoly.html">モデリング編</a>で仕込んだ <code>Cd</code> の色分けを、
+ここでマップとして取り出します。</p>
+
+<ol>
+  <li>プラスアイコンをクリックして項目を追加します</li>
+  <li>名前に <strong><code>Cd</code></strong> と入力します</li>
+  <li>型を <strong>RGB</strong> にします</li>
+  <li><code>custom</code> 出力をプレビューすると、色分けされたマップが見えます</li>
+</ol>
+
+<p><span class="tx-blue">これがマテリアルを分けるためのマスクになります。</span></p>
+
+<h2>5. UV の縁が見える問題を直す</h2>
+
+<p>焼いたマップをよく見ると、<span class="tx-red">UV シェルの境目が見えてしまいます。</span>
+Position マップなどでは特にはっきり出ます。</p>
+
+<blockquote>解像度を上げれば目立たなくはなりますが、根本的な解決ではありません。
+実際には多くのパッケージが<strong>テクスチャ空間で色を外側に伸ばす</strong>処理をしています。</blockquote>
+
+<p>Copernicus にもこの機能があり、有効にすると
+<strong>UV シェルの外側に、同じ色が伸びて塗られます</strong>。
+オンとオフを切り替えると、縁の処理が変わるのがはっきり分かります。</p>
+
+<h3>動画時点でのバグと回避策</h3>
+
+<p>この機能に不具合があったようで、回避策が紹介されていました。</p>
+
+<blockquote>SideFX が将来直すと思いますが、今のところ小さな回避策があります。
+<strong>カスタムアトリビュートをもう1つ追加してください。</strong>
+使う必要はありません。オフのままで構いません。少し待てば動きます。</blockquote>
+
+<h3>custom は複数のデータを束ねている</h3>
+
+<p><code>custom</code> 出力は<strong>複数のストリームを持てる</strong>ようになっています。
+複数のテクスチャがまとまって入っているので、
+<span class="tx-blue">使うときは<strong>アンパックして取り出します</strong>。</span></p>
+
+<p>これで縁のないきれいなマスクが焼けました。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>ワークライトは <strong>Dome Light Setup</strong> ＋ Houdini 標準の HDRI が手軽です</li>
+  <li>ベイクが不安定なときは<strong>ケージ</strong>を使います。まず<strong>スケール</strong>を確認します</li>
+  <li>ケージは <code>Normal</code>（<span class="tx-blue">ポイント単位</span>）→ <code>Peak</code> で作れます</li>
+  <li><code>Peak</code> の <code>Distance</code> と <code>Recompute Point Normals</code> が要点。値は試行錯誤で決めます</li>
+  <li>ベイクの出力は<strong>既定でほぼオフ</strong>。必要なものだけ有効にします</li>
+  <li>Edge は Radius で太さ、<strong>Cusp Angle を下げると拾うエッジが増えます</strong></li>
+  <li>カスタムアトリビュートに <code>Cd</code> を RGB で追加すれば、<strong>色分けがマスクになります</strong></li>
+  <li>UV の縁は<strong>外側に色を伸ばす機能</strong>で解決します。<span class="tx-muted">動画時点では、ダミーのカスタムアトリビュートを1つ足す回避策が必要でした</span></li>
+  <li><code>custom</code> 出力は複数データの束なので<strong>アンパックして使います</strong></li>
+</ul>
+
+<p>次はマスクを整理して、マテリアル用の HDA を組み立てていきます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

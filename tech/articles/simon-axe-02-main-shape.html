@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 2 — 刃のメインシェイプを立ち上げる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Group Create の Bounding Box で壊れないエッジ選択を作る方法、Boolean での引き算、Duplicate での穴の展開について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 2 — 刃のメインシェイプを立ち上げる</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=bIGOF5nvPtA">Axe modeling || Houdini tutorial</a>
+（Simon Houdini さん / 1:07:59 / 英語）の 11:35〜24:55 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-01-curve.html">参照画像とカーブで輪郭を取る</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/bIGOF5nvPtA?start=695"
+          title="Axe modeling || Houdini tutorial" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>チャプターでいうと <code>Define main shape</code> にあたる、13分ほどの長い一節です。
+前回作った輪郭から、斧の刃の本体を立ち上げます。</p>
+
+<h2>1. 刃の鋭いエッジを作る — 選択を壊さない工夫</h2>
+
+<img src="img/simon-axe-modeling-001350.png" alt="Group Create のパラメータパネル。Group Name が sharp_edge、Group Type が Edges、Keep in Bounding Regions の Bounding Type が Bounding Box になっている。ビューポートには刃のエッジを囲む赤いボックス">
+
+<p>刃の鋭い部分を作るには、そのエッジにベベルをかけます。
+手でエッジを選んで（<code>Shift</code> で追加選択、<code>Shift</code>+<code>A</code> でループ選択）
+ベベルすることもできますが、<span class="tx-red">ここに落とし穴があります。</span></p>
+
+<blockquote>あとからカーブを変更すると、<strong>手で作った選択は壊れます。</strong>
+カーブは何度でも戻って直せるのが利点なので、
+選択のほうも<strong>プロシージャルにしておくべき</strong>です。</blockquote>
+
+<h3>Group Create で範囲指定する</h3>
+
+<ol>
+  <li><code>Group Create</code> を置き、Group Name を <code>sharp_edge</code> にします</li>
+  <li>Group Type を <strong><code>Edges</code></strong> にします</li>
+  <li><strong><code>Keep in Bounding Regions</code></strong> を有効にし、
+      Bounding Type を <strong><code>Bounding Box</code></strong> にします</li>
+  <li>ワールドにボックスが出るので、<strong>刃の縁だけを囲む</strong>ように小さくして位置を合わせます</li>
+</ol>
+
+<p><span class="tx-blue">これで「この空間に入っているエッジ」という指定になるので、
+カーブを変えても選択が追従します。</span>
+<code>Space</code>+<code>3</code> でエッジモードに切り替えると作業しやすくなります。</p>
+
+<h3>ベベルをかける</h3>
+
+<p>できた <code>sharp_edge</code> グループを指定してベベルします。
+全体にかけるのではなく、グループだけに効かせられます。</p>
+
+<blockquote>ここで重要なのは、<strong>ベベルをかける面が可能なかぎり平らであること</strong>です。
+途中に点があると、<span class="tx-red">ベベルは最初に行き当たった点で止まってしまいます。</span></blockquote>
+
+<p>丸くなってしまっては困るので、鋭いエッジが出るように調整します。
+これで刃の基本形ができました。</p>
+
+<h2>2. 厚みを付けて閉じた形にする</h2>
+
+<p><code>PolyExtrude</code> で厚みを付けます。ここで一点、見落としやすい設定がありました。</p>
+
+<p>そのままだと<strong>裏側が開いた状態</strong>になります。
+<code>PolyExtrude</code> の中で<strong>背面を出力するオプション</strong>を有効にすると、
+閉じた3D形状になります。</p>
+
+<h2>3. くぼみを彫る — Tube を引き算する</h2>
+
+<img src="img/simon-axe-modeling-002020.png" alt="Boolean ノードのパラメータパネル。Operation が Subtract になっている。ビューポートでは刃の形状にチューブ状の形が重なっている">
+
+<p>参照写真を見ると、刃の面にくぼみがあります。これを引き算で作ります。</p>
+
+<ol>
+  <li><code>Tube</code> をワールドに置き、参照に合わせて回転・スケールします
+      <span class="tx-muted">（<code>W</code> でワイヤーフレーム表示にすると合わせやすくなります）</span></li>
+  <li>列数を増やします。動画では思い切って <strong>60</strong> にしていました</li>
+  <li><code>Bevel</code> をかけます。このとき <strong><code>ignore flattened parts</code></strong> を使い、
+      値を上げて形を整えます</li>
+</ol>
+
+<blockquote>ジオメトリを増やすことを恐れる必要はありません。
+<span class="tx-muted">この段階では気前よく足してしまってよい、という方針でした。</span></blockquote>
+
+<h3>Transform from Centroid が便利</h3>
+
+<p>位置を調整するときに <strong><code>Transform from Centroid</code></strong> が使われていました。</p>
+
+<blockquote>このノードは<strong>重心（centroid）を自動的に取ってくれる</strong>ので便利です。
+もしこのノードが手元に無ければ、
+通常の Transform の pivot 欄に <code>centroid</code> の関数を直接書けば同じことができます。</blockquote>
+
+<p>あとは <code>R</code> や <code>E</code> キーでモードを切り替えながら、
+回転や潰し具合を調整して参照に近づけます。
+最初はベベルが引き伸ばされたようになるので、チューブ自体を潰して形を整えていました。</p>
+
+<h3>Boolean で引く</h3>
+
+<p>形が決まったら <strong><code>Boolean</code></strong> の <strong><code>Subtract</code></strong> で刃から引きます。
+上の画像のパラメータパネルがその設定です。</p>
+
+<p class="tx-muted">Boolean のパネルには <code>Detriangulate</code>（All Polygons）や
+<code>Assume Seam Polygons Are Flat</code> といった項目もあり、
+継ぎ目の処理を細かく制御できるようになっています。</p>
+
+<h2>4. 左右対称にしてプレビューする</h2>
+
+<p>刃の両面を作るために <code>Symmetry</code> を足し、反対側にも同じくぼみを作ります。</p>
+
+<h3>ハイポリのプレビュー</h3>
+
+<p>仕上がりを確認するには、ボクセル（VDB）でハイポリ化して見るのが早いとのことでした。</p>
+
+<ul>
+  <li>ボクセルサイズを <code>0.01</code> 程度にして変換します</li>
+  <li>スムージングを何回か回すと、刃がなめらかになります</li>
+  <li><span class="tx-blue">プレビュー段階では<strong>100万ポリゴンくらいを狙う</strong>と処理が速く、様子も十分わかります</span></li>
+</ul>
+
+<p>最終的な解像度は後の工程で上げるので、ここでは軽く保っておきます。</p>
+
+<h2>5. 穴を開ける — Duplicate で並べる</h2>
+
+<p>参照を見ると、刃に穴がいくつも開いています。これも引き算で作ります。</p>
+
+<ol>
+  <li>小さい <code>Tube</code> を作り、中心を合わせてサイズを詰めます</li>
+  <li><strong><code>Duplicate</code></strong> ノードで複製します</li>
+  <li>pivot に <strong>centroid の X / Y / Z</strong> をコピーして入れます
+      <span class="tx-muted">（Z は既にその位置なので不要な場合もあります）</span></li>
+  <li>複製する個数を指定します</li>
+  <li><code>Duplicate</code> をもう1つ重ねると、<strong>縦横に展開できます</strong></li>
+</ol>
+
+<p>動画では6個の穴を作るつもりが9個並んでしまい、数を2に戻して調整していました。
+<span class="tx-blue">数を1つ変えるだけで並びが変わるのがプロシージャルの利点です。</span></p>
+
+<p>できた穴たちを <code>Merge</code> でまとめて、まとめて <code>Boolean</code> で引きます。
+大きい穴も同じ手順で、チューブをコピーして中心に置き、半径を調整して作ります。</p>
+
+<blockquote><span class="tx-red">これらの穴の形は、後で必ず再利用します。</span>
+刃の他のパーツも<strong>貫通する</strong>ので、同じ形で引き算する必要があるためです。</blockquote>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>手でエッジを選ぶと<strong>カーブを直したときに選択が壊れます</strong></li>
+  <li><code>Group Create</code> の <strong><code>Keep in Bounding Regions</code>（Bounding Box）</strong>で範囲指定すれば追従します</li>
+  <li>ベベルは<span class="tx-red">平らな面でないと、最初の点で止まります</span></li>
+  <li><code>PolyExtrude</code> は<strong>背面の出力を有効に</strong>しないと開いた形状のままです</li>
+  <li>くぼみは <code>Tube</code> を作って <code>Boolean</code> の <code>Subtract</code> で引きます</li>
+  <li><code>Transform from Centroid</code> は重心を自動で取ってくれます。無ければ pivot に <code>centroid</code> 関数を書きます</li>
+  <li>プレビューは VDB で<strong>100万ポリゴン程度</strong>を狙うと軽くて十分見えます</li>
+  <li>穴は <code>Duplicate</code> を重ねて縦横に展開できます。<strong>この形は後で再利用します</strong></li>
+</ul>
+
+<p>次は中央の金属プレートを作り、本体から引き算していきます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 8 — マテリアル HDA と Cable 型 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。色からマスクを作る手順、AO / Curvature / Pattern を入力に持つマテリアル HDA、複数テクスチャを束ねる Cable 型について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 8 — マテリアル HDA と Cable 型</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=ZcXKWAUx2fE">Axe Texturing: full breakdown of COPs texturing in Houdini</a>
+（Simon Houdini さん / 1:04:35 / 英語）の 20:40〜38:51 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-07-baking.html">ケージを作ってマップをベイクする</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/ZcXKWAUx2fE?start=1240"
+          title="Axe Texturing: full breakdown of COPs texturing in Houdini" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>ここからが本題です。<strong>マスクを作り、マテリアル用の HDA を組み立て、ベースカラーを作る</strong>まで。
+このシリーズで最も密度の高い部分だと思います。</p>
+
+<h2>1. 色からマスクを作る</h2>
+
+<p>前回焼いた <code>Cd</code> のマップから、パーツごとのマスクを取り出します。</p>
+
+<blockquote>やり方はいくつかありますが、これは<strong>他のパッケージに慣れている人には馴染みやすい</strong>方法です。
+「色が赤ならそこを全部サンプリングする」という考え方です。</blockquote>
+
+<ol>
+  <li><strong>pre-multiply を無効</strong>にします。これで普段見慣れた結果になります</li>
+  <li><strong>Unlit Mode</strong> に切り替えます</li>
+  <li><strong>スポイトのアイコン</strong>をクリックして、拾いたい部位の色をクリックします</li>
+  <li><code>Null</code> を置いてプレビューすると、白黒のマスクとして確認できます</li>
+</ol>
+
+<p>この手順で3つのマスクを作っていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>マスク</th><th>対象</th></tr>
+    <tr><td>handle mask</td><td>ハンドル</td></tr>
+    <tr><td>bolts mask</td><td>ボルト</td></tr>
+    <tr><td>mid panel mask</td><td>中央パネル</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">刃そのものはベースのマテリアルにして、
+その上に他のマスクで上書きしていく</span>という構成です。
+そのため刃のマスクは作っていません。</p>
+
+<p class="tx-muted">拾った結果に小さな点々（スペックル）が残ることがありますが、
+あとから調整できるとのことでした。</p>
+
+<h2>2. マテリアルを HDA にする</h2>
+
+<img src="img/simon-axe-texturing-002750.png" alt="Edit Operator Type Properties の Input/Output タブ。input1 が AO、input2 が Curvature、input3 が Pattern ですべて Mono、output1 が material で型が Cable になっている">
+
+<p>マテリアルは、ひとつの<strong>道具（ツール）</strong>として作ります。</p>
+
+<blockquote>マテリアルのプロパティを持つ単純なツールを1つ作って、
+<strong>それをコピーして少しずつ変える</strong>という進め方をします。
+金属やプラスチックなど、性質の違うマテリアルを表現していきます。</blockquote>
+
+<h3>設計方針</h3>
+
+<blockquote>プロシージャルで、賢く、<strong>別のモデルにも対応できる</strong>ようにしたい。
+違うモデルにこのツールを差し込むだけで動くように作ります。</blockquote>
+
+<h3>入力と出力</h3>
+
+<p>サブネットワークを作り、右クリックから <strong>Create Digital Asset</strong> を選びます。
+名前は <code>material_procedural_wear</code> としていました。</p>
+
+<p>上の画像が入出力の設定です。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th></th><th>名前</th><th>ラベル</th><th>型</th></tr>
+    <tr><td>input1</td><td><code>input1</code></td><td>AO</td><td><strong>Mono</strong></td></tr>
+    <tr><td>input2</td><td><code>input2</code></td><td>Curvature</td><td><strong>Mono</strong></td></tr>
+    <tr><td>input3</td><td><code>input3</code></td><td>Pattern</td><td><strong>Mono</strong></td></tr>
+    <tr><td>output1</td><td><code>output1</code></td><td>material</td><td><strong><code>Cable</code></strong></td></tr>
+  </table>
+</div>
+
+<p>Pattern は<strong>任意のノイズやパターン</strong>を差し込む口です。
+テスト用にフラクタルノイズを繋いでいました。</p>
+
+<h3>Cable という型</h3>
+
+<p><span class="tx-blue">出力の型が <code>Cable</code> になっているのがポイントです。</span></p>
+
+<blockquote>マテリアルは多くの要素からできています。
+ゲームで使うなら、通常はカラーマップ、メタルマップ、ラフネスマップ、ノーマルマップ
+あたりが一般的です。他のマップは、いつも保存しておくには多すぎます。</blockquote>
+
+<p><code>Cable</code> は<strong>複数のテクスチャを1本にまとめて持ち運ぶための型</strong>です。
+前回の <code>custom</code> 出力と同じ考え方で、パックしたりアンパックしたりできます。</p>
+
+<img src="img/simon-axe-texturing-003140.png" alt="TAB メニューで cable と入力した状態。Cable Filter / Cable Merge / Cable Pack / Cable Sort / Cable Split / Cable Switch / Cable Rename / Cable Unpack が並んでいる。右には HSV Adjust のパラメータ">
+
+<p>TAB メニューで <code>cable</code> と打つと、専用のノード群が出てきます。</p>
+
+<p><code>Cable Filter</code> / <code>Cable Merge</code> / <code>Cable Pack</code> /
+<code>Cable Sort</code> / <code>Cable Split</code> / <code>Cable Switch</code> /
+<code>Cable Rename</code> / <code>Cable Unpack</code></p>
+
+<h2>3. ベースカラーを作る</h2>
+
+<p>HDA の中身を組み立てていきます。使うノードは意外と少なめです。</p>
+
+<h3>色の基本を置く</h3>
+
+<ol>
+  <li><code>Constant</code> で色を作ります。<strong>RGB に設定するのを忘れずに</strong></li>
+  <li>動画では青を選んで、これをマテリアルの基本色にしていました</li>
+</ol>
+
+<h3>パターンを混ぜる</h3>
+
+<p>ブレンドで混ぜる方法もありますが、
+<span class="tx-blue">講師の方は <strong><code>HSV Adjust</code></strong> を使う方法を好んでいました。</span></p>
+
+<ul>
+  <li>ソースが色、<strong>マスクがパターン</strong>です</li>
+  <li>値をすべて同じままにすれば何も起きません</li>
+  <li><strong>Value を少し下げる</strong>とパターンがうっすら出ます</li>
+  <li><strong>Hue を少し変える</strong>と色味に変化が出ます</li>
+</ul>
+
+<p>上の画像の右側が実際の設定で、
+<code>Hue Shift</code> が <strong>177</strong>、<code>Saturation Scale</code> が <strong>1.793</strong>、
+<code>Value Scale</code> が <strong>0.237</strong> になっています。
+<code>Keep Luminance</code> と <code>Treat RGBA as Premultiplied</code> にチェックが入っています。</p>
+
+<h3>AO を重ねる</h3>
+
+<p>アンビエントオクルージョンを乗せる方法も2通り示されていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>方法</th><th>手順</th></tr>
+    <tr><td>掛け算</td><td><code>Mono to RGB</code> で変換して <strong>multiply</strong> でブレンド</td></tr>
+    <tr><td>マスクとして使う</td><td><code>HSV Adjust</code> のマスクに入れて Value を下げる</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-red">AO をマスクに使う場合、多くは反転が必要です。</span>
+<strong><code>Remap</code></strong> ノードで<strong>レンジを反転</strong>するボタンを押せば済みます。</p>
+
+<p>AO に色を付けることもできて、動画では<strong>茶色っぽい埃の感じ</strong>を出していました。</p>
+
+<h3>ラフネス</h3>
+
+<p>ラフネスはひとまず <code>Constant</code> で <strong>0.5</strong>。特別なことはしていません。</p>
+
+<p><span class="tx-blue">要素には名前を付けておきます。</span>
+ここでは <code>Base Color</code> と <code>Roughness</code> の2つです。</p>
+
+<blockquote>この動画で扱うのはこの2つだけです。
+ノーマルマップやメタルネスなどは、必要に応じて足してください。</blockquote>
+
+<h2>4. なぜパック／アンパックするのか</h2>
+
+<p>できたマテリアルは、そのままドラッグ＆ドロップでは使えません。
+<strong><code>Cable Unpack</code></strong> を通し、フィールドを設定すると
+ベースカラーとラフネスが自動的に取り出されます。</p>
+
+<p>手間に見えますが、理由がはっきり説明されていました。</p>
+
+<blockquote>なぜパックとアンパックをするのか。
+将来<strong>マテリアルノードを複数置いたとき</strong>、
+<span class="tx-blue">マスクを使ってマテリアル同士をブレンドするだけで済むからです。</span>
+とても速く、レイヤーのように重ねていけます。</blockquote>
+
+<p>つまり<strong>マテリアル1つ＝1本のケーブル</strong>として扱えるようにしておくことで、
+「金属の上に錆を重ねる」といった操作が、
+マップを1枚ずつ配線し直すのではなく<strong>ケーブル単位のブレンド</strong>で済むようになります。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>マスクは <strong>pre-multiply をオフ + Unlit Mode + スポイト</strong>で色から作れます</li>
+  <li>ベースになる部位（この例では刃）のマスクは作らず、<strong>上書きしていく構成</strong>にします</li>
+  <li>マテリアルは<strong>HDA にして使い回します</strong>。別モデルでも差し込めるように作ります</li>
+  <li>入力は <strong>AO / Curvature / Pattern の3つ、すべて Mono</strong></li>
+  <li>出力の型は <strong><code>Cable</code></strong>。複数テクスチャを1本にまとめられます</li>
+  <li>色は <code>Constant</code>（RGB）＋ <code>HSV Adjust</code> でパターンを混ぜます</li>
+  <li>AO をマスクに使うときは <strong><code>Remap</code> でレンジを反転</strong>します</li>
+  <li><span class="tx-blue">パック／アンパックするのは、マテリアル同士をマスクでブレンドできるようにするため</span>です</li>
+</ul>
+
+<p>次はラフネスマップを作り込み、HDA を仕上げます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

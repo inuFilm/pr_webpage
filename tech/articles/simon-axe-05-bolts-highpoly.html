@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 5 — ボルトの仕組みとハイポリ／ローポリ | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Copy to Points でのボルト配置と仕組みの使い回し、ID アトリビュートでのマスク生成、Remesh to Grid と PolyReduce について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 5 — ボルトの仕組みとハイポリ／ローポリ</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=bIGOF5nvPtA">Axe modeling || Houdini tutorial</a>
+（Simon Houdini さん / 1:07:59 / 英語）の 52:38〜最後まで。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-04-handle.html">ハンドルの稜線とグリップ</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/bIGOF5nvPtA?start=3158"
+          title="Axe modeling || Houdini tutorial" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>モデリング編の最終回です。<strong>ボルトを並べる仕組み</strong>を作り、
+テクスチャリングに渡すための<strong>ハイポリとローポリ</strong>を書き出します。</p>
+
+<h2>1. ボルトの仕組みを作る</h2>
+
+<p>参照写真を見ると、上のプレートにボルトが7本並んでいます。
+1本ずつ配置するのではなく、<strong>点を置いてそこに形をコピーする</strong>仕組みにします。</p>
+
+<h3>点を置く</h3>
+
+<ol>
+  <li><code>Add</code> ノードで<strong>点の数を7</strong>にします</li>
+  <li>フロントビューに切り替えます。点は中央に固まっているので、
+      <strong>1つずつ掴んで参照写真の位置に置いていきます</strong></li>
+</ol>
+
+<p class="tx-muted">「完璧である必要はありません」とのことで、あとから微調整できます。</p>
+
+<h3>点に形をコピーする</h3>
+
+<p>使うのは <strong><code>Copy to Points</code></strong> です。
+<span class="tx-muted">「Houdini でとてもよく使われるノードです」と紹介されていました。</span></p>
+
+<p>コピーするものは2種類あります。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>用途</th><th>作り方</th></tr>
+    <tr><td><strong>穴</strong>（引き算する側）</td><td><code>Tube</code> を40分割くらいで小さく作り、軸を合わせて回転</td></tr>
+    <tr><td><strong>ボルト本体</strong></td><td>同じチューブを複製し、<strong>6角形</strong>にして潰し、引き算で溝を作る</td></tr>
+  </table>
+</div>
+
+<p>穴のほうは <code>Boolean</code> の Subtract で本体から引きます。
+このとき<span class="tx-blue">チューブを少しずらして配置すると、面取りが自動的に付きます。</span></p>
+
+<p>ボルト本体は <code>Merge</code> で足し込み、<code>Transform</code> で位置を合わせます。
+<span class="tx-muted">「やりすぎず、単純に Transform で済ませます」とのことでした。</span></p>
+
+<h3>この仕組みごと使い回す</h3>
+
+<blockquote>中央のプレートにも5本のボルトがあります。
+<strong>作ったボルトの仕組みを、まるごとコピー＆ペーストします。</strong></blockquote>
+
+<p>貼り付けたら、点の数を <code>7</code> から <code>5</code> に変えて位置を動かすだけです。
+ボルトの太さや大きさも <code>Transform</code> ひとつで変えられます。</p>
+
+<p><span class="tx-blue">仕組み自体が再利用できるので、
+似たものが増えても手間がほとんど増えません。</span></p>
+
+<h2>2. パーツごとに ID を振る</h2>
+
+<img src="img/simon-axe-modeling-010020.png" alt="Labs Symmetrize のパネルと、参照写真の上に完成した斧が表示されたビューポート。ネットワークは merge3 から symmetrize1、remeshgrid1 へ続く">
+
+<p>ここが後工程に効いてくる仕込みです。</p>
+
+<ol>
+  <li><code>Attribute Create</code> を置きます</li>
+  <li>名前を <strong><code>ID</code></strong> にします</li>
+  <li>クラスを <strong>Primitive</strong>、型を <strong>String</strong> にします</li>
+  <li>値をパーツごとに <code>A</code>、<code>B</code>、<code>C</code>… と付けます。
+      ボルトだけは <strong><code>bolts</code></strong> という名前にしていました</li>
+</ol>
+
+<blockquote>すべてを <code>Merge</code> したあとでも、<strong>どのポリゴンがどのパーツか</strong>を
+取り出せるようにするためです。</blockquote>
+
+<h3>ID マップを作る</h3>
+
+<p><code>Color</code> ノードの <strong>Color from Attribute</strong> を使い、
+クラスを <strong>Primitive</strong> にして <code>ID</code> を指定すると、
+<span class="tx-blue">パーツごとに色分けされた ID マップができます。</span></p>
+
+<p>これは Substance Painter などに渡す<strong>マスク</strong>として使えます。
+「ボルトだけを狙う」といった操作が簡単になります。</p>
+
+<p class="tx-muted">プレビュー用に、刃は薄いグレー、中央プレートは中間グレー…と
+実際の色を付けておくのも紹介されていました。Houdini 内で完成イメージを掴むためです。</p>
+
+<h2>3. ハイポリを作る</h2>
+
+<img src="img/simon-axe-modeling-010520.png" alt="Remesh to Grid のパラメータパネル。Surface Type が Closed Volume、Element Size が 0.0005、Project to Original が有効になっている。ビューポートには完成したハイポリの斧">
+
+<p>ハイポリ化には <strong><code>Remesh to Grid</code></strong> が使われていました。
+上の画像で設定が読み取れます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>パラメータ</th><th>値</th></tr>
+    <tr><td>Surface Type</td><td><code>Closed Volume</code></td></tr>
+    <tr><td>Element Size</td><td><code>0.0005</code></td></tr>
+    <tr><td>Adaptivity</td><td><code>0</code></td></tr>
+    <tr><td>Project to Original</td><td>有効</td></tr>
+    <tr><td>VDB Smoothing</td><td><code>0.001</code></td></tr>
+  </table>
+</div>
+
+<h3>まとめてリメッシュすると破綻する</h3>
+
+<p><span class="tx-red">全部を一度にリメッシュすると、プレート同士やボルトが1つの塊に融合してしまいます。</span></p>
+
+<p>解決策として、<strong>パーツごとに個別にリメッシュする</strong>方法が取られていました。
+動画では「4回ループする」と説明されており、パーツの数だけ処理を繰り返す形です。</p>
+
+<p><span class="tx-blue">こうするとパーツの境界が保たれ、
+エッジがきれいに丸まってベイクに向いた形になります。</span>
+品質を上げたければ解像度を上げるだけです。</p>
+
+<h3>ID を引き継ぐ</h3>
+
+<p>リメッシュ後も ID を残したいので、<code>Attribute Copy</code> で <code>ID</code> を転送します。</p>
+
+<blockquote>色が表示されないことがありますが、これは
+<strong>Houdini がポイントの色を優先する</strong>ためです。
+ポイントの色とプリミティブの色が重複しているので、
+<span class="tx-blue"><code>ID</code> をプリミティブからポイントに promote</span> してしまうのが簡単です。</blockquote>
+
+<p>あとは <code>FBX</code> ノードで書き出せば、ハイポリは完成です。</p>
+
+<h2>4. ローポリを作る</h2>
+
+<p>ローポリは <code>Merge</code> したものから <strong><code>PolyReduce</code></strong> で作ります。</p>
+
+<ul>
+  <li>目標ポリゴン数を指定します。動画では最初 <strong>7,000</strong> を狙っていました</li>
+  <li>実際には <strong>8,500 くらい</strong>が「ディテールが全部残る良い値」だったとのことです</li>
+  <li>ボルトのディテールも残っていました</li>
+</ul>
+
+<p class="tx-muted">「ボルトをローポリから外すこともできます。数値を変えるだけです」とも言われていました。</p>
+
+<h3>UV</h3>
+
+<p>UV 展開で触っていた項目です。</p>
+
+<ul>
+  <li><strong>回転ステップ</strong>を増やすと、配置の選択肢が広がります</li>
+  <li><strong>パディングと解像度</strong>を調整すると、パーツが均等に散らばります</li>
+  <li><strong><code>Harden UV Seams</code></strong> を有効にすると、
+      <span class="tx-blue">ベイクがうまくいくことがある</span>そうです</li>
+</ul>
+
+<p>書き出したものを Substance Painter に持っていくと、ID マップのおかげで
+マテリアルの割り当てがとても簡単になります。そこから Unreal へ、という流れでした。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>ボルトは <code>Add</code> で点を置き、<strong><code>Copy to Points</code></strong> で形を配置します</li>
+  <li>穴用のチューブを<strong>少しずらすと面取りが自動で付きます</strong></li>
+  <li><span class="tx-blue">ボルトの仕組みごとコピー＆ペーストできます。</span>点の数を変えるだけで別の場所に使い回せます</li>
+  <li><code>Attribute Create</code> で <strong>Primitive の String アトリビュート <code>ID</code></strong> を振っておきます</li>
+  <li><code>Color from Attribute</code>（Primitive）で<strong>ID マップ</strong>が作れます。Substance でのマスクになります</li>
+  <li>ハイポリは <code>Remesh to Grid</code>。<span class="tx-red">まとめてかけるとパーツが融合するので、パーツごとに処理します</span></li>
+  <li>色が出ないときは <code>ID</code> を<strong>プリミティブからポイントに promote</strong> します</li>
+  <li>ローポリは <code>PolyReduce</code>。<strong>8,500 ポリゴン</strong>でディテールが十分残りました</li>
+  <li>UV は <code>Harden UV Seams</code> がベイクの助けになることがあります</li>
+</ul>
+
+<p>モデリング編はここまでです。次はこの斧に、Copernicus（COPs）でテクスチャを付けていきます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

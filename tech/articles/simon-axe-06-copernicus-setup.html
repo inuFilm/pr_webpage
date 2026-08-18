@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 6 — Copernicus でテクスチャリングを始める | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。Copernicus ネットワークの初期設定、bake セットアップで付いてくる low/high/cage、Bake Geometry Textures が出力できる12種類のマップについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 6 — Copernicus でテクスチャリングを始める</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=ZcXKWAUx2fE">Axe Texturing: full breakdown of COPs texturing in Houdini</a>
+（Simon Houdini さん / 2025-09-15 / 1:04:35 / 英語）の 0:00〜7:18 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+モデリング編は<a href="simon-axe-01-curve.html">こちら</a>から始まります。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/ZcXKWAUx2fE"
+          title="Axe Texturing: full breakdown of COPs texturing in Houdini" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>このシリーズについて</h2>
+
+<p><a href="simon-axe-05-bolts-highpoly.html">モデリング編</a>で作った斧に、
+<strong>Houdini の中だけでテクスチャを付けていく</strong>チュートリアルです。
+Houdini 21 のリリースを受けて作られたもので、1時間5分・21チャプターあります。</p>
+
+<blockquote>以前と比べて、<strong>Houdini の中でテクスチャリングをかなりの部分までやれる</strong>という
+自信が持てるようになりました。それをここでやってみたい、というのが動画の趣旨です。</blockquote>
+
+<h2>1. モデルを用意する</h2>
+
+<p>斧のファイルが無くても試せるように、2つの方法が紹介されていました。</p>
+
+<h3>方法1: Test Geometry を使う</h3>
+
+<ol>
+  <li><code>Test Geometry</code> の <strong>Shader Ball</strong> を置きます</li>
+  <li><code>UV Layout</code> をかけて、これを<strong>ローポリ</strong>とします</li>
+  <li>元のモデルはサブディビジョンで作られているので、<code>Subdivide</code> をかけて<strong>ハイポリ</strong>とします</li>
+</ol>
+
+<h3>方法2: 実際のファイルを読み込む</h3>
+
+<p>片方しか無い場合の対処も示されていました。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>手元にあるもの</th><th>作り方</th></tr>
+    <tr><td>ハイポリだけ</td><td><code>PolyReduce</code> でローポリを作る</td></tr>
+    <tr><td>ローポリだけ</td><td><strong>ボクセル化してからスムージング</strong>をかける。90度の硬いエッジが少し丸くなります</td></tr>
+  </table>
+</div>
+
+<h3>色で部位を識別できるようにしておく</h3>
+
+<p><a href="simon-axe-05-bolts-highpoly.html">モデリング編の最後</a>と同じ考え方です。
+モデルの各部位に色を付けておくと、後のテクスチャリングで狙い撃ちできます。</p>
+
+<blockquote>モデルのすべての部位は<strong>それぞれ違うマテリアル</strong>になります。
+なので、この色分け（ID）のやり方をおすすめします。
+Substance でも同じことができて、<span class="tx-blue">マテリアルの選択とマスク作りがとても簡単になります。</span></blockquote>
+
+<p>色は <code>Color</code> ノードで付けます。<code>Cd</code> としてポイントのデータに入ります。
+グループを作って部位ごとに違う色を割り当てておきます。</p>
+
+<h3>Null を置いておく</h3>
+
+<p>ローポリとハイポリそれぞれに <code>Null</code> ノードを置き、
+これを Copernicus 側から参照します。</p>
+
+<blockquote>Null にしておくと<strong>あとから間に何かを挟めます。</strong>
+UV を作り直したり、法線を直したり、データを足したり。
+思ったとおりのデータになっていなければ、間に差し込めます。</blockquote>
+
+<h2>2. Copernicus ネットワークを作る</h2>
+
+<img src="img/simon-axe-texturing-000500.png" alt="空の Copernicus ネットワーク。ツールバーに Resolution 1024、Proxy 1:1、Border Wrap、Precision 32-bit、UDIM 1001 が並んでいる">
+
+<p><code>Copernicus Network</code> を置いてダブルクリックすると、
+テクスチャリング用のノードを置ける階層に入ります。</p>
+
+<p>上部のツールバーに主要な設定が並んでいます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>項目</th><th>初期値</th></tr>
+    <tr><td>Resolution</td><td>1024 × 1024</td></tr>
+    <tr><td>Proxy</td><td>1:1</td></tr>
+    <tr><td>Border</td><td>Wrap</td></tr>
+    <tr><td>Precision</td><td>32-bit</td></tr>
+    <tr><td>Tile Vis</td><td>3</td></tr>
+    <tr><td>UDIM</td><td>1001</td></tr>
+  </table>
+</div>
+
+<h2>3. Baker のセットアップ</h2>
+
+<img src="img/simon-axe-texturing-000635.png" alt="SOP Import が low / high / cage の3つ並び、bakegeometrytextures1 に繋がっている。ベイクノードの出力に normal、occlusion、curvature、cavity、thickness などが並ぶ">
+
+<p>ネットワークの中で <code>bake</code> と入力すると候補が出ます。
+<strong>ベイクノード単体</strong>と<strong>セットアップ</strong>のどちらも選べますが、
+<span class="tx-blue">セットアップを選ぶと必要なノードが一式ついてきます。</span></p>
+
+<p>上の画像がその結果です。<code>SOP Import</code> が3つ
+（<strong>low</strong> / <strong>high</strong> / <strong>cage</strong>）用意され、
+<strong><code>Bake Geometry Textures</code></strong> に繋がっています。</p>
+
+<p>あとはアイコンからメッシュのパスを指定するだけです。
+low には先ほどのローポリの Null、high にはハイポリの Null を選んで Accept します。</p>
+
+<h3>ベイクできるマップ</h3>
+
+<p>ノードの出力を見ると、焼けるものが一望できます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>入力</th><th>出力</th></tr>
+    <tr><td><code>size_ref</code> / <code>low</code> / <code>high</code> / <code>cage</code> / <code>skew</code></td>
+        <td><code>normal</code> / <code>edgenormal</code> / <code>worldnormal</code> / <code>position</code> /
+            <code>occlusion</code> / <code>curvature</code> / <code>edge</code> / <code>cavity</code> /
+            <code>thickness</code> / <code>height</code> / <code>alpha</code> / <code>custom</code></td></tr>
+  </table>
+</div>
+
+<p>この時点でノーマルマップが焼かれ、それらしい見た目になります。</p>
+
+<blockquote>解像度は上げられますが、<strong>まずは低い解像度で作業することをおすすめします。</strong>
+先にいくつか組み立ててから上げればいいためです。</blockquote>
+
+<h2>4. Material Previewer で3Dの見た目を確認する</h2>
+
+<p>2Dのマップだけ見ていても、モデル上でどう見えるかは分かりません。
+そこで <strong><code>Material Previewer</code></strong> を使います。</p>
+
+<ol>
+  <li>ジオメトリとマテリアルを繋ぎます。まずはジオメトリだけで構いません</li>
+  <li>焼いたノーマルマップを繋ぎます</li>
+  <li>解像度を上げると、より正確に見えます</li>
+</ol>
+
+<p><span class="tx-red">結果が更新されないときは、ノードを2回クリックしてみてください。</span>
+データがキャッシュされていることがあるためです。</p>
+
+<p>上の画像の右側が <code>Preview Material</code> のパラメータで、
+Metalness / Specular / Coat / Sheen / Emission / Normals and Displace /
+Transmission / Subsurface Scattering / Opacity といった項目が並んでいます。
+<code>Tint With Cd</code> にチェックが入っているのが、先ほどの色分けを活かす設定です。</p>
+
+<blockquote>Karma でのレンダリングなども使えますが、個人的には
+<strong>速いビューポートで作業を進められること</strong>を優先しています。
+完全に正確である必要はなく、速く作業できることのほうが大事です。</blockquote>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>斧が無くても <code>Test Geometry</code> の Shader Ball で試せます</li>
+  <li>ハイポリだけなら <code>PolyReduce</code>、ローポリだけなら<strong>ボクセル化してスムージング</strong></li>
+  <li>部位ごとに <code>Cd</code> で色を付けておくと、<span class="tx-blue">後のマスク作りが一気に楽になります</span></li>
+  <li>low / high は <code>Null</code> にしておくと、あとから間に処理を挟めます</li>
+  <li><code>Copernicus Network</code> の初期値は <strong>1024 × 1024 / 32-bit / UDIM 1001</strong></li>
+  <li><code>bake</code> と打って<strong>セットアップ</strong>を選べば、low / high / cage の <code>SOP Import</code> が一式付いてきます</li>
+  <li><code>Bake Geometry Textures</code> は normal / occlusion / curvature / cavity / thickness など<strong>12種類</strong>を出力できます</li>
+  <li>作業中は<strong>解像度を低めに</strong>。更新されないときはノードを2回クリックします</li>
+</ul>
+
+<p>次はワークライトを設定して、ケージを使ったベイクを詰めていきます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

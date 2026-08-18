@@ -11,6 +11,76 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "simon-axe-01-curve",
+    "title": "Houdini で斧を作る 1 — 参照画像とカーブで輪郭を取る",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Reference Images ノード、Curve のプリセットと描き方、Convert / Resample / Facet で点の数を整える手順について。"
+  },
+  {
+    "slug": "simon-axe-02-main-shape",
+    "title": "Houdini で斧を作る 2 — 刃のメインシェイプを立ち上げる",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Group Create の Bounding Box で壊れないエッジ選択を作る方法、Boolean での引き算、Duplicate での穴の展開について。"
+  },
+  {
+    "slug": "simon-axe-03-plates",
+    "title": "Houdini で斧を作る 3 — ざっくり描いて引き算で揃える",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。完璧にトレースせず Boolean で輪郭を揃える発想、Match Size でプレートを密着させる方法、法線でのグループ作成について。"
+  },
+  {
+    "slug": "simon-axe-04-handle",
+    "title": "Houdini で斧を作る 4 — ハンドルの稜線とグリップ",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Cube を45度回して Boolean Intersection で断面の稜線を作る方法、Collision and Limits 付きのベベル、グリップのくぼみについて。"
+  },
+  {
+    "slug": "simon-axe-05-bolts-highpoly",
+    "title": "Houdini で斧を作る 5 — ボルトの仕組みとハイポリ／ローポリ",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Copy to Points でのボルト配置と仕組みの使い回し、ID アトリビュートでのマスク生成、Remesh to Grid と PolyReduce について。"
+  },
+  {
+    "slug": "simon-axe-06-copernicus-setup",
+    "title": "Houdini で斧を作る 6 — Copernicus でテクスチャリングを始める",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。Copernicus ネットワークの初期設定、bake セットアップで付いてくる low/high/cage、Bake Geometry Textures が出力できる12種類のマップについて。"
+  },
+  {
+    "slug": "simon-axe-07-baking",
+    "title": "Houdini で斧を作る 7 — ケージを作ってマップをベイクする",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。Normal と Peak で作るケージ、Edge マップの設定、Cd をカスタムアトリビュートとして焼く方法、UV の縁を消す処理について。"
+  },
+  {
+    "slug": "simon-axe-08-material-hda",
+    "title": "Houdini で斧を作る 8 — マテリアル HDA と Cable 型",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。色からマスクを作る手順、AO / Curvature / Pattern を入力に持つマテリアル HDA、複数テクスチャを束ねる Cable 型について。"
+  },
+  {
+    "slug": "simon-axe-09-roughness-hda",
+    "title": "Houdini で斧を作る 9 — ラフネスと HDA のインターフェース",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。Screen と Multiply でのラフネス作り、HDA のパラメータをフォルダで整理する方法、Match Current Definition でのツール確定について。"
+  },
+  {
+    "slug": "simon-axe-10-blending-export",
+    "title": "Houdini で斧を作る 10 — マテリアルを重ねて書き出す",
+    "category": "houdini-modeling",
+    "date": "2026-08-18",
+    "description": "Simon Houdini さんの Axe Texturing チュートリアル最終回の日本語メモです。マスクの流用によるメタルネス、Reference と Delete Channel、Triplanar が動かない原因、ROP Image Output での一括書き出しについて。"
+  },
+  {
     "slug": "sidefx-animate-kinefx-01-basics",
     "title": "Houdini 22 KineFX アニメーション 1 — リグをノードとして扱う",
     "category": "houdini-animation",

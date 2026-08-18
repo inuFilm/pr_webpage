@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 3 — ざっくり描いて引き算で揃える | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。完璧にトレースせず Boolean で輪郭を揃える発想、Match Size でプレートを密着させる方法、法線でのグループ作成について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 3 — ざっくり描いて引き算で揃える</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=bIGOF5nvPtA">Axe modeling || Houdini tutorial</a>
+（Simon Houdini さん / 1:07:59 / 英語）の 24:55〜40:50 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-02-main-shape.html">刃のメインシェイプを立ち上げる</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/bIGOF5nvPtA?start=1495"
+          title="Axe modeling || Houdini tutorial" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>刃の上に重なる<strong>金属プレートを2層</strong>作ります。
+ここで出てくる考え方が、このチュートリアル全体でいちばん役に立つところだと思いました。</p>
+
+<h2>1. ざっくり描いて、引き算で揃える</h2>
+
+<p>中央の金属プレートは、刃のほとんどを覆いながら一部だけ形が違います。
+前回のようにカーブで正確にトレースしようとすると大変です。</p>
+
+<blockquote>完璧にトレースするのではなく、<strong>とてもざっくりした形</strong>を描きます。
+そして<strong>元の刃で引き算します。</strong>そうすれば
+<span class="tx-blue">輪郭が勝手にぴったり揃います。</span></blockquote>
+
+<p>気にするのは<strong>プレート固有の形をしている部分だけ</strong>で、
+刃と共通する輪郭は「だいたい外側を通っていればいい」という描き方をします。</p>
+
+<blockquote>この線を完璧になぞろうとしたら、きれいに仕上げるのに何時間もかかります。
+<strong>一度の引き算で済むなら、そのほうがずっと速い</strong>のです。</blockquote>
+
+<p>これがプロシージャルモデリングらしい発想だと思いました。
+<span class="tx-blue">形を「描いて合わせる」のではなく、「演算で合わせる」</span>という切り替えです。</p>
+
+<h2>2. プレートを組み立てる</h2>
+
+<img src="img/simon-axe-modeling-002810.png" alt="Boolean のパラメータパネルと、刃の上にプレートの輪郭がワイヤーフレームで重なったビューポート。左上には開けた穴が見えている">
+
+<ol>
+  <li>前回作った<strong>チューブで前面のくぼみを切り抜きます</strong>。
+      ここでも <code>Transform from Centroid</code> で位置を合わせます</li>
+  <li><code>PolyExtrude</code> で厚みを付け、形を閉じます</li>
+  <li><strong>元の刃の形状で <code>Boolean</code> の Subtract</strong> をかけます。これで輪郭が確定します</li>
+  <li>前回開けた穴を <code>Merge</code> でまとめ、まとめて引き算します</li>
+</ol>
+
+<p class="tx-muted">動画では <code>Merge</code> でまとめすぎてしまい、
+「これは繋ぎすぎですね」と配線を引き直す場面がありました。
+穴の形は共通なので、<strong>あとから大きさを変えれば全部に反映されます。</strong></p>
+
+<h3>面取りを足す</h3>
+
+<p>参照写真を見ると、プレートの縁に面取り（チャンファー）が入っています。
+<code>PolyBevel</code> をエッジに当てて <code>Enter</code> で確定するだけです。</p>
+
+<p>範囲を絞りたい場合は、前回と同じく<strong>グループを作ってその範囲だけ</strong>ベベルできます。
+動画では前面全体にかけていましたが、プリミティブを2つ選んでしまって
+「前面だけにしましょう」と選び直す場面もありました。</p>
+
+<h2>3. Match Size でプレートを重ねる</h2>
+
+<img src="img/simon-axe-modeling-003120.png" alt="Match Size のパラメータパネル。Justify With が Input 2 Bound で、Justify X / Y / Z がそれぞれ設定できるようになっている">
+
+<p>作ったプレートを刃の上に載せる段になって、
+<span class="tx-red">重なる位置がずれていることに気づきます。</span>
+手で数値を入れて合わせることもできますが、プロシージャルなやり方があります。</p>
+
+<p>それが <strong><code>Match Size</code></strong> です。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>パラメータ</th><th>設定</th></tr>
+    <tr><td><code>Justify With</code></td><td><code>Input 2 Bound</code>（2つ目の入力の境界に合わせる）</td></tr>
+    <tr><td><code>Justify X</code> / <code>Justify Y</code></td><td><strong>None</strong>（動かさない）</td></tr>
+    <tr><td><code>Justify Z</code></td><td><strong>Min → Max</strong>（奥行き方向だけ、端を合わせる）</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">これでプレートが刃の上に、ぴったり隙間なく載ります。</span>
+Z 軸を選んでいるのは、この作例で奥行きにあたる軸だからです。</p>
+
+<p>各軸には <code>Offset by</code> のスライダーもあるので、
+<strong>意図的に少し浮かせたい場合はここで調整できます。</strong>
+デフォルトでは完全に密着します。</p>
+
+<h2>4. 上層のプレートも同じ流れで</h2>
+
+<p>2枚目のプレートも、基本は同じ手順です。ここで補足されていた小技をいくつか。</p>
+
+<h3>法線で面を選ぶ</h3>
+
+<p>「Z軸のマイナス方向を向いている面をすべて反転させたい」といった指定は、
+<strong>法線をもとにグループを作る</strong>ことでできます。
+<code>Group Create</code> でその条件を作り、<code>Reverse</code> に渡します。</p>
+
+<p>同じ考え方で「前面のプリミティブだけ」を <code>front</code> というグループにして、
+そこにだけ処理をかける、という使い方もしていました。</p>
+
+<h3>2D の面のまま引き算する</h3>
+
+<p>シリンダー2本を追加で引き算する場面では、
+<span class="tx-muted">「これはまだ2Dの平面で、面を引き算しているだけです。それで正しいです」</span>
+と説明されていました。厚みを付けるのは引き算のあとで構いません。</p>
+
+<h2>5. ハイポリの見え方を確かめる</h2>
+
+<p>最終的にハイポリで見たときに破綻しないか、この段階で確認します。
+「完璧ではないけれど動く」簡易的な方法として紹介されていた手順です。</p>
+
+<ol>
+  <li><code>Fuse</code> で点をまとめます</li>
+  <li>エッジにベベルをかけます（動画では角度 <code>35</code> 度あたりで、必要な箇所だけに効かせていました）</li>
+  <li><code>Subdivide</code> でサブディビジョンをかけます</li>
+  <li>端の処理が気になる場合は<strong>三角化してからもう一度サブディビジョン</strong>します</li>
+</ol>
+
+<p>そのあと全体を <code>Merge</code> して <code>Match Size</code> で位置を合わせ、
+ボクセル化すればハイポリの雰囲気が確認できます。</p>
+
+<blockquote>まだエッジが目立つようなら、やることは単純です。
+<strong>点を増やせばいいだけ</strong>です。
+点を選んでベベルすれば点が増えます。</blockquote>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li><span class="tx-blue">完璧にトレースせず、ざっくり描いて元の形状で引き算すると輪郭が勝手に揃います</span></li>
+  <li>共通の穴は <code>Merge</code> でまとめて引き算します。<strong>1か所直せば全部に反映されます</strong></li>
+  <li>面取りは <code>PolyBevel</code>。範囲を絞るならグループを併用します</li>
+  <li><strong><code>Match Size</code></strong> で <code>Justify With</code> を <code>Input 2 Bound</code> にし、
+      <strong>合わせたい軸だけ Min/Max</strong>、他は None にすると密着します</li>
+  <li><code>Offset by</code> で意図的に浮かせることもできます</li>
+  <li>法線を条件にグループを作れば、「マイナス方向を向いた面だけ反転」といった処理ができます</li>
+  <li>ハイポリの確認は <code>Fuse</code> → ベベル → <code>Subdivide</code> の簡易手順で十分です</li>
+</ul>
+
+<p>次はハンドル（柄）とグリップを作ります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

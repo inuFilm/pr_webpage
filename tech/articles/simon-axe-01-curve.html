@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 1 — 参照画像とカーブで輪郭を取る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe modeling チュートリアルの日本語メモです。Reference Images ノード、Curve のプリセットと描き方、Convert / Resample / Facet で点の数を整える手順について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 1 — 参照画像とカーブで輪郭を取る</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=bIGOF5nvPtA">Axe modeling || Houdini tutorial</a>
+（Simon Houdini さん / 2023-12-29 / 1:07:59 / 英語）の 0:00〜11:35 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/bIGOF5nvPtA"
+          title="Axe modeling || Houdini tutorial" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>このシリーズについて</h2>
+
+<p>Houdini でブーリアンを主体にした<strong>ハードサーフェスモデリング</strong>で斧を作るチュートリアルです。
+1時間8分あり、チャプターが25個に切られています。</p>
+
+<blockquote>このチュートリアルは、すべてを100%完璧に作ることが目的ではありません。
+<strong>どう組み立てて、どう修正していくかという全体の流れ</strong>を扱います。
+プロシージャルなので、あとからいくらでも変えられます。</blockquote>
+
+<p>この記事では、参照画像を読み込んでカーブで輪郭をなぞり、ポリゴンに変換するまでを扱います。</p>
+
+<h2>1. 参照画像を読み込む</h2>
+
+<p>3Dモデリングを始めるとき、まずは参照が欲しくなります。
+Houdini には <strong><code>Reference Images</code></strong> というノードがあり、
+画像を指定するだけでビューポートに表示できます。</p>
+
+<p class="tx-muted">動画では実際の斧の写真を1枚読み込んで、それをなぞる形で進めていました。</p>
+
+<h2>2. カーブツールで輪郭をなぞる</h2>
+
+<img src="img/simon-axe-modeling-000535.png" alt="斧の参照写真の上に、コントロールポイント付きのカーブが引かれている。右のパネルには Curve ノードの Primitive Type が Bezier Curve になっている">
+
+<p>ジオメトリの中に入り、<code>Curve</code> を置いて輪郭をトレースしていきます。</p>
+
+<h3>カーブの種類</h3>
+
+<p>Tab メニューにはいくつか候補が出ますが、これらは<strong>すべて <code>Curve</code> のプリセット</strong>です。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>種類</th><th>性質</th></tr>
+    <tr><td><strong>Bezier</strong></td><td>丸みのあるカーブ。今回はこれを使います</td></tr>
+    <tr><td>Polygon</td><td>直線のみ。折れ線になります</td></tr>
+    <tr><td>Spline</td><td>スプライン</td></tr>
+  </table>
+</div>
+
+<p>上の画像のパラメータパネルでも <code>Primitive Type</code> が <code>Bezier Curve</code> になっています。
+斧のようになめらかな輪郭には Bezier が向いている、という判断です。</p>
+
+<p class="tx-muted">ノードを置いたあとでも、パネルの Primitive Type を切り替えれば種類を変えられます。
+動画では Polygon に切り替えて「これだと折れ線しか描けません」と実演していました。</p>
+
+<h3>参照画像が見えないとき</h3>
+
+<p>ビューポートに参照画像が出ていない場合は、サイドの表示設定から
+<strong><code>show all objects</code></strong> を有効にします。</p>
+
+<h3>描き方</h3>
+
+<ul>
+  <li><strong>クリック</strong>すると直線の点が置かれます</li>
+  <li><strong>押したままドラッグ</strong>すると、カーブを持った点になります</li>
+  <li><code>Auto Smooth</code> のようなモードもあり、動画でも試していました
+      <span class="tx-muted">（ただし「必ずしも完璧ではない」とのことで、あとで手直ししていました）</span></li>
+</ul>
+
+<blockquote>最初から完璧を目指す必要はありません。
+<strong>ベースの形が入っていれば、それだけで十分です。</strong></blockquote>
+
+<h3>Edit Mode で整える</h3>
+
+<p>描いたあとは <code>Edit Mode</code> に切り替えます。ここでできることが実用的でした。</p>
+
+<ul>
+  <li>点を掴んで動かす</li>
+  <li>点を<strong>コーナーポイントに変換</strong>する（丸みを消して角にする）</li>
+  <li>線そのものを掴んで、軸に沿って揃える</li>
+  <li>点を削除する</li>
+  <li>スムージングや点の均等化<span class="tx-muted">（ただし「思ったとおりにならないことが多いので、結局は手で動かしています」とのこと）</span></li>
+</ul>
+
+<p>刃の付け根のように<strong>角にしたいところはコーナーに、
+刃先のようになめらかにしたいところは曲線のまま</strong>、と使い分けていきます。
+ベベルを大きくしたくないところは、点の間隔を詰めておきます。</p>
+
+<h2>3. カーブをポリゴンに変換する</h2>
+
+<img src="img/simon-axe-modeling-000935.png" alt="Convert ノードのパラメータパネル。Convert To が Polygon になっている。ネットワークは curve1 から convert1、resample1 と続く">
+
+<p>形が決まったら、他のノードで扱える形式に変換します。</p>
+
+<h3>Convert</h3>
+
+<p><strong><code>Convert</code></strong> ノードで <code>Convert To</code> を <strong><code>Polygon</code></strong> にします。
+Bezier のままだと後段の処理で扱いにくいためです。</p>
+
+<h3>Resample</h3>
+
+<p><strong><code>Resample</code></strong> は<strong>距離をもとに点を追加</strong>します。
+間隔を小さくすれば、同じ間隔で点が増えていきます。</p>
+
+<h3>Facet で余分な点を落とす</h3>
+
+<p>ここが実用的なところでした。<strong><code>Facet</code></strong> ノードには
+<strong>同一直線上に並んだ点を削除する機能</strong>があります。</p>
+
+<p><span class="tx-blue">プレートの平らな部分や、刃の上側の直線部分では、
+点がたくさんあっても形は変わりません。</span>
+そういう点をまとめて消せます。</p>
+
+<p>削除する判定にはしきい値があり、
+<strong>オブジェクトの大きさによって適切な値が変わります</strong>。
+動画でも値を調整しながら、必要な情報が残る範囲で点を減らしていました。</p>
+
+<blockquote>ディテールは足りている必要がありますが、多すぎても少なすぎてもいけません。
+<strong>ちょうどよいところを探す作業</strong>です。
+この段階ではポリゴン数を気にしすぎる必要はありません。
+ハイポリでもローポリでもなく、<strong>ミッドポリ</strong>くらいを狙います。</blockquote>
+
+<p class="tx-muted">ベベルが足りないと感じたら、Poly Modeling のモードに切り替えて
+<code>2</code> キーで点を選び、あとから足すこともできます。</p>
+
+<h2>4. 向きを揃えておく</h2>
+
+<p>最後に <strong><code>Reverse</code></strong> ノードでポリゴンを反転させます。</p>
+
+<p>目的は<span class="tx-blue">形状を Z 軸のプラス側に向けておく</span>ことです。
+最初はマイナス側を向いていたので、ここで直しています。</p>
+
+<blockquote>後の工程で扱いやすいように、この段階で向きを決めておきます。
+どこを目指すかがある程度わかっているので、先に整えておくわけです。</blockquote>
+
+<p>厚みについては、刃の中心部分なので <code>0.01</code> 程度と小さめにしていました。
+「わずかに厚みがある」くらいで十分とのことです。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>参照画像は <strong><code>Reference Images</code></strong> ノードで読み込めます</li>
+  <li>Tab メニューの Bezier / Polygon / Spline は<strong>すべて <code>Curve</code> のプリセット</strong>です</li>
+  <li>クリックで直線、<strong>押したままドラッグでカーブ</strong>の点になります</li>
+  <li>Edit Mode で点をコーナーに変換したり、軸に沿って揃えたりできます</li>
+  <li>最初から完璧を目指さず、<strong>ベース形状ができたら次へ進みます</strong></li>
+  <li><code>Convert</code> で Polygon にしてから、<code>Resample</code> と <code>Facet</code> で点の数を整えます</li>
+  <li><span class="tx-blue"><code>Facet</code> の「同一直線上の点を削除」で、形を変えずに点を減らせます</span></li>
+  <li>この段階の目標はハイポリでもローポリでもなく<strong>ミッドポリ</strong>です</li>
+</ul>
+
+<p>次は、この輪郭から斧のメインシェイプを立ち上げていきます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

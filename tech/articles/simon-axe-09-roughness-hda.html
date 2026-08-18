@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 9 — ラフネスと HDA のインターフェース | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe Texturing チュートリアルの日本語メモです。Screen と Multiply でのラフネス作り、HDA のパラメータをフォルダで整理する方法、Match Current Definition でのツール確定について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 9 — ラフネスと HDA のインターフェース</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=ZcXKWAUx2fE">Axe Texturing: full breakdown of COPs texturing in Houdini</a>
+（Simon Houdini さん / 1:04:35 / 英語）の 38:51〜47:50 部分。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-08-material-hda.html">マテリアル HDA と Cable 型</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/ZcXKWAUx2fE?start=2331"
+          title="Axe Texturing: full breakdown of COPs texturing in Houdini" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>ラフネスマップを作り込み、<strong>HDA に使いやすいインターフェースを付けて完成させます</strong>。
+ここまでできると、あとはコピーして値を変えるだけでマテリアルが増やせるようになります。</p>
+
+<h2>1. ラフネスマップを作る</h2>
+
+<p>前提として、ラフネスマップの読み方が説明されていました。</p>
+
+<blockquote>値が<strong>明るいほどツヤが少なく</strong>、
+<strong>暗いほどツヤが強く</strong>なります。</blockquote>
+
+<h3>エッジを効かせる</h3>
+
+<p>前回焼いた <code>Edge</code> や <code>Curvature</code> のマップを使って、
+<span class="tx-blue">角の部分だけ質感を変えます。</span></p>
+
+<ul>
+  <li><code>Blend</code> ノードで混ぜます</li>
+  <li>ブレンド量は <strong>0.5</strong> にしておきます。
+      <span class="tx-muted">「あとで使う人が調整できるように」という意図でした</span></li>
+  <li><strong><code>Screen</code></strong> のブレンドで重ねると、その領域が明るくなります。
+      つまり<strong>反射が弱くなります</strong></li>
+</ul>
+
+<p>エッジが摩耗して光り方が変わる、という表現がこれで作れます。</p>
+
+<h3>パターンを混ぜる</h3>
+
+<p>ユーザーが差し込むパターンも、ラフネスに効かせられるようにします。</p>
+
+<ul>
+  <li>パターンを前景、それまでの結果を背景にします</li>
+  <li><strong><code>Multiply</code></strong> で混ぜます</li>
+  <li>ここも <strong>0.5</strong> を初期値にします</li>
+</ul>
+
+<p>これでラフネスに自然なムラが入ります。</p>
+
+<h2>2. HDA のインターフェースを作る</h2>
+
+<img src="img/simon-axe-texturing-004520.png" alt="完成した material_procedural_wear ノード。AO / Curvature / Pattern の入力と material 出力を持ち、右のパネルには basecolor と roughness のタブ、base roughness・edge highlights・AO amount・Pattern influence が並んでいる">
+
+<p>ここからが「道具にする」工程です。HDA のパラメータ画面を開いて、
+<strong>必要なつまみだけを表に出します</strong>。</p>
+
+<h3>フォルダで整理する</h3>
+
+<p>大きく2つのフォルダを作ります。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>フォルダ</th><th>中に出すもの</th></tr>
+    <tr><td><strong>basecolor</strong></td><td>基本の色、そして <strong>Pattern / AO / Curvature</strong> のサブフォルダ</td></tr>
+    <tr><td><strong>roughness</strong></td><td>base roughness / edge highlights / AO amount / Pattern influence</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">サブフォルダの順番は、HDA の入力の順番と揃えていました。</span>
+Pattern → AO → Curvature の順です。使う人が迷いにくくなります。</p>
+
+<p>各フォルダには、内部ノードのパラメータを引っぱってきます。</p>
+
+<ul>
+  <li>Pattern には <code>HSV Adjust</code> の <strong>hue</strong> と <strong>value</strong></li>
+  <li>Curvature には <strong>hue / saturation / value</strong></li>
+</ul>
+
+<blockquote>いくつでも出せますが、<strong>私はこの2つに絞ります。</strong></blockquote>
+
+<p>出しすぎないという判断が実用的だと思いました。</p>
+
+<h3>完成したインターフェース</h3>
+
+<p>上の画像が結果です。<code>roughness</code> タブには4つのつまみが並んでいます。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>パラメータ</th><th>初期値</th></tr>
+    <tr><td><code>base roughness</code></td><td>0.5</td></tr>
+    <tr><td><code>edge highlights</code></td><td>0.5</td></tr>
+    <tr><td><code>AO amount</code></td><td>0.5</td></tr>
+    <tr><td><code>Pattern influence</code></td><td>0.5</td></tr>
+  </table>
+</div>
+
+<p><span class="tx-blue">すべて 0.5 を初期値にしてあるので、
+上げても下げても調整できる状態から始められます。</span></p>
+
+<h3>範囲を固定する</h3>
+
+<p>値が想定外の範囲に行かないよう、<strong>レンジをロック</strong>しておきます。
+動画では 0 から 1 に固定していました。</p>
+
+<h3>ツールを確定する</h3>
+
+<ol>
+  <li><code>Apply</code> → <code>Accept</code></li>
+  <li>ツールを<strong>保存</strong>します</li>
+  <li>右クリックから <strong><code>Match Current Definition</code></strong> を選びます</li>
+</ol>
+
+<p>これでツールがロックされ、アイコンに鍵が付きます。使える状態になりました。</p>
+
+<h2>3. マテリアルを増やす</h2>
+
+<p>あとは HDA をコピーして名前と値を変えるだけです。</p>
+
+<p>動画では最初にハンドル用の<strong>プラスチック</strong>を作っていました。
+青系にして、<strong>彩度を少し下げ、暗めに</strong>する、といった調整です。</p>
+
+<blockquote>ここまで作ってしまえば、マテリアルを増やすのは
+<span class="tx-blue">つまみを触るだけ</span>になります。</blockquote>
+
+<p class="tx-muted">上の画像のビューポートには 8,500 プリミティブと表示されています。
+<a href="simon-axe-05-bolts-highpoly.html">モデリング編</a>で <code>PolyReduce</code> の目標にしていた数と同じで、
+あのローポリがそのまま使われていることが分かります。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>ラフネスは<strong>明るいほどツヤが少なく、暗いほどツヤが強い</strong></li>
+  <li>エッジは <code>Screen</code> で重ねると明るくなり、反射が弱まります</li>
+  <li>パターンは <code>Multiply</code> で混ぜます</li>
+  <li><span class="tx-blue">調整用の値はすべて <strong>0.5</strong> を初期値にしておくと、上下どちらにも振れます</span></li>
+  <li>HDA のインターフェースは<strong>フォルダで整理</strong>し、順番は入力と揃えます</li>
+  <li>出すパラメータは<strong>絞ります</strong>。全部出す必要はありません</li>
+  <li>レンジをロックして、想定外の値が入らないようにします</li>
+  <li>保存して <strong><code>Match Current Definition</code></strong> でツールを確定します</li>
+</ul>
+
+<p>次は最終回。作ったマテリアルをマスクで重ね、トライプラナーや汚しを足して書き出します。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

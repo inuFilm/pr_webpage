@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini で斧を作る 10 — マテリアルを重ねて書き出す | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Simon Houdini さんの Axe Texturing チュートリアル最終回の日本語メモです。マスクの流用によるメタルネス、Reference と Delete Channel、Triplanar が動かない原因、ROP Image Output での一括書き出しについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini で斧を作る 10 — マテリアルを重ねて書き出す</h1>
+        <p class="tech-meta">houdini-modeling / 2026-08-18</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=ZcXKWAUx2fE">Axe Texturing: full breakdown of COPs texturing in Houdini</a>
+（Simon Houdini さん / 1:04:35 / 英語）の 47:50〜最後まで。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。作者公式の翻訳ではありません。
+前回は<a href="simon-axe-09-roughness-hda.html">ラフネスと HDA のインターフェース</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/ZcXKWAUx2fE?start=2870"
+          title="Axe Texturing: full breakdown of COPs texturing in Houdini" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この記事で扱うこと</h2>
+
+<p>シリーズ最終回です。作ったマテリアル HDA をマスクで重ね、
+トライプラナーと汚しを足して、テクスチャとして書き出します。</p>
+
+<h2>1. メタルネスマップはマスクの流用で済む</h2>
+
+<p>思わず膝を打った部分です。</p>
+
+<blockquote>メタルネスマップは、私の場合<strong>ハンドルのマスクと同じもの</strong>です。
+この斧はハンドル以外すべて金属なので、
+<span class="tx-blue">そのマスクがそのままメタルマップになります。</span></blockquote>
+
+<p>ハンドルのマスクをメタルマップの入力に繋ぐだけで、
+ハンドル以外が金属という設定ができあがります。</p>
+
+<h2>2. ボルト用のパターンを作る</h2>
+
+<p>ボルトには引っかき傷のような質感を足していました。</p>
+
+<ol>
+  <li><strong>Tile パターン</strong>を使います</li>
+  <li>分割数を増やします</li>
+  <li>形（Shaping）を <strong>Circle</strong> にします</li>
+  <li>サイズを<strong>潰して</strong>細長くします</li>
+  <li><strong>位置にランダム性</strong>を足します</li>
+</ol>
+
+<p>これで<span class="tx-blue">ランダムな引っかき傷のような表面</span>ができます。
+量を増やせば傷が増えます。パターン同士をブレンドすることもできます。</p>
+
+<h3>重ねる順番</h3>
+
+<p>マスクでブレンドするとき、<strong>ボルトが先、それまでのマテリアルが後</strong>という順にしていました。
+<span class="tx-muted">「こちらのほうが理にかなっています」とのことです。</span></p>
+
+<h2>3. Reference で「ほとんど同じマテリアル」を作る</h2>
+
+<p>中央パネルは刃と同じ金属ですが、少しだけ性質を変えたい。
+そこで Houdini の <strong>Reference</strong> 機能を使います。</p>
+
+<ol>
+  <li>既存のマテリアルを参照します。<span class="tx-blue">参照されたパラメータは<strong>緑色</strong>になります</span></li>
+  <li>変えたい項目だけ右クリックして <strong><code>Delete Channel</code></strong> します</li>
+  <li>その項目だけが切り離され、個別に設定できるようになります</li>
+</ol>
+
+<blockquote>まったく同じ金属のまま、<strong>一部のプロパティだけを上書きできます。</strong></blockquote>
+
+<p>動画ではラフネスを掛け算で少し変えて、
+「まだ光沢はあるけれど、少し抑えめ」という調整をしていました。</p>
+
+<h2>4. Triplanar — 設定を間違えると動かない</h2>
+
+<p>UV に依存しないテクスチャの貼り方です。</p>
+
+<p><code>Triplanar</code> ノードは <strong>position</strong> と <strong>world normal</strong> のデータを必要とします。
+これはベイクから取れるので、<span class="tx-red">ベイクノードで World Normal を有効にしておく</span>必要があります。</p>
+
+<h3>つまずきどころ</h3>
+
+<blockquote>既定のままだと<strong>うまく動きません。</strong>回避方法を見つけました。</blockquote>
+
+<p>ポイントは<strong>データの範囲</strong>です。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>データ</th><th>必要な設定</th></tr>
+    <tr><td>Position</td><td>相対位置（バウンディングボックスに合わせる）</td></tr>
+    <tr><td>World Normal</td><td><span class="tx-red"><strong>-1 から 1</strong></span>（0 から 1 ではありません）</td></tr>
+  </table>
+</div>
+
+<p>ここを直すとトライプラナーが正しく効きます。
+テクスチャは Megascans のようなものでも、単純なノイズでも構いません。</p>
+
+<p>できたものを既存の値と <code>Multiply</code> でブレンドすれば、
+<span class="tx-blue">金属表面に自然なムラが乗ります。</span></p>
+
+<h2>5. 汚しを足す</h2>
+
+<p>やり方はこれまでと同じで、汚し用のマテリアルを1つ作って重ねます。</p>
+
+<ol>
+  <li>ベースのマテリアルノードをコピーして <code>dirt</code> と名付けます</li>
+  <li>そのままだと効果が極端なので、マスクで抑えます</li>
+  <li><strong>AO マップ</strong>を使い、<code>Remap</code> で<strong>レンジを反転</strong>します。必要なら強度も調整します</li>
+  <li>一様になりすぎないよう <strong><code>Slope by Direction</code></strong> を足し、フラクタルノイズを繋ぎます</li>
+  <li>スケールのスライダーで<strong>控えめに</strong>調整します</li>
+</ol>
+
+<blockquote>やりすぎないことが大事です。とても控えめにしたいところです。</blockquote>
+
+<p>くぼんだところに汚れが溜まる、という自然な見え方になります。</p>
+
+<p class="tx-muted">周波数の高いノイズを足すと細かいディテールが出ますが、
+これも <code>Remap</code> で効き具合を制御できます。
+<span class="tx-blue">「積み重ねていけるレイヤーシステム」</span>として、
+それぞれを個別に調整できるのが利点です。</p>
+
+<h2>6. ポストプロセス</h2>
+
+<p>最後に全体の調整です。ベースカラーだけを狙ったマップを差し込めます。</p>
+
+<ul>
+  <li><strong>Sharpen</strong> で細部を立たせます。動画では「少しかける程度」にしていました</li>
+  <li>あとから部分的に制御することもできます</li>
+</ul>
+
+<h2>7. テクスチャを書き出す</h2>
+
+<img src="img/simon-axe-texturing-010300.png" alt="完成したテクスチャが適用された斧と、ROP Image Output ノード。既定のファイルパスは $HIPNAME.$OS.$F4.exr">
+
+<p>ここまで作ったマテリアルは、<strong>それ自体が Cable 接続</strong>です。
+中を見れば、すべてのマップがパックされているのが分かります。</p>
+
+<img src="img/simon-axe-texturing-010345.png" alt="ROP Image Output のパラメータ。Add AOVs from input ボタンと Output AOVs 21、basecolor / metalness / specular / spec_color といった AOV 名が並んでいる">
+
+<h3>ROP Image Output</h3>
+
+<p>書き出しには <strong><code>ROP Image Output</code></strong> を使います。</p>
+
+<ol>
+  <li><strong><code>Add AOVs from input</code></strong> ボタンを押します。
+      <span class="tx-blue">これだけで<strong>21個の AOV</strong> が一括登録されます</span></li>
+  <li>不要なものは右クリックで削除します。
+      あるいは<strong>全部消して、必要なものだけ手で足す</strong>こともできます</li>
+</ol>
+
+<p>上の画像に <code>basecolor</code> / <code>metalness</code> / <code>specular</code> /
+<code>spec_color</code> / <code>roughness</code> …と並んでいるのが見えます。</p>
+
+<h3>ファイル名にレイヤー名を入れる</h3>
+
+<p>ファイル名には<strong>レイヤー名を表す特殊な指定</strong>を使います。
+<code>axe</code> のような名前のあとにそれを付けて <code>.png</code> とすると、
+<span class="tx-blue">AOV ごとに自動で名前が付いたファイルが書き出されます。</span></p>
+
+<p class="tx-muted">解像度やカラースペースをここで上書きすることもできます。
+<strong>ノーマルマップなどでカラースペースの扱いは重要</strong>なので、
+知っておくとよい、と補足されていました。</p>
+
+<h2>おわりに</h2>
+
+<p>動画の締めくくりで、こう話されていました。</p>
+
+<blockquote>ここまでで、この仕組みがどう動くのかの全体像はつかめたと思います。
+<strong>とても強力なマテリアルツールを作りました。</strong>
+これは単純な例なので、もっと良くしていけます。</blockquote>
+
+<blockquote>Substance Painter や Designer のような感覚で、
+<span class="tx-blue">Houdini の中でプロシージャルにモデルをテクスチャリングできます。</span>
+自分のワークフローやパイプラインに合ったものを作れます。</blockquote>
+
+<p>この仕組みは複数のモデルで使い回せる作りになっています。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li><span class="tx-blue">メタルネスマップは<strong>ハンドルのマスクの流用</strong>で済みました</span></li>
+  <li>ボルトの傷は <strong>Tile パターン（Circle・位置をランダム化）</strong>で作れます</li>
+  <li><strong>Reference</strong> して <code>Delete Channel</code> すると、一部だけ違うマテリアルが作れます</li>
+  <li><span class="tx-red"><code>Triplanar</code> は World Normal を <strong>-1 から 1</strong> にしないと動きません</span></li>
+  <li>汚しは <strong>AO を反転</strong>して使い、<code>Slope by Direction</code> で一様さを崩します</li>
+  <li>書き出しは <code>ROP Image Output</code> の <strong><code>Add AOVs from input</code></strong> で21個が一括登録されます</li>
+  <li>ファイル名に<strong>レイヤー名の指定</strong>を入れると、AOV ごとに自動で書き出されます</li>
+  <li>カラースペースの上書きは<strong>ノーマルマップで重要</strong>です</li>
+</ul>
+
+<p>斧のモデリングからテクスチャリングまで、全10回はこれで完結です。
+最初から読む場合は<a href="simon-axe-01-curve.html">第1回 参照画像とカーブで輪郭を取る</a>へ。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
