@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APEX のノード — 名前空間で地図を作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="APEX の 598 ノードを名前空間ごとに整理し、リグを組むときに実際に触るものは1ノードずつ、配列・辞書・文字列などの機械的な族はまとめ表にしました。ノード名は Houdini 22.0.368 の同梱ヘルプと照合済みです。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>APEX のノード — 名前空間で地図を作る</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/character/apex.html">APEX (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/apex/index.html">APEX nodes</a> /
+<a href="https://www.sidefx.com/docs/houdini/character/kinefx.html">KineFX</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>APEX が <strong>SOP とは別の考え方</strong>であること（グラフ自体がデータ）</li><li><strong>名前空間の地図</strong> — どの接頭辞が何の担当か</li><li>リグの部品・スケルトン・変換を<strong>1ノードずつ</strong></li><li>配列・辞書・文字列・グラフ操作は<strong>まとめ表</strong>で</li></ul>
+
+
+<h2>APEX は「グラフそのものがデータ」</h2>
+
+<p>SOP はジオメトリを流しますが、<strong>APEX が扱うのはグラフ（ノードの繋がり方）そのもの</strong>です。
+リグを組むというのは「グラフを作る」ことで、キャラクターを動かすというのは「そのグラフを評価する」ことです。</p>
+
+<p>だから APEX には <strong>2種類の使い方</strong>があります。ここが分かれば全体像が掴めます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>やっていること</th><th>使うノード</th></tr></thead>
+  <tbody>
+    <tr><td><strong>グラフを作る</strong></td>
+        <td>リグを組み立てる。ノードを足し、繋ぎ、名前を付ける</td>
+        <td><code>graph::</code> / <code>component::</code></td></tr>
+    <tr><td><strong>グラフの中身</strong></td>
+        <td>できたリグが毎フレーム走らせる計算</td>
+        <td><code>rig::</code> / <code>skel::</code> / <code>transform::</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>graph::AddNode</code> のようなノードは「リグを組み立てる工程」で動くもので、
+できあがったリグの中には入りません。逆に <code>rig::TwoBoneIK</code> は
+<strong>リグの中に残って毎フレーム走る</strong>部品です。
+この区別が付かないと、どのノードをどこで使うのか分からなくなります。</p>
+
+<h2>名前空間の地図</h2>
+
+<p>APEX のノードは <code>apex::&lt;名前空間&gt;::&lt;名前&gt;</code> という形で、
+<strong>名前空間を見れば担当が分かります。</strong></p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>名前空間</th><th>担当</th><th>数</th></tr></thead>
+  <tbody>
+    <tr><td><code>rig::</code></td><td>リグの部品（IK・コンストレイン・スプライン）</td><td>約 30</td></tr>
+    <tr><td><code>component::</code></td><td>リグの部品を<strong>まとめて組む</strong>高水準の道具</td><td>約 40</td></tr>
+    <tr><td><code>skel::</code></td><td>スケルトン（骨の階層）を扱う</td><td>約 35</td></tr>
+    <tr><td><code>transform::</code></td><td>変換行列の計算</td><td>約 25</td></tr>
+    <tr><td><code>quaternion::</code></td><td>クォータニオンの計算</td><td>約 15</td></tr>
+    <tr><td><code>fbik::</code></td><td>全身 IK</td><td>約 15</td></tr>
+    <tr><td><code>graph::</code></td><td><strong>グラフそのものを組み立てる</strong></td><td>約 70</td></tr>
+    <tr><td><code>geo::</code></td><td>ジオメトリの読み書き</td><td>約 60</td></tr>
+    <tr><td><code>ch::</code></td><td>アニメーションチャンネル（キー）</td><td>約 40</td></tr>
+    <tr><td><code>array::</code> / <code>dict::</code> / <code>string::</code></td>
+        <td>汎用のデータ操作</td><td>約 60</td></tr>
+    <tr><td><code>guide::</code></td><td>ガイド（リグを配置するための目印）</td><td>約 8</td></tr>
+    <tr><td><code>dynamicpath::</code></td><td>動きの経路（投擲軌道など）</td><td>約 25</td></tr>
+    <tr><td><code>sim::</code> / <code>ragdoll::</code></td><td>シミュレーション連携</td><td>約 12</td></tr>
+    <tr><td><code>uievent::</code></td><td>ビューポートの操作イベント</td><td>約 8</td></tr>
+    <tr><td>（接頭辞なし）</td><td>数学・論理・型変換</td><td>約 55</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted"><code>&lt;T&gt;</code> が付いているものは<strong>型が可変</strong>です
+（<code>Add&lt;T&gt;</code> は float でも vector でも matrix でも使えます）。
+同じ計算に型ごとの別ノードが用意されているわけではありません。</p>
+
+
+<h2>1. リグの部品（rig::）</h2>
+
+<p><strong>できあがったリグの中に残って、毎フレーム走る</strong>ノードたちです。</p>
+
+<h3>TwoBoneIK <span class="tx-muted">apex::rig::TwoBoneIK</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>2本の骨の IK を解く</td></tr>
+    <tr><td>使いどころ</td><td>腕・脚。<strong>リグでいちばん出番が多い</strong></td></tr>
+  </tbody>
+</table></div>
+<p>上腕と前腕、あるいは腿とすねの2本を、手首／足首の位置に合わせて曲げます。肘・膝の向きは別途ヒントで与えます。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-TwoBoneIK.html">公式リファレンス（英語）</a></p>
+
+<h3>MultiBoneIK <span class="tx-muted">apex::rig::MultiBoneIK</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3本以上の骨の IK を解く</td></tr>
+    <tr><td>使いどころ</td><td>尻尾・触手・背骨のように骨数が多い連なり</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-MultiBoneIK.html">公式リファレンス（英語）</a></p>
+
+<h3>MultiBoneIKFromArray <span class="tx-muted">apex::rig::MultiBoneIKFromArray</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>骨を配列で受け取る MultiBoneIK</td></tr>
+    <tr><td>使いどころ</td><td>骨数が可変のとき</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-MultiBoneIKFromArray.html">公式リファレンス（英語）</a></p>
+
+<h3>CurveIK <span class="tx-muted">apex::rig::CurveIK</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>カーブに沿って骨を並べる IK</td></tr>
+    <tr><td>使いどころ</td><td><strong>背骨・尻尾。</strong>カーブを動かすと骨が追従する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-CurveIK.html">公式リファレンス（英語）</a></p>
+
+<h3>FkTransform <span class="tx-muted">apex::rig::FkTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>FK の変換を計算する</td></tr>
+    <tr><td>使いどころ</td><td>親から子へ順に回していく普通の階層</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-FkTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>PointConstraint <span class="tx-muted">apex::rig::PointConstraint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリの点に追従させる</td></tr>
+    <tr><td>使いどころ</td><td>変形するメッシュにコントローラを貼りつける</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-PointConstraint.html">公式リファレンス（英語）</a></p>
+
+<h3>PrimConstraint <span class="tx-muted">apex::rig::PrimConstraint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>プリムに追従させる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-PrimConstraint.html">公式リファレンス（英語）</a></p>
+
+<h3>UVConstraint <span class="tx-muted">apex::rig::UVConstraint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>UV 座標の位置に追従させる</td></tr>
+    <tr><td>使いどころ</td><td>面が変形しても、テクスチャ上の同じ場所に留めたいとき</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-UVConstraint.html">公式リファレンス（英語）</a></p>
+
+<h3>CurveConstraint <span class="tx-muted">apex::rig::CurveConstraint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>カーブ上の位置に追従させる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-CurveConstraint.html">公式リファレンス（英語）</a></p>
+
+<h3>ParentBlend <span class="tx-muted">apex::rig::ParentBlend</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数の親の間で追従先を混ぜる</td></tr>
+    <tr><td>使いどころ</td><td><strong>スペーススイッチ。</strong>手を腰にも頭にも付けられるようにする</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-ParentBlend.html">公式リファレンス（英語）</a></p>
+
+<h3>ControlShape <span class="tx-muted">apex::rig::ControlShape</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>コントローラの見た目（ビューポートで掴む形）を作る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-ControlShape.html">公式リファレンス（英語）</a></p>
+
+<h3>AbstractControl <span class="tx-muted">apex::rig::AbstractControl</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>形を持たない抽象的なコントロール</td></tr>
+    <tr><td>使いどころ</td><td>数値だけのスイッチや設定</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-AbstractControl.html">公式リファレンス（英語）</a></p>
+
+<h3>ControlSpline <span class="tx-muted">apex::rig::ControlSpline</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>コントローラでスプラインを作る</td></tr>
+    <tr><td>使いどころ</td><td>曲線でまとめて操作したいとき</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-ControlSpline.html">公式リファレンス（英語）</a></p>
+
+<h3>SplineOffset <span class="tx-muted">apex::rig::SplineOffset</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>スプラインからのずれを扱う</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-SplineOffset.html">公式リファレンス（英語）</a></p>
+
+<h3>RBFInterpolation <span class="tx-muted">apex::rig::RBFInterpolation</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td><strong>RBF 補間。</strong>サンプル姿勢の間をなめらかに繋ぐ</td></tr>
+    <tr><td>使いどころ</td><td>肩や股関節の補正（ポーズスペースデフォーム）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-RBFInterpolation.html">公式リファレンス（英語）</a></p>
+
+<h3>PoseWeightInterpolation <span class="tx-muted">apex::rig::PoseWeightInterpolation</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ポーズごとの重みを補間する</td></tr>
+    <tr><td>使いどころ</td><td>RBF と組み合わせて補正シェイプを効かせる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-PoseWeightInterpolation.html">公式リファレンス（英語）</a></p>
+
+<h3>ExtractLocalTransform <span class="tx-muted">apex::rig::ExtractLocalTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ワールド変換からローカル変換を取り出す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-ExtractLocalTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>ExtractParmTransform <span class="tx-muted">apex::rig::ExtractParmTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>パラメータから変換を取り出す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-ExtractParmTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>CombineParmTransform <span class="tx-muted">apex::rig::CombineParmTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>移動・回転・スケールのパラメータを1つの変換にまとめる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-CombineParmTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>ControlRigExtract <span class="tx-muted">apex::rig::ControlRigExtract</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>コントロールリグを取り出す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-ControlRigExtract.html">公式リファレンス（英語）</a></p>
+
+<h3>SampleSplineTransforms <span class="tx-muted">apex::rig::SampleSplineTransforms</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>スプライン上の変換をサンプリングする</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-SampleSplineTransforms.html">公式リファレンス（英語）</a></p>
+
+<h3>SplineInterpolateTransforms <span class="tx-muted">apex::rig::SplineInterpolateTransforms</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>スプラインに沿って変換を補間する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-rig-SplineInterpolateTransforms.html">公式リファレンス（英語）</a></p>
+
+<h2>2. リグを組み立てる部品（component::）</h2>
+
+<p><strong>リグを作る工程で動く</strong>、高水準の道具です。1つで「IK と FK とスイッチとコントローラ」を丸ごと生やす、といった働きをします。</p>
+
+<h3>FKIK <span class="tx-muted">apex::component::FKIK</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>FK と IK の両方を持ち、切り替えられる仕組みを丸ごと作る</td></tr>
+    <tr><td>使いどころ</td><td>腕・脚の標準的な作り。<strong>まずこれ</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-FKIK.html">公式リファレンス（英語）</a></p>
+
+<h3>FBIK <span class="tx-muted">apex::component::FBIK</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>全身 IK の仕組みを作る</td></tr>
+    <tr><td>使いどころ</td><td>足を地面に置いたまま腰を動かす、といった操作</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-FBIK.html">公式リファレンス（英語）</a></p>
+
+<h3>MultiIk <span class="tx-muted">apex::component::MultiIk</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>多関節の IK を作る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-MultiIk.html">公式リファレンス（英語）</a></p>
+
+<h3>Bonedeform <span class="tx-muted">apex::component::Bonedeform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>骨でメッシュを変形させる仕組みを作る</td></tr>
+    <tr><td>使いどころ</td><td>スキニングを効かせる段</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-Bonedeform.html">公式リファレンス（英語）</a></p>
+
+<h3>Blendshape <span class="tx-muted">apex::component::Blendshape</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ブレンドシェイプの仕組みを作る</td></tr>
+    <tr><td>使いどころ</td><td>表情や補正シェイプ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-Blendshape.html">公式リファレンス（英語）</a></p>
+
+<h3>Deltamush <span class="tx-muted">apex::component::Deltamush</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>デルタマッシュ（変形のならし）を作る</td></tr>
+    <tr><td>使いどころ</td><td>スキニングの折れをなめらかにする</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-Deltamush.html">公式リファレンス（英語）</a></p>
+
+<h3>Lookat <span class="tx-muted">apex::component::Lookat</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>何かを見る仕組みを作る</td></tr>
+    <tr><td>使いどころ</td><td>目・頭の追従</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-Lookat.html">公式リファレンス（英語）</a></p>
+
+<h3>Twist <span class="tx-muted">apex::component::Twist</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ねじれを分散させる仕組みを作る</td></tr>
+    <tr><td>使いどころ</td><td><strong>前腕・太もも。</strong>手首をひねったときの潰れを防ぐ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-Twist.html">公式リファレンス（英語）</a></p>
+
+<h3>ReverseFoot <span class="tx-muted">apex::component::ReverseFoot</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>リバースフット（かかと・つま先で回す足）を作る</td></tr>
+    <tr><td>使いどころ</td><td>歩きの足の転がし</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-ReverseFoot.html">公式リファレンス（英語）</a></p>
+
+<h3>Spline <span class="tx-muted">apex::component::Spline</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>スプラインで操作する仕組みを作る</td></tr>
+    <tr><td>使いどころ</td><td>背骨・尻尾</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-Spline.html">公式リファレンス（英語）</a></p>
+
+<h3>AddSpaceSwitchControl <span class="tx-muted">apex::component::AddSpaceSwitchControl</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>スペーススイッチのコントロールを足す</td></tr>
+    <tr><td>使いどころ</td><td>親を切り替えられるようにする</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-AddSpaceSwitchControl.html">公式リファレンス（英語）</a></p>
+
+<h3>AddControlGroup <span class="tx-muted">apex::component::AddControlGroup</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>コントロールをグループにまとめる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-AddControlGroup.html">公式リファレンス（英語）</a></p>
+
+<h3>AddIkInverter <span class="tx-muted">apex::component::AddIkInverter</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>IK ↔ FK を行き来するための逆算を足す</td></tr>
+    <tr><td>使いどころ</td><td>切り替えたときに姿勢が飛ばないようにする</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-AddIkInverter.html">公式リファレンス（英語）</a></p>
+
+<h3>MappedConstraints <span class="tx-muted">apex::component::MappedConstraints</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>対応表からコンストレインをまとめて張る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-MappedConstraints.html">公式リファレンス（英語）</a></p>
+
+<h3>GetRestTransform <span class="tx-muted">apex::component::GetRestTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>静止姿勢の変換を取り出す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-GetRestTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>SetRestTransform <span class="tx-muted">apex::component::SetRestTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>静止姿勢の変換を設定する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-SetRestTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>SetTransformParent <span class="tx-muted">apex::component::SetTransformParent</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>変換の親を設定する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-SetTransformParent.html">公式リファレンス（英語）</a></p>
+
+<h3>UpdateControls <span class="tx-muted">apex::component::UpdateControls</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>コントロールの状態を更新する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-UpdateControls.html">公式リファレンス（英語）</a></p>
+
+<h3>UpdateRig <span class="tx-muted">apex::component::UpdateRig</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>リグ全体を更新する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-component-UpdateRig.html">公式リファレンス（英語）</a></p>
+
+<h2>3. スケルトン（skel::）</h2>
+
+<p>骨の階層を読んだり書き換えたりします。<strong>ジョイントは点、階層は親子の属性</strong>で表されています。</p>
+
+<h3>FindJoint <span class="tx-muted">apex::skel::FindJoint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>名前でジョイントを探す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-FindJoint.html">公式リファレンス（英語）</a></p>
+
+<h3>FindJoints <span class="tx-muted">apex::skel::FindJoints</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>パターンで複数のジョイントを探す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-FindJoints.html">公式リファレンス（英語）</a></p>
+
+<h3>FindRoots <span class="tx-muted">apex::skel::FindRoots</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>根のジョイントを探す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-FindRoots.html">公式リファレンス（英語）</a></p>
+
+<h3>GetParent <span class="tx-muted">apex::skel::GetParent</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>親を得る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-GetParent.html">公式リファレンス（英語）</a></p>
+
+<h3>GetChildren <span class="tx-muted">apex::skel::GetChildren</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>子を得る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-GetChildren.html">公式リファレンス（英語）</a></p>
+
+<h3>GetDescendants <span class="tx-muted">apex::skel::GetDescendants</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>子孫を全部得る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-GetDescendants.html">公式リファレンス（英語）</a></p>
+
+<h3>GetAncestors <span class="tx-muted">apex::skel::GetAncestors</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>祖先を全部得る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-GetAncestors.html">公式リファレンス（英語）</a></p>
+
+<h3>SetParent <span class="tx-muted">apex::skel::SetParent</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>親を付け替える</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-SetParent.html">公式リファレンス（英語）</a></p>
+
+<h3>AddJoint <span class="tx-muted">apex::skel::AddJoint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジョイントを足す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-AddJoint.html">公式リファレンス（英語）</a></p>
+
+<h3>DeleteJoint <span class="tx-muted">apex::skel::DeleteJoint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジョイントを消す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-DeleteJoint.html">公式リファレンス（英語）</a></p>
+
+<h3>OrientJoints <span class="tx-muted">apex::skel::OrientJoints</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジョイントの向きを揃える</td></tr>
+  </tbody>
+</table></div>
+<p><strong>リグを作る前にここを揃えておかないと、回転軸がばらばらになります。</strong></p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-OrientJoints.html">公式リファレンス（英語）</a></p>
+
+<h3>GetPointTransform <span class="tx-muted">apex::skel::GetPointTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ワールド変換を得る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-GetPointTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>GetPointLocalTransform <span class="tx-muted">apex::skel::GetPointLocalTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ローカル変換を得る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-GetPointLocalTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>SetPointTransforms <span class="tx-muted">apex::skel::SetPointTransforms</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>変換をまとめて設定する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-SetPointTransforms.html">公式リファレンス（英語）</a></p>
+
+<h3>EvaluateMotionClip <span class="tx-muted">apex::skel::EvaluateMotionClip</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>モーションクリップを評価する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-EvaluateMotionClip.html">公式リファレンス（英語）</a></p>
+
+<h3>SmoothMotion <span class="tx-muted">apex::skel::SmoothMotion</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>動きをなめらかにする</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-SmoothMotion.html">公式リファレンス（英語）</a></p>
+
+<h3>Blend <span class="tx-muted">apex::skel::Blend</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>2つのスケルトンの姿勢を混ぜる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-Blend.html">公式リファレンス（英語）</a></p>
+
+<h3>Traverse <span class="tx-muted">apex::skel::Traverse</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>階層をたどる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-skel-Traverse.html">公式リファレンス（英語）</a></p>
+
+<h2>4. 変換とクォータニオン</h2>
+
+<p><strong>回転を扱うならここ</strong>です。行列とクォータニオンを行き来しながら計算します。</p>
+
+<h3>Build <span class="tx-muted">apex::transform::Build</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>移動・回転・スケールから変換を作る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-Build.html">公式リファレンス（英語）</a></p>
+
+<h3>Explode <span class="tx-muted">apex::transform::Explode</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>変換を移動・回転・スケールに分解する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-Explode.html">公式リファレンス（英語）</a></p>
+
+<h3>Blend <span class="tx-muted">apex::transform::Blend</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>2つの変換を混ぜる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-Blend.html">公式リファレンス（英語）</a></p>
+
+<h3>MultiBlend&lt;T&gt; <span class="tx-muted">apex::transform::MultiBlend&lt;T&gt;</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数の変換を重みつきで混ぜる</td></tr>
+    <tr><td>使いどころ</td><td><strong>スペーススイッチの中身</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-MultiBlend<T>.html">公式リファレンス（英語）</a></p>
+
+<h3>LookAt <span class="tx-muted">apex::transform::LookAt</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>指定した方向を向く変換を作る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-LookAt.html">公式リファレンス（英語）</a></p>
+
+<h3>Dihedral&lt;T&gt; <span class="tx-muted">apex::transform::Dihedral&lt;T&gt;</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>あるベクトルを別のベクトルに向ける回転を作る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-Dihedral<T>.html">公式リファレンス（英語）</a></p>
+
+<h3>Slerp&lt;T&gt; <span class="tx-muted">apex::transform::Slerp&lt;T&gt;</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>変換を球面補間する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-Slerp<T>.html">公式リファレンス（英語）</a></p>
+
+<h3>MirrorTransform <span class="tx-muted">apex::transform::MirrorTransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>左右反転した変換を作る</td></tr>
+    <tr><td>使いどころ</td><td><strong>左右対称のリグ。</strong>片側を作って反対に写す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-MirrorTransform.html">公式リファレンス（英語）</a></p>
+
+<h3>PolarDecompose&lt;T&gt; <span class="tx-muted">apex::transform::PolarDecompose&lt;T&gt;</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>回転成分とスケール成分に分ける</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-PolarDecompose<T>.html">公式リファレンス（英語）</a></p>
+
+<h3>SmoothRotation <span class="tx-muted">apex::transform::SmoothRotation</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>回転の飛びをならす</td></tr>
+  </tbody>
+</table></div>
+<p>オイラー角の 360 度ジャンプを取り除きます。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-transform-SmoothRotation.html">公式リファレンス（英語）</a></p>
+
+<h3>FromEuler <span class="tx-muted">apex::quaternion::FromEuler</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>オイラー角からクォータニオンへ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-quaternion-FromEuler.html">公式リファレンス（英語）</a></p>
+
+<h3>ToEuler <span class="tx-muted">apex::quaternion::ToEuler</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>クォータニオンからオイラー角へ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-quaternion-ToEuler.html">公式リファレンス（英語）</a></p>
+
+<h3>FromAxisAngle <span class="tx-muted">apex::quaternion::FromAxisAngle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>軸と角度からクォータニオンへ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-quaternion-FromAxisAngle.html">公式リファレンス（英語）</a></p>
+
+<h3>Multiply <span class="tx-muted">apex::quaternion::Multiply</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>クォータニオンを合成する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-quaternion-Multiply.html">公式リファレンス（英語）</a></p>
+
+<h3>Invert <span class="tx-muted">apex::quaternion::Invert</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>逆クォータニオン</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-quaternion-Invert.html">公式リファレンス（英語）</a></p>
+
+<h3>SwingTwistDecompose&lt;T&gt; <span class="tx-muted">apex::quaternion::SwingTwistDecompose&lt;T&gt;</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>回転を「振り」と「ねじり」に分ける</td></tr>
+    <tr><td>使いどころ</td><td><strong>前腕のねじれ分散。</strong>ひねりだけを取り出して複数の骨に配る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-quaternion-SwingTwistDecompose<T>.html">公式リファレンス（英語）</a></p>
+
+<h3>SwingTwistInterpolate <span class="tx-muted">apex::quaternion::SwingTwistInterpolate</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>振りとねじりを別々に補間する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-quaternion-SwingTwistInterpolate.html">公式リファレンス（英語）</a></p>
+
+<h2>5. 全身 IK とラグドール</h2>
+
+<h3>Solver <span class="tx-muted">apex::fbik::Solver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>全身 IK のソルバ本体</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-Solver.html">公式リファレンス（英語）</a></p>
+
+<h3>SetSkeleton <span class="tx-muted">apex::fbik::SetSkeleton</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>解く対象のスケルトンを渡す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-SetSkeleton.html">公式リファレンス（英語）</a></p>
+
+<h3>SetTarget <span class="tx-muted">apex::fbik::SetTarget</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>1つの目標を設定する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-SetTarget.html">公式リファレンス（英語）</a></p>
+
+<h3>SetTargets <span class="tx-muted">apex::fbik::SetTargets</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数の目標をまとめて設定する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-SetTargets.html">公式リファレンス（英語）</a></p>
+
+<h3>SetComTarget <span class="tx-muted">apex::fbik::SetComTarget</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>重心の目標を設定する</td></tr>
+    <tr><td>使いどころ</td><td><strong>バランスを取らせる。</strong>足を固定したまま上体を倒す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-SetComTarget.html">公式リファレンス（英語）</a></p>
+
+<h3>SolveFABRIK <span class="tx-muted">apex::fbik::SolveFABRIK</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>FABRIK 法で解く</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-SolveFABRIK.html">公式リファレンス（英語）</a></p>
+
+<h3>SolvePhysIK <span class="tx-muted">apex::fbik::SolvePhysIK</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>物理ベースで解く</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-SolvePhysIK.html">公式リファレンス（英語）</a></p>
+
+<h3>GetCenterOfMass <span class="tx-muted">apex::fbik::GetCenterOfMass</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>重心を得る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-fbik-GetCenterOfMass.html">公式リファレンス（英語）</a></p>
+
+<h3>Solve <span class="tx-muted">apex::ragdoll::Solve</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ラグドールを解く</td></tr>
+    <tr><td>使いどころ</td><td>キャラクターを物理で倒す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/apex/apex-ragdoll-Solve.html">公式リファレンス（英語）</a></p>
+
+<h2>6. グラフを組み立てる（graph::）</h2>
+
+<p><strong>リグを作る工程で使うもの</strong>です。Python でリグを組むときの中心になります。</p>
+
+<h3>よく使うもの</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::graph::AddNode</code></td><td>ノードを足す</td></tr><tr><td><code>apex::graph::AddOrUpdateNode</code></td><td>無ければ足し、あれば更新する</td></tr><tr><td><code>apex::graph::FindNode</code></td><td>名前でノードを探す</td></tr><tr><td><code>apex::graph::FindNodes</code></td><td>パターンで複数探す</td></tr><tr><td><code>apex::graph::DeleteNode</code></td><td>ノードを消す</td></tr><tr><td><code>apex::graph::RenameNode</code></td><td>名前を変える</td></tr><tr><td><code>apex::graph::ConnectInput</code></td><td>入力を繋ぐ</td></tr><tr><td><code>apex::graph::FindAndConnectInput</code></td><td>探して繋ぐ</td></tr><tr><td><code>apex::graph::DisconnectPort</code></td><td>外す</td></tr><tr><td><code>apex::graph::IsConnected</code></td><td>繋がっているか調べる</td></tr><tr><td><code>apex::graph::FindPort</code></td><td>ポートを探す</td></tr><tr><td><code>apex::graph::PromoteInput</code></td><td>入力を外に出す（サブネットの入口にする）</td></tr><tr><td><code>apex::graph::PromoteOutput</code></td><td>出力を外に出す</td></tr><tr><td><code>apex::graph::AddSubnet</code></td><td>サブネットを作る</td></tr><tr><td><code>apex::graph::PackSubnet</code></td><td>サブネットにまとめる</td></tr><tr><td><code>apex::graph::UnpackSubnet</code></td><td>サブネットを展開する</td></tr><tr><td><code>apex::graph::SetNodeTag</code></td><td>ノードにタグを付ける</td></tr><tr><td><code>apex::graph::FindNodeTags</code></td><td>タグでノードを探す</td></tr><tr><td><code>apex::graph::Compile</code></td><td>グラフをコンパイルする</td></tr><tr><td><code>apex::graph::Layout</code></td><td>見やすく並べ直す</td></tr><tr><td><code>apex::graph::SaveToGeometry</code></td><td>グラフをジオメトリとして保存する</td></tr><tr><td><code>apex::graph::LoadFromGeometry</code></td><td>ジオメトリからグラフを読む</td></tr><tr><td><code>apex::graph::Merge</code></td><td>2つのグラフを合流させる</td></tr><tr><td><code>apex::graph::Invoke</code></td><td>別のグラフを呼び出す</td></tr></tbody></table></div>
+<p><strong>グラフはジオメトリとして保存されます</strong>（<code>SaveToGeometry</code> / <code>LoadFromGeometry</code>）。リグが .bgeo に入るのはこのためです。</p>
+
+<h2>7. ジオメトリを読み書きする（geo::）</h2>
+
+<h3>よく使うもの</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::geo::PointAttribValue&lt;T&gt;</code></td><td>点属性を1つ読む</td></tr><tr><td><code>apex::geo::SetPointAttribValue&lt;T&gt;</code></td><td>点属性を1つ書く</td></tr><tr><td><code>apex::geo::PointAttribValuesToArray&lt;T&gt;</code></td><td>点属性を配列でまとめて読む</td></tr><tr><td><code>apex::geo::SetPointAttribValuesFromArray&lt;T&gt;</code></td><td>配列からまとめて書く</td></tr><tr><td><code>apex::geo::PrimAttribValue&lt;T&gt;</code></td><td>プリム属性を読む</td></tr><tr><td><code>apex::geo::DetailAttribValue&lt;T&gt;</code></td><td>detail 属性を読む</td></tr><tr><td><code>apex::geo::FindPointAttribValue&lt;T&gt;</code></td><td>値から点を探す</td></tr><tr><td><code>apex::geo::NumPoints</code></td><td>点の数</td></tr><tr><td><code>apex::geo::NumPrims</code></td><td>プリムの数</td></tr><tr><td><code>apex::geo::PrimPoints</code></td><td>プリムを構成する点</td></tr><tr><td><code>apex::geo::PointPrims</code></td><td>点が属するプリム</td></tr><tr><td><code>apex::geo::GlobPoints</code></td><td>パターンで点を選ぶ</td></tr><tr><td><code>apex::geo::InPointGroup</code></td><td>グループに入っているか</td></tr><tr><td><code>apex::geo::SetPointGroup</code></td><td>グループに入れる</td></tr><tr><td><code>apex::geo::Merge</code></td><td>ジオメトリを合流させる</td></tr><tr><td><code>apex::geo::Transform</code></td><td>ジオメトリを変換する</td></tr><tr><td><code>apex::geo::XyzDist</code></td><td>最も近い面までの距離</td></tr><tr><td><code>apex::geo::Intersect</code></td><td>レイ交差</td></tr><tr><td><code>apex::geo::BoundingBox</code></td><td>バウンディングボックス</td></tr><tr><td><code>apex::geo::ForEachPointBegin</code></td><td>点ごとのループの始まり</td></tr><tr><td><code>apex::geo::ForEachPointEnd</code></td><td>点ごとのループの終わり</td></tr><tr><td><code>apex::geo::SpringPointAttribs</code></td><td>属性にバネの遅れを付ける</td></tr><tr><td><code>apex::geo::JigglePointAttribs</code></td><td>属性を揺らす</td></tr><tr><td><code>apex::geo::LagOvershootPointAttribs</code></td><td>遅れと行き過ぎを付ける</td></tr><tr><td><code>apex::geo::GuideDeform</code></td><td>ガイドで変形させる</td></tr><tr><td><code>apex::geo::Lattice</code></td><td>ラティスで変形させる</td></tr><tr><td><code>apex::geoutils::Wrangle</code></td><td>VEX を走らせる</td></tr></tbody></table></div>
+<p><strong><code>Spring</code> / <code>Jiggle</code> / <code>LagOvershoot</code> は「揺れもの」の中身</strong>です。コントローラの動きに遅れを付けたいときに使います。</p>
+
+<h2>8. アニメーションのキー（ch::）</h2>
+
+<h3>よく使うもの</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::ch::Evaluate</code></td><td>チャンネルを評価する</td></tr><tr><td><code>apex::ch::EvaluateLayered</code></td><td>レイヤーを重ねて評価する</td></tr><tr><td><code>apex::ch::AddKey</code></td><td>キーを1つ足す</td></tr><tr><td><code>apex::ch::AddKeys</code></td><td>キーをまとめて足す</td></tr><tr><td><code>apex::ch::DeleteKeys</code></td><td>キーを消す</td></tr><tr><td><code>apex::ch::ShiftKeys</code></td><td>キーを時間方向にずらす</td></tr><tr><td><code>apex::ch::ScaleKeys</code></td><td>キーの値を拡大縮小する</td></tr><tr><td><code>apex::ch::CycleKeys</code></td><td>キーを繰り返す</td></tr><tr><td><code>apex::ch::BlendKeys</code></td><td>キーを混ぜる</td></tr><tr><td><code>apex::ch::ReduceKeys</code></td><td>キーを間引く</td></tr><tr><td><code>apex::ch::SmoothKeys</code></td><td>キーをなめらかにする</td></tr><tr><td><code>apex::ch::SmoothAutoTangents</code></td><td>自動タンジェントをならす</td></tr><tr><td><code>apex::ch::EulerFilter</code></td><td>オイラー角の飛びを直す</td></tr><tr><td><code>apex::ch::ChannelFromPrim</code></td><td>プリムからチャンネルを作る</td></tr><tr><td><code>apex::ch::ChannelToPrim</code></td><td>チャンネルをプリムにする</td></tr><tr><td><code>apex::ch::AnimStackBuild</code></td><td>アニメーションスタックを組む</td></tr><tr><td><code>apex::ch::AnimStackEvaluate</code></td><td>アニメーションスタックを評価する</td></tr></tbody></table></div>
+<p><strong><code>EulerFilter</code> は回転が 360 度飛ぶ問題を直します。</strong>モーションキャプチャや変換したデータで起きがちです。</p>
+
+<h2>9. 汎用のデータ操作</h2>
+
+<p>ここは他の言語の標準ライブラリに当たる部分です。<strong>名前から機能が推測できる</strong>ので、一覧で眺めておけば足ります。</p>
+
+<h3>配列（array::）</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::array::Build&lt;T&gt;</code></td><td>配列を作る</td></tr><tr><td><code>apex::array::Get&lt;T&gt;</code></td><td>要素を取り出す</td></tr><tr><td><code>apex::array::Set&lt;T&gt;</code></td><td>要素を書き換える</td></tr><tr><td><code>apex::array::Append&lt;T&gt;</code></td><td>末尾に足す</td></tr><tr><td><code>apex::array::Insert&lt;T&gt;</code></td><td>途中に挿す</td></tr><tr><td><code>apex::array::Remove&lt;T&gt;</code></td><td>取り除く</td></tr><tr><td><code>apex::array::Length&lt;T&gt;</code></td><td>長さ</td></tr><tr><td><code>apex::array::Find&lt;T&gt;</code></td><td>探す</td></tr><tr><td><code>apex::array::Slice&lt;T&gt;</code></td><td>切り出す</td></tr><tr><td><code>apex::array::Sort&lt;T&gt;</code></td><td>並べ替える</td></tr><tr><td><code>apex::array::SortAndRemoveDuplicates&lt;T&gt;</code></td><td>並べ替えて重複を消す</td></tr><tr><td><code>apex::array::Reverse&lt;T&gt;</code></td><td>逆順にする</td></tr><tr><td><code>apex::array::Sum&lt;T&gt;</code></td><td>合計</td></tr><tr><td><code>apex::array::Max&lt;T&gt;</code></td><td>最大</td></tr><tr><td><code>apex::array::Min&lt;T&gt;</code></td><td>最小</td></tr><tr><td><code>apex::array::Lerp&lt;T&gt;</code></td><td>要素ごとに補間する</td></tr><tr><td><code>apex::array::Extend&lt;T&gt;</code></td><td>別の配列を繋げる</td></tr></tbody></table></div>
+
+<h3>辞書（dict::）</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::dict::Build</code></td><td>辞書を作る</td></tr><tr><td><code>apex::dict::Get&lt;T&gt;</code></td><td>値を取り出す</td></tr><tr><td><code>apex::dict::Set&lt;T&gt;</code></td><td>値を入れる</td></tr><tr><td><code>apex::dict::GetNested&lt;T&gt;</code></td><td>入れ子の値を取り出す</td></tr><tr><td><code>apex::dict::SetNested&lt;T&gt;</code></td><td>入れ子の値を入れる</td></tr><tr><td><code>apex::dict::Contains</code></td><td>キーがあるか</td></tr><tr><td><code>apex::dict::Keys</code></td><td>キーの一覧</td></tr><tr><td><code>apex::dict::Remove</code></td><td>取り除く</td></tr><tr><td><code>apex::dict::Update</code></td><td>別の辞書で更新する</td></tr><tr><td><code>apex::dict::RenameKeys</code></td><td>キーの名前を変える</td></tr><tr><td><code>apex::dict::PatternRenameKeys</code></td><td>パターンでキーの名前を変える</td></tr></tbody></table></div>
+<p><strong>辞書はリグの設定を持ち回るのに使われます。</strong>「どのコントロールがどの骨を動かすか」のような対応表が入ります。</p>
+
+<h3>文字列（string::）</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::string::Format</code></td><td>書式に当てはめる</td></tr><tr><td><code>apex::string::Join</code></td><td>繋げる</td></tr><tr><td><code>apex::string::Split</code></td><td>分ける</td></tr><tr><td><code>apex::string::Replace</code></td><td>置き換える</td></tr><tr><td><code>apex::string::Find</code></td><td>探す</td></tr><tr><td><code>apex::string::StartsWith</code></td><td>前方一致</td></tr><tr><td><code>apex::string::EndsWith</code></td><td>後方一致</td></tr><tr><td><code>apex::string::Upper</code></td><td>大文字にする</td></tr><tr><td><code>apex::string::Lower</code></td><td>小文字にする</td></tr><tr><td><code>apex::string::PatternRename</code></td><td>パターンで名前を付け替える</td></tr><tr><td><code>apex::string::RegexMatch</code></td><td>正規表現で照合する</td></tr><tr><td><code>apex::string::RegexReplace</code></td><td>正規表現で置き換える</td></tr><tr><td><code>apex::string::PathSplit</code></td><td>パスを分解する</td></tr><tr><td><code>apex::string::ForceValidName</code></td><td>使える名前に直す</td></tr></tbody></table></div>
+<p><strong>左右対称のリグは <code>PatternRename</code> で作ります。</strong><code>*_L</code> を <code>*_R</code> に置き換えて反転した側を生やす、という形。</p>
+
+<h3>数学・論理</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::Add&lt;T&gt;</code></td><td>足す</td></tr><tr><td><code>apex::Subtract&lt;T&gt;</code></td><td>引く</td></tr><tr><td><code>apex::Multiply&lt;T&gt;</code></td><td>掛ける</td></tr><tr><td><code>apex::Divide&lt;T&gt;</code></td><td>割る</td></tr><tr><td><code>apex::Negate&lt;T&gt;</code></td><td>符号を反転する</td></tr><tr><td><code>apex::Abs&lt;T&gt;</code></td><td>絶対値</td></tr><tr><td><code>apex::Clamp&lt;T&gt;</code></td><td>範囲で止める</td></tr><tr><td><code>apex::Lerp&lt;T&gt;</code></td><td>線形補間</td></tr><tr><td><code>apex::NLerp&lt;T&gt;</code></td><td>正規化つき線形補間</td></tr><tr><td><code>apex::Efit</code></td><td>範囲を移し替える（クランプなし）</td></tr><tr><td><code>apex::Max&lt;T&gt;</code></td><td>大きいほう</td></tr><tr><td><code>apex::Min&lt;T&gt;</code></td><td>小さいほう</td></tr><tr><td><code>apex::Average&lt;T&gt;</code></td><td>平均</td></tr><tr><td><code>apex::Length&lt;T&gt;</code></td><td>長さ</td></tr><tr><td><code>apex::Distance&lt;T&gt;</code></td><td>距離</td></tr><tr><td><code>apex::Normalize&lt;T&gt;</code></td><td>正規化</td></tr><tr><td><code>apex::DotProduct&lt;T&gt;</code></td><td>内積</td></tr><tr><td><code>apex::Invert&lt;T&gt;</code></td><td>逆数・逆行列</td></tr><tr><td><code>apex::Transpose&lt;T&gt;</code></td><td>転置</td></tr><tr><td><code>apex::Equals&lt;T&gt;</code></td><td>等しいか</td></tr><tr><td><code>apex::AlmostEquals&lt;T&gt;</code></td><td>ほぼ等しいか</td></tr><tr><td><code>apex::GreaterThan&lt;T&gt;</code></td><td>より大きいか</td></tr><tr><td><code>apex::LessThan&lt;T&gt;</code></td><td>より小さいか</td></tr><tr><td><code>apex::Switch&lt;T&gt;</code></td><td>番号で入力を選ぶ</td></tr><tr><td><code>apex::SwitchByName&lt;T&gt;</code></td><td>名前で入力を選ぶ</td></tr><tr><td><code>apex::TwoWaySwitch&lt;T&gt;</code></td><td>真偽で2つから選ぶ</td></tr><tr><td><code>apex::Noise&lt;T&gt;</code></td><td>ノイズ</td></tr><tr><td><code>apex::Quantize&lt;T&gt;</code></td><td>段階に落とす</td></tr><tr><td><code>apex::RampLookup&lt;T&gt;</code></td><td>ランプを評価する</td></tr><tr><td><code>apex::DegreesToRadians&lt;T&gt;</code></td><td>度 → ラジアン</td></tr><tr><td><code>apex::RadiansToDegrees&lt;T&gt;</code></td><td>ラジアン → 度</td></tr><tr><td><code>apex::GetComponent&lt;T&gt;</code></td><td>成分を取り出す</td></tr><tr><td><code>apex::SetComponent&lt;T&gt;</code></td><td>成分を書き換える</td></tr><tr><td><code>apex::Convert&lt;SrcT, DesT&gt;</code></td><td>型を変換する</td></tr><tr><td><code>apex::Value&lt;T&gt;</code></td><td>定数を置く</td></tr><tr><td><code>apex::Null&lt;T&gt;</code></td><td>何もしない（配線の整理用）</td></tr><tr><td><code>apex::RunVex</code></td><td>VEX を走らせる</td></tr><tr><td><code>apex::ForBegin</code></td><td>ループの始まり</td></tr><tr><td><code>apex::ForEnd</code></td><td>ループの終わり</td></tr><tr><td><code>apex::ForEachBegin&lt;T&gt;</code></td><td>配列ごとのループの始まり</td></tr><tr><td><code>apex::ForEachEnd&lt;T&gt;</code></td><td>配列ごとのループの終わり</td></tr></tbody></table></div>
+<p><strong><code>&lt;T&gt;</code> は型が可変</strong>という意味です。同じ <code>Add&lt;T&gt;</code> がfloat でも vector でも matrix でも使えます。</p>
+
+<h2>10. ガイドと動きの経路</h2>
+
+<h3>ガイド（guide::）と経路（dynamicpath::）</h3>
+<p><strong>ガイドは「リグをどこに置くか」の目印</strong>です。ガイドを配置してから、そこにリグの部品を生やす、という順で組みます。</p>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>apex::guide::FindOrAddGuide</code></td><td>ガイドを探す／足す</td></tr><tr><td><code>apex::guide::SetGuideParent</code></td><td>ガイドの親を設定する</td></tr><tr><td><code>apex::guide::SetGuideProperties</code></td><td>ガイドの性質を設定する</td></tr><tr><td><code>apex::guide::ControlsFromGuides</code></td><td>ガイドからコントロールを作る</td></tr><tr><td><code>apex::guide::UpdateShapesFromGuides</code></td><td>ガイドから形を更新する</td></tr><tr><td><code>apex::dynamicpath::ProjectilePathFromSpeed</code></td><td>初速から投擲軌道を作る</td></tr><tr><td><code>apex::dynamicpath::ProjectilePathFromPlane</code></td><td>着地面から投擲軌道を作る</td></tr><tr><td><code>apex::dynamicpath::Evaluate</code></td><td>経路を評価する</td></tr><tr><td><code>apex::dynamicpath::AddTweakTarget</code></td><td>経路に通過点を足す</td></tr><tr><td><code>apex::dynamicpath::Bake</code></td><td>経路を焼く</td></tr><tr><td><code>apex::dynamicpath::LoadFromChannels</code></td><td>チャンネルから経路を読む</td></tr></tbody></table></div>
+
+
+<h2>読み方のコツ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>見たもの</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>&lt;T&gt;</code> が付いている</td><td>型が可変。float / vector / matrix で共通</td></tr>
+    <tr><td><code>graph::</code> で始まる</td><td><strong>リグを組む工程</strong>で動く。リグの中には残らない</td></tr>
+    <tr><td><code>rig::</code> / <code>skel::</code> で始まる</td>
+        <td><strong>リグの中身</strong>。毎フレーム走る</td></tr>
+    <tr><td><code>...FromArray</code> が付いている</td><td>入力を配列でまとめて受け取る版</td></tr>
+    <tr><td><code>...ToArray</code> が付いている</td><td>結果を配列で返す版</td></tr>
+    <tr><td><code>__parms__</code> / <code>__output__</code></td>
+        <td>グラフの入口と出口。自分で置くものではない</td></tr>
+  </tbody>
+</table></div>
+
+<p>598 個ありますが、<strong>実際に手で置くのは <code>component::</code> の十数個</strong>で、
+残りはその中身か、Python でグラフを組むときの部品です。
+リグを1本組んでみて中を開くのが、いちばん早い読み方だと思います。</p>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/character/apex.html">APEX (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/apex/index.html">APEX nodes</a></li><li><a href="https://www.sidefx.com/docs/houdini/character/kinefx.html">KineFX</a></li><li><a href="https://www.sidefx.com/docs/houdini/character/apex_graphs.html">APEX Graph の考え方</a></li><li><a href="https://www.sidefx.com/docs/houdini/character/rigging.html">Rigging with APEX</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

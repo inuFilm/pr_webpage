@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MPM のノード — 10個しかないので全部 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="MPM（物質点法）のノードは SOP 8個 + DOP 2個で全部です。器・材料・コリジョン・ソルバ・出口の並びと、1ノードずつの用途・要のパラメータをまとめました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>MPM のノード — 10個しかないので全部</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/mpm/index.html">MPM (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmsolver.html">MPM Solver SOP</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmsource.html">MPM Source SOP</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>MPM が<strong>何を解くもの</strong>なのか（FLIP・Vellum・RBD との住み分け）</li><li>SOP 8個 + DOP 2個を<strong>全部</strong>、1ノードずつ</li><li>材料の性質がどのパラメータで決まるか</li></ul>
+
+
+<h2>MPM は「粒子とグリッドを行き来する」ソルバ</h2>
+
+<p>MPM（Material Point Method / 物質点法）は、材料を<strong>粒子</strong>で持ちながら、
+力の計算だけ<strong>グリッド</strong>で行い、また粒子に戻す、という往復で解きます。
+FLIP と似た構造ですが、狙っているものが違います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ソルバ</th><th>得意なもの</th></tr></thead>
+  <tbody>
+    <tr><td><strong>MPM</strong></td><td>雪・砂・泥・粘土・肉・パン生地。<strong>形が残る／崩れる</strong>もの。
+        固体と流体の中間にあるものが一番の得意分野</td></tr>
+    <tr><td>FLIP</td><td>水。形が残らない液体</td></tr>
+    <tr><td>Vellum</td><td>布・紐・風船。薄いもの、伸び縮みするもの</td></tr>
+    <tr><td>RBD</td><td>剛体。割れるが変形はしないもの</td></tr>
+  </tbody>
+</table></div>
+
+<p>「砂の山を崩す」「雪に足跡が残る」「粘土がひしゃげる」のように、
+<strong>変形したまま止まる</strong>ものは MPM の担当です。</p>
+
+<p>並びは Pyro や FLIP と同じ形で、<strong>器 → 材料 → 障害物 → 解く → 出口</strong>です。</p>
+
+
+<h2>1. 器を決める</h2>
+
+<h3>MPM Container <span class="tx-muted">mpmcontainer</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>解く領域・解像度・開始フレームを決める</td></tr>
+    <tr><td>使いどころ</td><td>MPM を組むときの起点</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>particlesep</code> — 粒子の間隔。<strong>細かさと重さを決める主役</strong>（既定 <code>0.025</code>）<br><code>gridscale</code> — グリッドを粒子間隔の何倍にするか（既定 <code>2</code>）<br><code>size</code> — 領域の大きさ（既定 <code>10.0 10.0 10.0</code>）<br><code>startframe</code> — 開始フレーム（既定 <code>1</code>）<br><code>friction</code> — 領域の壁の摩擦（既定 <code>1</code>）<br><code>sticky</code> — 壁への貼りつき（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>領域の各面（<code>xneg</code> / <code>xpos</code> …）ごとに、通す・止めるを設定できます。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmcontainer.html">公式リファレンス（英語）</a></p>
+
+<h2>2. 材料をつくる</h2>
+
+<p><strong>MPM の性格はここで決まります。</strong>同じソルバでも、ここの設定で雪にも砂にも粘土にもなります。</p>
+
+<h3>MPM Source <span class="tx-muted">mpmsource</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>メッシュやボリュームから MPM の粒子を作る。<strong>材料の性質もここで持たせる</strong></td></tr>
+    <tr><td>使いどころ</td><td>崩したい・ひしゃげさせたいものを渡すとき</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>density</code> — 密度。重さ（既定 <code>400</code>）<br><code>e</code> — ヤング率。<strong>硬さ</strong>。大きいほど硬い（既定 <code>1.4</code>）<br><code>nu</code> — ポアソン比。潰したときの横への膨らみ方（既定 <code>0.2</code>）<br><code>compressionhardening</code> — 潰れたときに硬くなる度合い。雪らしさはここ（既定 <code>10</code>）<br><code>emission</code> — 時間とともに湧かせるか（既定 <code>1</code>）<br><code>enablepinconstraint</code> — 一部を固定して動かなくする（既定 <code>False</code>）</td></tr>
+    <tr><td>注意</td><td><strong>硬さは <code>e</code>（ヤング率）です。</strong>名前が1文字なので見落としやすいのですが、砂と粘土と雪の違いはほぼここと <code>compressionhardening</code> の組み合わせで出ます。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmsource.html">公式リファレンス（英語）</a></p>
+
+<h2>3. ぶつかるものを渡す</h2>
+
+<h3>MPM Collider <span class="tx-muted">mpmcollider</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>VDB のコリジョンを定義する。跳ね返す／消す</td></tr>
+    <tr><td>使いどころ</td><td>地面・器・キャラクターに当てるとき</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>type</code> — コリジョンの種類（既定 <code>0</code>）<br><code>response</code> — 当たったときの応答（跳ねる／止まる／消す）（既定 <code>0</code>）<br><code>friction</code> — 摩擦。<strong>砂が斜面で止まるかどうかはここ</strong>（既定 <code>1</code>）<br><code>sticky</code> — 貼りつき（既定 <code>0</code>）<br><code>computevelocity</code> — 動くコリジョンの速度を材料に伝える（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmcollider.html">公式リファレンス（英語）</a></p>
+
+<h2>4. 解く</h2>
+
+<h3>MPM Solver (SOP) <span class="tx-muted">mpmsolver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>MPM を解く</td></tr>
+    <tr><td>使いどころ</td><td>器・材料・コリジョンを渡した先に置く本体</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>cflcondition</code> — サブステップの自動決定。<strong>小さくすると安定するが遅くなる</strong>（既定 <code>1</code>）<br><code>airdrag</code> — 空気抵抗（既定 <code>0</code>）<br><code>cacheenabled</code> — メモリキャッシュ（既定 <code>True</code>）<br><code>deterministic</code> — 毎回同じ結果になるようにする（既定 <code>True</code>）<br><code>autoresim</code> — 上流が変わったら解き直す（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>重い処理なので、まず <code>particlesep</code> を粗くして動きだけ見ます。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmsolver.html">公式リファレンス（英語）</a></p>
+
+<h3>MPM Solver (DOP) <span class="tx-muted">mpmsolver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中に置く MPM ソルバ本体</td></tr>
+    <tr><td>使いどころ</td><td>SOP 版で届かないところを触りたいとき</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/mpmsolver.html">公式リファレンス（英語）</a></p>
+
+<h3>MPM Object <span class="tx-muted">mpmobject</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中で MPM のオブジェクトを定義する</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/mpmobject.html">公式リファレンス（英語）</a></p>
+
+<h2>5. 出口 — 絵にする</h2>
+
+<p>MPM の出力は粒子です。そのままではレンダーできないので、面にするか、元のモデルに動きを移します。</p>
+
+<h3>MPM Surface <span class="tx-muted">mpmsurface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>粒子から面を作る</td></tr>
+    <tr><td>使いどころ</td><td>砂・泥・雪など、<strong>元の形が残らない</strong>ものの出口</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>kernelradius</code> — 1粒が影響する半径。<strong>大きいと膜っぽく、小さいと粒っぽくなる</strong>（既定 <code>2</code>）<br><code>enablesmooth</code> — 表面をならす（既定 <code>False</code>）<br><code>iterations</code> — ならす回数（既定 <code>1</code>）<br><code>adaptivity</code> — 平らなところの面を減らす（既定 <code>0.005</code>）<br><code>fillinterior</code> — 内部を埋める（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmsurface.html">公式リファレンス（英語）</a></p>
+
+<h3>MPM Deform Pieces <span class="tx-muted">mpmdeformpieces</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>MPM の動きを、<strong>レンダー用の元モデル</strong>に移す</td></tr>
+    <tr><td>使いどころ</td><td>形が保たれるもの（粘土のかたまり、肉）の出口。面を作り直すより元のモデルのほうがきれいなとき</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>kernelradius</code> — 粒子からの影響半径（既定 <code>10</code>）<br><code>enableattribtransfer</code> — UV などの属性も一緒に運ぶ（既定 <code>False</code>）<br><code>closegaps</code> — 隙間を閉じる</td></tr>
+  </tbody>
+</table></div>
+<p><strong><code>mpmsurface</code> と使い分けます。</strong>崩れて原形をとどめないなら <code>mpmsurface</code>、ひしゃげるだけで元の形が分かるなら <code>mpmdeformpieces</code> のほうがきれいです。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmdeformpieces.html">公式リファレンス（英語）</a></p>
+
+<h3>MPM Post Fracture <span class="tx-muted">mpmpostfracture</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>MPM の最終状態を使って、レンダー用ジオメトリを割る</td></tr>
+    <tr><td>使いどころ</td><td>ちぎれた・割れた結果を、元モデルの割れとして表現したいとき</td></tr>
+    <tr><td>入力</td><td>2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>dofracture</code> — 割りを有効にする（既定 <code>True</code>）<br><code>elementsize</code> — 割れの細かさ（既定 <code>1</code>）<br><code>amplitude</code> — 割れ目の乱れ（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmpostfracture.html">公式リファレンス（英語）</a></p>
+
+<h3>MPM Debris Source <span class="tx-muted">mpmdebrissource</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>MPM から、二次シミュレーション用の点を取り出す</td></tr>
+    <tr><td>使いどころ</td><td>砂埃を Pyro で足す、破片をパーティクルで飛ばす</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>minspeed</code> — 取り出す最低速度（既定 <code>0.5</code>）<br><code>ratiotokeep</code> — 取り出す割合（既定 <code>1</code>）<br><code>pscalemult</code> — 取り出す点の大きさ倍率（既定 <code>0.35</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>「速く動いているところだけ」「引き伸ばされているところだけ」を条件にして取り出せます。砂煙を足すときの入口になります。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmdebrissource.html">公式リファレンス（英語）</a></p>
+
+
+<h2>材料の作り分け</h2>
+
+<p>MPM の勘所は <code>mpmsource</code> にほぼ集まっています。
+どれも <code>e</code>（硬さ）と、潰れたときの振る舞いの組み合わせです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>作りたいもの</th><th>効くところ</th></tr></thead>
+  <tbody>
+    <tr><td>砂</td><td>硬さは低め。<code>mpmcollider</code> の <code>friction</code> を上げると
+        斜面で止まるようになる</td></tr>
+    <tr><td>雪</td><td><code>compressionhardening</code> を効かせる。踏んだところが固まる</td></tr>
+    <tr><td>粘土・パン生地</td><td>硬さ低め・硬化なし。出口は <code>mpmdeformpieces</code></td></tr>
+    <tr><td>泥</td><td>硬さをかなり低く。ほとんど液体寄り</td></tr>
+  </tbody>
+</table></div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず見るところ</th></tr></thead>
+  <tbody>
+    <tr><td>爆発したように飛び散る</td><td><code>cflcondition</code> を小さく。硬さ <code>e</code> が高すぎないか</td></tr>
+    <tr><td>斜面で止まらず流れ続ける</td><td><code>mpmcollider</code> の <code>friction</code></td></tr>
+    <tr><td>面がぬるっとしすぎる</td><td><code>mpmsurface</code> の <code>kernelradius</code> を小さく</td></tr>
+    <tr><td>とにかく重い</td><td><code>particlesep</code>。まず粗く</td></tr>
+  </tbody>
+</table></div>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/mpm/index.html">MPM (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmsolver.html">MPM Solver SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmsource.html">MPM Source SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmcontainer.html">MPM Container SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/mpmcollider.html">MPM Collider SOP</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -10,6 +10,8 @@ body, h1, h2, h3, p, ul, ol, figure, blockquote { margin: 0; }
   --tech-accent: #2CA9E1;    /* 既存サイトのアクセント色 */
   --tech-bg: #203744;
   --tech-panel: #ffffff;
+  --tech-panel-alt: #f4f7f9; /* 表ヘッダ・バッジなどの淡い面 */
+  --tech-zebra: #fafcfd;     /* 表の縞 */
   --tech-text: #2b3a44;
   --tech-muted: #7a868e;
   --tech-border: #dde3e8;
@@ -49,7 +51,7 @@ body.tech {
 /* レイアウト */
 
 .tech-layout {
-  max-width: 1100px;
+  max-width: 1240px;
   margin: 0 auto;
   padding: 24px 16px;
 }
@@ -57,8 +59,8 @@ body.tech {
 @media (min-width: 900px) {
   .tech-layout {
     display: grid;
-    grid-template-columns: 260px minmax(0, 1fr);
-    gap: 24px;
+    grid-template-columns: 248px minmax(0, 1fr);
+    gap: 20px;
   }
 
   #tech-sidebar {
@@ -67,64 +69,159 @@ body.tech {
     align-self: start;
     max-height: calc(100vh - 48px);
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 }
 
-/* サイドバー */
+/* ============================================================
+   サイドバー
+   本文より一段小さい文字にして、54本の記事一覧でも視線が滑るようにする。
+   ============================================================ */
 
 #tech-sidebar {
   background: var(--tech-panel);
   border: 1px solid var(--tech-border);
-  border-radius: 6px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: 10px 10px 12px;
+  font-size: 0.875rem;
+  line-height: 1.55;
 }
 
 .tech-sidebar-top {
   display: block;
-  font-weight: bold;
+  font-weight: 700;
   color: var(--tech-dark);
+  text-decoration: none;
+  padding: 4px 6px 10px;
+  border-bottom: 1px solid var(--tech-border);
 }
 
+.tech-sidebar-top:hover { color: var(--tech-accent); }
+
+.tech-search {
+  width: 100%;
+  font: inherit;
+  color: var(--tech-text);
+  background: var(--tech-panel);
+  padding: 6px 9px;
+  margin: 10px 0;
+  border: 1px solid var(--tech-border);
+  border-radius: 5px;
+}
+
+.tech-search::placeholder { color: var(--tech-muted); }
+
+.tech-search:focus {
+  outline: none;
+  border-color: var(--tech-accent);
+  box-shadow: 0 0 0 2px rgba(44, 169, 225, 0.18);
+}
+
+.tech-sidebar-empty {
+  color: var(--tech-muted);
+  padding: 6px;
+  font-size: 0.85rem;
+}
+
+/* カテゴリ（開閉） */
+
+details.tech-cat { border-top: 1px solid var(--tech-border); }
+
 details.tech-cat summary {
-  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 700;
   cursor: pointer;
   color: var(--tech-dark);
-  padding: 6px 0;
+  padding: 8px 6px;
+  list-style: none;
+}
+
+details.tech-cat summary::-webkit-details-marker { display: none; }
+
+details.tech-cat summary::before {
+  content: "\25B8";              /* ▸ */
+  color: var(--tech-muted);
+  font-size: 0.78em;
+  line-height: 1;
+}
+
+details.tech-cat[open] summary::before { content: "\25BE"; }  /* ▾ */
+
+details.tech-cat summary:hover { color: var(--tech-accent); }
+details.tech-cat.has-current > summary { color: var(--tech-accent); }
+
+.tech-cat-name { flex: 1 1 auto; min-width: 0; }
+
+.tech-cat-count {
+  flex: 0 0 auto;
+  font-weight: 400;
+  font-size: 0.75rem;
+  line-height: 1.6;
+  color: var(--tech-muted);
+  background: var(--tech-panel-alt);
+  border-radius: 999px;
+  padding: 0 8px;
 }
 
 #tech-sidebar ul {
   list-style: none;
-  padding-left: 8px;
+  margin: 0;
+  padding: 0 0 8px;
 }
 
-#tech-sidebar ul a {
+#tech-sidebar li a {
+  display: block;
   color: var(--tech-text);
   text-decoration: none;
+  padding: 5px 8px 5px 15px;
+  border-left: 3px solid transparent;
+  border-radius: 0 4px 4px 0;
 }
 
-#tech-sidebar ul a:hover {
+#tech-sidebar li a:hover {
   color: var(--tech-accent);
+  background: var(--tech-panel-alt);
 }
 
 #tech-sidebar li.is-current > a {
   color: var(--tech-accent);
-  font-weight: bold;
-  border-left: 3px solid var(--tech-accent);
+  font-weight: 700;
+  border-left-color: var(--tech-accent);
+  background: var(--tech-panel-alt);
 }
+
+#tech-sidebar li.is-hidden { display: none; }
 
 /* 本文パネル */
 
 .tech-main {
   background: var(--tech-panel);
   border: 1px solid var(--tech-border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 24px;
+  min-width: 0;
 }
 
-/* 記事タイポグラフィ */
+@media (min-width: 900px) {
+  .tech-main { padding: 28px 32px; }
+}
+
+.tech-intro {
+  color: var(--tech-muted);
+  margin-top: 10px;
+}
+
+/* ============================================================
+   記事タイポグラフィ
+   ノード早見表のように h3 と表が大量に並ぶ記事でも拾えるよう、
+   見出しに区切りを入れて表を一段小さくしている。
+   ============================================================ */
 
 .tech-article h1 {
-  font-size: 1.6rem;
+  font-size: 1.65rem;
+  line-height: 1.45;
   border-bottom: 2px solid var(--tech-accent);
   padding-bottom: 8px;
 }
@@ -132,19 +229,32 @@ details.tech-cat summary {
 .tech-article .tech-meta {
   color: var(--tech-muted);
   font-size: 0.85rem;
+  margin-top: 6px;
 }
+
+.tech-article .tech-meta a {
+  color: var(--tech-muted);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--tech-border);
+}
+
+.tech-article .tech-meta a:hover { color: var(--tech-accent); }
 
 .tech-article h2,
 .tech-cat-block h2 {
-  font-size: 1.25rem;
+  font-size: 1.3rem;
+  line-height: 1.5;
   border-left: 4px solid var(--tech-accent);
-  padding-left: 8px;
-  margin-top: 32px;
+  padding-left: 10px;
+  margin-top: 40px;
 }
 
 .tech-article h3 {
-  font-size: 1.1rem;
-  margin-top: 24px;
+  font-size: 1.06rem;
+  line-height: 1.5;
+  margin-top: 30px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--tech-border);
 }
 
 .tech-article p,
@@ -159,15 +269,17 @@ details.tech-cat summary {
   padding-left: 24px;
 }
 
-.tech-article a {
-  color: var(--tech-accent);
-}
+.tech-article li { margin: 4px 0; }
+
+.tech-article a { color: var(--tech-accent); }
 
 .tech-article code {
   background: #eef2f5;
+  font-size: 0.92em;
   padding: 2px 5px;
   border-radius: 3px;
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  word-break: break-word;
 }
 
 .tech-article pre {
@@ -176,71 +288,201 @@ details.tech-cat summary {
   padding: 14px;
   border-radius: 6px;
   overflow-x: auto;
+  font-size: 0.88rem;
+  line-height: 1.65;
 }
 
 .tech-article pre code {
   background: none;
+  font-size: inherit;
   padding: 0;
 }
 
-.tech-article img {
+.tech-article img,
+.tech-article svg {
   max-width: 100%;
   height: auto;
 }
 
+/* 表 */
+
 .tech-article .table-wrap {
   overflow-x: auto;
+  margin: 14px 0;
 }
 
 .tech-article table {
   border-collapse: collapse;
+  font-size: 0.9rem;
+  line-height: 1.65;
 }
 
 .tech-article th,
 .tech-article td {
   border: 1px solid var(--tech-border);
-  padding: 6px 10px;
+  padding: 7px 11px;
+  vertical-align: top;
 }
 
 .tech-article th {
-  background: #eef2f5;
+  background: var(--tech-panel-alt);
+  text-align: left;
+  white-space: nowrap;
 }
+
+.tech-article tbody tr:nth-child(even) { background: var(--tech-zebra); }
 
 .tech-article blockquote {
   border-left: 4px solid var(--tech-border);
   padding-left: 12px;
   color: var(--tech-muted);
+  margin: 14px 0;
 }
 
-/* 一覧カード（index） */
+/* ============================================================
+   一覧（index）
+   ============================================================ */
+
+.tech-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 22px 0 4px;
+}
+
+.tech-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--tech-border);
+  border-radius: 999px;
+  padding: 4px 13px;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  text-decoration: none;
+  color: var(--tech-dark);
+  background: var(--tech-panel);
+}
+
+.tech-chip:hover {
+  border-color: var(--tech-accent);
+  color: var(--tech-accent);
+}
+
+.tech-chip span {
+  color: var(--tech-muted);
+  font-size: 0.75rem;
+}
+
+.tech-cat-block { scroll-margin-top: 16px; }
+
+.tech-cat-block h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.tech-cards {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+@media (min-width: 780px) {
+  .tech-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .tech-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   border: 1px solid var(--tech-border);
-  border-radius: 6px;
-  padding: 12px 16px;
-  margin: 12px 0;
+  border-radius: 8px;
+  padding: 12px 15px;
   text-decoration: none;
+  background: var(--tech-panel);
+  transition: border-color .12s ease, transform .12s ease;
 }
 
 .tech-card:hover {
   border-color: var(--tech-accent);
+  transform: translateY(-1px);
 }
 
 .tech-card-title {
-  font-weight: bold;
+  font-weight: 700;
+  line-height: 1.5;
   color: var(--tech-dark);
 }
 
+.tech-card:hover .tech-card-title { color: var(--tech-accent); }
+
 .tech-card-date {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--tech-muted);
 }
 
 .tech-card-desc {
   display: block;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--tech-muted);
+}
+
+/* ============================================================
+   記事の前後ナビ（同じカテゴリ内）
+   ============================================================ */
+
+.tech-pager {
+  display: grid;
+  gap: 10px;
+  margin-top: 44px;
+  padding-top: 20px;
+  border-top: 1px solid var(--tech-border);
+}
+
+@media (min-width: 700px) {
+  .tech-pager { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.tech-pager-pos {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  color: var(--tech-muted);
+}
+
+.tech-pager a {
+  display: block;
+  border: 1px solid var(--tech-border);
+  border-radius: 8px;
+  padding: 10px 15px;
+  text-decoration: none;
   color: var(--tech-text);
+}
+
+.tech-pager a:hover { border-color: var(--tech-accent); }
+
+.tech-pager .is-next { text-align: right; }
+
+.tech-pager-dir {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--tech-muted);
+}
+
+.tech-pager-title {
+  display: block;
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--tech-dark);
+}
+
+.tech-pager a:hover .tech-pager-title { color: var(--tech-accent); }
+
+.tech-pager-empty { display: none; }
+
+@media (min-width: 700px) {
+  .tech-pager-empty { display: block; }
 }
 
 /* フッター */
@@ -253,9 +495,9 @@ details.tech-cat summary {
 }
 
 /* ===== article-editor 拡張（動画・文字色・見出し4-6） ===== */
-.tech-article h4 { font-size: 1.05rem; margin-top: 20px; color: var(--tech-dark); }
-.tech-article h5 { font-size: 1rem; margin-top: 16px; color: var(--tech-dark); }
-.tech-article h6 { font-size: 0.95rem; margin-top: 16px; color: var(--tech-muted); }
+.tech-article h4 { font-size: 1.02rem; margin-top: 22px; color: var(--tech-dark); }
+.tech-article h5 { font-size: 0.98rem; margin-top: 18px; color: var(--tech-dark); }
+.tech-article h6 { font-size: 0.94rem; margin-top: 18px; color: var(--tech-muted); }
 .tech-article .tx-red { color: #e05252; }
 .tech-article .tx-blue { color: var(--tech-accent); }
 .tech-article .tx-green { color: #3fae6a; }

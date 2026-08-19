@@ -11,6 +11,69 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "nodes-vex",
+    "title": "VEX — よく使う関数と、行列まわりの実例",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "wrangle 系ノードの使い分けから、アトリビュートの読み書き・数学・乱数・ベクトル・行列と回転まで。よく使う VEX 関数を用途別にまとめ、行列操作は動くサンプルを添えました。関数名は Houdini 22.0.368 の同梱ヘルプと照合済みです。"
+  },
+  {
+    "slug": "nodes-pyro",
+    "title": "Pyro のノード — どれが何をするのか",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "Pyro 関連のノードを「発生源 / 焼く / 解く / 見た目 / ボリューム操作」の5段に分けて、1ノードずつ用途と要のパラメータをまとめました。名前と既定値は Houdini 22.0.368 の実機で照合しています。"
+  },
+  {
+    "slug": "nodes-flip",
+    "title": "FLIP のノード — 3本の線を通す形を覚える",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "FLIP と白泡のノードを「器 / 解く / 面にする / 白泡 / 軽くする」に分けて、1ノードずつ用途と要のパラメータをまとめました。配線が3本1組になっている理由と、止めた境界が水を消す話も含みます。"
+  },
+  {
+    "slug": "nodes-mpm",
+    "title": "MPM のノード — 10個しかないので全部",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "MPM（物質点法）のノードは SOP 8個 + DOP 2個で全部です。器・材料・コリジョン・ソルバ・出口の並びと、1ノードずつの用途・要のパラメータをまとめました。"
+  },
+  {
+    "slug": "nodes-rbd",
+    "title": "RBD のノード — 割る・束ねる・繋ぐ・解く",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "破壊まわりのノードを「割る / パックする / 拘束を作る / 解く / 仕上げ」に分けて、1ノードずつ用途と要のパラメータをまとめました。パックし忘れると重力でも落ちない話、assemble が glue を殺す話も含みます。"
+  },
+  {
+    "slug": "nodes-cfx",
+    "title": "CFX のノード — Vellum・毛・群衆・筋肉",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "キャラクターFX まわりのノードを Vellum / ヘア / 群衆 / 筋肉・皮膚 の4系統に分けて、1ノードずつ用途と要のパラメータをまとめました。Vellum が「拘束を作ってから解く」形である理由も含みます。"
+  },
+  {
+    "slug": "nodes-apex",
+    "title": "APEX のノード — 名前空間で地図を作る",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "APEX の 598 ノードを名前空間ごとに整理し、リグを組むときに実際に触るものは1ノードずつ、配列・辞書・文字列などの機械的な族はまとめ表にしました。ノード名は Houdini 22.0.368 の同梱ヘルプと照合済みです。"
+  },
+  {
+    "slug": "nodes-mtlx",
+    "title": "MaterialX のノード — 型が厳密なシェーダー",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "MaterialX のノードをサーフェス・BSDF・テクスチャ・座標・ノイズ・色・数学・合成に分けて、1ノードずつ用途をまとめました。signature で型が変わる仕組みと、結線が黙って外れる落とし穴も実測を交えて説明します。"
+  },
+  {
+    "slug": "nodes-cop",
+    "title": "COP のノード — テクスチャを作る道具",
+    "category": "houdini-nodes",
+    "date": "2026-08-19",
+    "description": "Copernicus のノードを「入口・生成・色・フィルタ・変形・合成・PBR・ジオメトリ連携」に分けて、1ノードずつ用途と要のパラメータをまとめました。タイリングと法線の向き、書き出しの色空間の話も含みます。"
+  },
+  {
     "slug": "solaris-00-map",
     "title": "Solaris と Karma の地図 — 何が複雑なのかを先に整理する",
     "category": "houdini-solaris",

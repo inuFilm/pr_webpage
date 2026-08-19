@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MaterialX のノード — 型が厳密なシェーダー | 技術メモ | makeinufilm</title>
+  <meta name="description" content="MaterialX のノードをサーフェス・BSDF・テクスチャ・座標・ノイズ・色・数学・合成に分けて、1ノードずつ用途をまとめました。signature で型が変わる仕組みと、結線が黙って外れる落とし穴も実測を交えて説明します。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>MaterialX のノード — 型が厳密なシェーダー</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/solaris/materialx.html">MaterialX (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/vop/index.html">MaterialX nodes</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/karma_materials.html">Karma materials</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>MaterialX が<strong>型に厳密</strong>であること、<code>signature</code> で型が変わる仕組み</li><li>サーフェス・BSDF・テクスチャ・座標・ノイズ・色・数学・合成を<strong>1ノードずつ</strong></li><li><strong>結線が黙って外れる</strong>落とし穴（実測）</li></ul>
+
+
+<h2>MaterialX は型に厳密</h2>
+
+<p>Blender のシェーダーノードは、色を Shader ソケットに挿しても何となく動きます。
+<strong>MaterialX はそれを許しません。</strong>
+<code>color3</code> と <code>vector3</code> と <code>float</code> は別の型で、
+繋がらないものは繋がりません。</p>
+
+<p>そのぶん、同じ計算に型ごとの別ノードが必要になりそうですが、そうはなっていません。
+<strong>1つのノードが <code>signature</code> というパラメータで型を切り替えます。</strong></p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th></th></tr></thead>
+  <tbody>
+    <tr><td><code>mtlxadd</code> の <code>signature</code> = <code>float</code></td>
+        <td>float 同士を足す</td></tr>
+    <tr><td><code>mtlxadd</code> の <code>signature</code> = <code>color3</code></td>
+        <td>色同士を足す</td></tr>
+    <tr><td><code>mtlxadd</code> の <code>signature</code> = <code>vector3</code></td>
+        <td>ベクトル同士を足す</td></tr>
+  </tbody>
+</table></div>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td colspan="2"><strong>スクリプトで組むときの実測メモ</strong></td></tr>
+    <tr><td><code>signature</code> は<strong>結線したあとに</strong>設定する</td>
+        <td>メニューの中身が繋がった入力の型で絞り込まれるため、繋ぐ前だと目的の値が選べません</td></tr>
+    <tr><td><code>signature</code> を変えると<strong>線が黙って外れる</strong></td>
+        <td>型が合わなくなった結線が、警告もエラーも無く切れます。
+        「結線 → signature」を変化が無くなるまで交互に回してから、最後にもう一度繋ぎ直すのが確実です</td></tr>
+    <tr><td>素の型のトークンは <code>"default"</code></td>
+        <td><code>"float"</code> ではありません</td></tr>
+    <tr><td>トークンにアンダースコアは入らない</td>
+        <td><code>color3vector3</code> であって <code>color3_vector3</code> ではない。
+        間違えると<strong>黙ってメニューの先頭に落ちます</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>この「エラーが出ないまま線が外れる」が MaterialX でいちばん厄介なところです。
+出来上がったマテリアルが真っ黒／真っ白になったら、まず<strong>出口までの線が生きているか</strong>を疑ってください。</p>
+
+<h2>Houdini 独自のノード</h2>
+
+<p>名前に <code>h</code> が入るもの（<code>hmtlxrampc</code> のように先頭に付くものと、
+<code>mtlxhuniformramp</code> のように <code>mtlx</code> の後に付くものがあります）は
+<strong>Houdini が独自に足したもの</strong>で、MaterialX の標準にはありません。
+ランプなど、標準では表現しにくいものが入っています。
+他のアプリに持っていくときは互換性に注意してください。</p>
+
+
+<h2>1. サーフェス（出口）</h2>
+
+<p><strong>マテリアルの終点</strong>です。ここに繋がっていないと何も出ません。</p>
+
+<h3>mtlxstandard_surface <span class="tx-muted">mtlxstandard_surface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>Autodesk Standard Surface。<strong>Houdini の既定のサーフェス</strong></td></tr>
+    <tr><td>使いどころ</td><td>迷ったらこれ。ほとんどの素材が作れる</td></tr>
+    <tr><td>入力</td><td>0〜42</td></tr>
+    <tr><td>要のパラメータ</td><td><code>base_color</code> — 基本の色（既定 <code>0.8 0.8 0.8</code>）<br><code>specular_roughness</code> — 粗さ（既定 <code>0.2</code>）<br><code>metalness</code> — 金属かどうか（既定 <code>0</code>）<br><code>transmission</code> — 透過（既定 <code>0</code>）<br><code>emission</code> — 発光の強さ（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxstandard_surface.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxopen_pbr_surface <span class="tx-muted">mtlxopen_pbr_surface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>OpenPBR Surface。<strong>Standard Surface の後継</strong></td></tr>
+    <tr><td>使いどころ</td><td>新しい規格で組みたいとき。Blender の Principled とほぼ同じモデル</td></tr>
+    <tr><td>入力</td><td>0〜41</td></tr>
+    <tr><td>要のパラメータ</td><td><code>base_weight</code> — ベースの強さ（既定 <code>1</code>）<br><code>base_color</code> — 基本の色（既定 <code>0.8 0.8 0.8</code>）<br><code>specular_roughness</code> — 粗さ（既定 <code>0.3</code>）<br><code>transmission_weight</code> — 透過（既定 <code>0</code>）<br><code>geometry_opacity</code> — 不透明度（既定 <code>1</code>）</td></tr>
+    <tr><td>注意</td><td><strong><code>base_weight</code> が 0 だと <code>base_color</code> を繋いでも真っ黒になります。</strong>Blender の発光シェーダーから変換したときなど、0 で入ってくることがあり、色を確かめようとして延々 0.0 を測る羽目になります（実測で踏みました）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxopen_pbr_surface.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxUsdPreviewSurface <span class="tx-muted">mtlxUsdPreviewSurface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>USD の標準プレビューサーフェス</td></tr>
+    <tr><td>使いどころ</td><td>他のアプリに確実に渡したいとき。<strong>表現力は低いが互換性が高い</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxUsdPreviewSurface.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxgltf_pbr <span class="tx-muted">mtlxgltf_pbr</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>glTF の PBR サーフェス</td></tr>
+    <tr><td>使いどころ</td><td>Web / ゲーム向けに glTF で出すとき</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxgltf_pbr.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxsurface <span class="tx-muted">mtlxsurface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>BSDF と EDF を受け取ってサーフェスにする</td></tr>
+    <tr><td>使いどころ</td><td><strong>部品から自分で組む</strong>とき。下の BSDF 群の出口</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxsurface.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxsurfacematerial <span class="tx-muted">mtlxsurfacematerial</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>サーフェスとディスプレイスメントをまとめてマテリアルにする</td></tr>
+    <tr><td>使いどころ</td><td>USD のマテリアルプリムとして出す最終段</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxsurfacematerial.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxdisplacement <span class="tx-muted">mtlxdisplacement</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ディスプレイスメント（実際に面を動かす）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxdisplacement.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxsurface_unlit <span class="tx-muted">mtlxsurface_unlit</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ライティングを受けないサーフェス</td></tr>
+    <tr><td>使いどころ</td><td><strong>トゥーンや UI。</strong>光を無視してそのまま色を出す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxsurface_unlit.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxthin_surface <span class="tx-muted">mtlxthin_surface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>厚みのない面用のサーフェス</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxthin_surface.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxvolume <span class="tx-muted">mtlxvolume</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームのシェーダー</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxvolume.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxvolumematerial <span class="tx-muted">mtlxvolumematerial</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームのマテリアル</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxvolumematerial.html">公式リファレンス（英語）</a></p>
+
+<h2>2. BSDF / EDF の部品</h2>
+
+<p><strong>サーフェスを自分で組み立てる</strong>ための部品です。<code>mtlxlayer</code> で重ねて <code>mtlxsurface</code> に入れます。</p>
+
+<h3>mtlxlayer <span class="tx-muted">mtlxlayer</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>BSDF を重ねる。<strong>部品から組むときの中心</strong></td></tr>
+  </tbody>
+</table></div>
+<p>下地の上にコーティングを乗せる、といった重ね方をします。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxlayer.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxdielectric_bsdf <span class="tx-muted">mtlxdielectric_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>誘電体（非金属）の反射</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxdielectric_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxconductor_bsdf <span class="tx-muted">mtlxconductor_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>導体（金属）の反射</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxconductor_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxoren_nayar_diffuse_bsdf <span class="tx-muted">mtlxoren_nayar_diffuse_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ざらついた拡散反射</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxoren_nayar_diffuse_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxburley_diffuse_bsdf <span class="tx-muted">mtlxburley_diffuse_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>Burley の拡散反射</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxburley_diffuse_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxsubsurface_bsdf <span class="tx-muted">mtlxsubsurface_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>表面下散乱</td></tr>
+    <tr><td>使いどころ</td><td>肌・大理石・ロウ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxsubsurface_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxsheen_bsdf <span class="tx-muted">mtlxsheen_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>布の光沢</td></tr>
+    <tr><td>使いどころ</td><td>ベルベット・起毛</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxsheen_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtranslucent_bsdf <span class="tx-muted">mtlxtranslucent_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>透けて散る反射</td></tr>
+    <tr><td>使いどころ</td><td>葉・紙</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtranslucent_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxthin_film_bsdf <span class="tx-muted">mtlxthin_film_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>薄膜干渉</td></tr>
+    <tr><td>使いどころ</td><td>シャボン玉・油膜</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxthin_film_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxgeneralized_schlick_bsdf <span class="tx-muted">mtlxgeneralized_schlick_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>一般化 Schlick の反射</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxgeneralized_schlick_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxchiang_hair_bsdf <span class="tx-muted">mtlxchiang_hair_bsdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>毛のシェーダー</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxchiang_hair_bsdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxuniform_edf <span class="tx-muted">mtlxuniform_edf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>一様な発光</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxuniform_edf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxconical_edf <span class="tx-muted">mtlxconical_edf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>円錐状に絞った発光</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxconical_edf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxabsorption_vdf <span class="tx-muted">mtlxabsorption_vdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームの吸収</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxabsorption_vdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxanisotropic_vdf <span class="tx-muted">mtlxanisotropic_vdf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームの異方性散乱</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxanisotropic_vdf.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxartistic_ior <span class="tx-muted">mtlxartistic_ior</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>反射色と縁の色から屈折率を求める</td></tr>
+    <tr><td>使いどころ</td><td><strong>金属を色で指定したいとき。</strong>IOR を直に触るより直感的</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxartistic_ior.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxroughness_anisotropy <span class="tx-muted">mtlxroughness_anisotropy</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>粗さと異方性から、方向別の粗さを作る</td></tr>
+    <tr><td>使いどころ</td><td>ヘアラインの入った金属</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxroughness_anisotropy.html">公式リファレンス（英語）</a></p>
+
+<h2>3. テクスチャ</h2>
+
+<h3>mtlximage <span class="tx-muted">mtlximage</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>画像を読む。<strong>いちばん基本</strong></td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+    <tr><td>要のパラメータ</td><td><code>file</code> — 画像ファイル<br><code>uaddressmode</code> — U 方向の繰り返し方（既定 <code>periodic</code>）<br><code>filtertype</code> — 補間の種類（既定 <code>linear</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlximage.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtiledimage <span class="tx-muted">mtlxtiledimage</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>画像をタイル状に繰り返して貼る</td></tr>
+    <tr><td>使いどころ</td><td>繰り返し数を直に指定したいとき</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtiledimage.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxhextiledimage <span class="tx-muted">mtlxhextiledimage</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>六角形タイルでランダムに貼り、<strong>繰り返しの見えを消す</strong></td></tr>
+    <tr><td>使いどころ</td><td>タイリングの格子っぽさが目立つとき</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxhextiledimage.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxhextilednormalmap <span class="tx-muted">mtlxhextilednormalmap</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>同上の法線マップ版</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxhextilednormalmap.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxlatlongimage <span class="tx-muted">mtlxlatlongimage</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>正距円筒図法の画像を貼る</td></tr>
+    <tr><td>使いどころ</td><td>環境マップ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxlatlongimage.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtriplanarprojection <span class="tx-muted">mtlxtriplanarprojection</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3軸から投影して貼る</td></tr>
+    <tr><td>使いどころ</td><td><strong>UV の無いモデル。</strong>プロシージャルな形にテクスチャを乗せる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtriplanarprojection.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxnormalmap <span class="tx-muted">mtlxnormalmap</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>法線マップを適用する</td></tr>
+    <tr><td>注意</td><td><strong>接空間かワールドかを間違えると、陰影が明後日の方向になります。</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxnormalmap.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxheighttonormal <span class="tx-muted">mtlxheighttonormal</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>高さマップから法線を作る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxheighttonormal.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxbump <span class="tx-muted">mtlxbump</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>バンプマップを適用する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxbump.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxblur <span class="tx-muted">mtlxblur</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>テクスチャをぼかす</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxblur.html">公式リファレンス（英語）</a></p>
+
+<h3>hmtlxpbrtextureset <span class="tx-muted">hmtlxpbrtextureset</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>PBR のテクスチャ一式（basecolor / roughness / normal…）をまとめて読む</td></tr>
+    <tr><td>使いどころ</td><td><strong>Houdini 独自。</strong>テクスチャセットを1ノードで済ませる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxpbrtextureset.html">公式リファレンス（英語）</a></p>
+
+<h2>4. 座標とジオメトリの情報</h2>
+
+<p>「どこを読むか」を決める段です。<strong>テクスチャの前に必ず考えます。</strong></p>
+
+<h3>mtlxtexcoord <span class="tx-muted">mtlxtexcoord</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>UV 座標を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtexcoord.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxplace2d <span class="tx-muted">mtlxplace2d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>2D 座標を移動・回転・スケールする</td></tr>
+    <tr><td>使いどころ</td><td>テクスチャの貼り方を調整する</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+    <tr><td>要のパラメータ</td><td><code>scale</code> — スケール（既定 <code>1.0 1.0</code>）<br><code>offset</code> — オフセット（既定 <code>0.0 0.0</code>）<br><code>rotate</code> — 回転（既定 <code>0</code>）<br><code>pivot</code> — 回転の中心（既定 <code>0.0 0.0</code>）</td></tr>
+    <tr><td>注意</td><td><strong><code>scale</code> は座標を「割り」ます。</strong>Blender の Mapping は「掛ける」ので、値をそのまま移すと <code>scale²</code> ぶんずれます。<code>offset</code> も向きが逆（place2d は引く、Blender は足す）。エラーは一切出ず、グラデーションが振り切れて全面が単色になったりします（実測）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxplace2d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxposition <span class="tx-muted">mtlxposition</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>位置を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxposition.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxnormal <span class="tx-muted">mtlxnormal</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>法線を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxnormal.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtangent <span class="tx-muted">mtlxtangent</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>接線を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtangent.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxbitangent <span class="tx-muted">mtlxbitangent</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>従法線を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxbitangent.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxviewdirection <span class="tx-muted">mtlxviewdirection</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>視線の向きを読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxviewdirection.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxfacingratio <span class="tx-muted">mtlxfacingratio</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>面が視線に対してどれだけ正対しているか</td></tr>
+    <tr><td>使いどころ</td><td><strong>フレネル的な効果、リムライト</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxfacingratio.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxgeomcolor <span class="tx-muted">mtlxgeomcolor</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリの色（Cd）を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxgeomcolor.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxgeompropvalue <span class="tx-muted">mtlxgeompropvalue</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリの任意の属性を読む</td></tr>
+    <tr><td>使いどころ</td><td><strong>SOP で作った属性をシェーダーで使う。</strong>散らしのばらつきを色に反映させるときなど</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxgeompropvalue.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxrotate2d <span class="tx-muted">mtlxrotate2d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>2D で回す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxrotate2d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxrotate3d <span class="tx-muted">mtlxrotate3d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3D で回す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxrotate3d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtransformpoint <span class="tx-muted">mtlxtransformpoint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>点を別の空間に変換する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtransformpoint.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtransformvector <span class="tx-muted">mtlxtransformvector</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ベクトルを変換する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtransformvector.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtransformnormal <span class="tx-muted">mtlxtransformnormal</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>法線を変換する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtransformnormal.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtime <span class="tx-muted">mtlxtime</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>時間を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtime.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxframe <span class="tx-muted">mtlxframe</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>フレーム番号を読む</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxframe.html">公式リファレンス（英語）</a></p>
+
+<h2>5. ノイズとパターン</h2>
+
+<h3>mtlxfractal3d <span class="tx-muted">mtlxfractal3d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>オクターブを重ねた 3D ノイズ。<strong>いちばん出番が多い</strong></td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+    <tr><td>要のパラメータ</td><td><code>octaves</code> — 重ねる回数（既定 <code>3</code>）<br><code>lacunarity</code> — 周波数の伸び（既定 <code>2</code>）<br><code>diminish</code> — 振幅の減り方（既定 <code>0.5</code>）<br><code>amplitude</code> — 振幅（既定 <code>1</code>）</td></tr>
+    <tr><td>注意</td><td><strong>座標を入れる入力の名前は <code>position</code> です。</strong><code>in</code> に繋いだつもりで動かない、というのがよくあります（実測）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxfractal3d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxnoise3d <span class="tx-muted">mtlxnoise3d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3D のパーリンノイズ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxnoise3d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxworleynoise3d <span class="tx-muted">mtlxworleynoise3d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>セル状のノイズ（ボロノイ）</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+    <tr><td>要のパラメータ</td><td><code>style</code> — 距離の測り方（既定 <code>0</code>）<br><code>jitter</code> — セルの乱れ（既定 <code>1</code>）</td></tr>
+    <tr><td>注意</td><td><strong><code>style</code> は整数です</strong>（0 = Distance / 1 = Solid）。文字列を入れると通りません。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxworleynoise3d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxcellnoise3d <span class="tx-muted">mtlxcellnoise3d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>セルごとに一定値を返すノイズ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxcellnoise3d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxunifiednoise3d <span class="tx-muted">mtlxunifiednoise3d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数のノイズを1つのノードにまとめたもの</td></tr>
+    <tr><td>使いどころ</td><td>種類を切り替えながら試したいとき</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxunifiednoise3d.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxrandomfloat <span class="tx-muted">mtlxrandomfloat</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>入力から乱数（float）を作る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxrandomfloat.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxrandomcolor <span class="tx-muted">mtlxrandomcolor</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>入力から乱数（色）を作る</td></tr>
+    <tr><td>使いどころ</td><td><strong>インスタンスごとに色を変える</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxrandomcolor.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxcheckerboard <span class="tx-muted">mtlxcheckerboard</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>市松模様</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxcheckerboard.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxgrid <span class="tx-muted">mtlxgrid</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>格子</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxgrid.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxline <span class="tx-muted">mtlxline</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>線</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxline.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxcircle <span class="tx-muted">mtlxcircle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>円</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxcircle.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxhexagon <span class="tx-muted">mtlxhexagon</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>六角形</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxhexagon.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxcrosshatch <span class="tx-muted">mtlxcrosshatch</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>斜線のハッチング</td></tr>
+    <tr><td>使いどころ</td><td><strong>トゥーンの影の表現</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxcrosshatch.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxtrianglewave <span class="tx-muted">mtlxtrianglewave</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>三角波</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxtrianglewave.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxflake3d <span class="tx-muted">mtlxflake3d</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>薄片（フレーク）</td></tr>
+    <tr><td>使いどころ</td><td>ラメ入りの塗装</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxflake3d.html">公式リファレンス（英語）</a></p>
+
+<h2>6. 色を調整する</h2>
+
+<h3>mtlxcolorcorrect <span class="tx-muted">mtlxcolorcorrect</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>色を総合的に調整する（明るさ・彩度・ガンマ・色相）</td></tr>
+    <tr><td>使いどころ</td><td><strong>まずこれ</strong></td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxcolorcorrect.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxhsvadjust <span class="tx-muted">mtlxhsvadjust</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>色相・彩度・明度で調整する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxhsvadjust.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxsaturate <span class="tx-muted">mtlxsaturate</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>彩度を変える</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxsaturate.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxcontrast <span class="tx-muted">mtlxcontrast</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>コントラストを変える</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxcontrast.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxrange <span class="tx-muted">mtlxrange</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>入力の範囲を出力の範囲へ移す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxrange.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxremap <span class="tx-muted">mtlxremap</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>値の対応を付け替える</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxremap.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxluminance <span class="tx-muted">mtlxluminance</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>輝度を取り出す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxluminance.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxblackbody <span class="tx-muted">mtlxblackbody</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>色温度から色を作る</td></tr>
+    <tr><td>使いどころ</td><td><strong>炎・電球。</strong>ケルビンで指定できる</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxblackbody.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxrgbtohsv <span class="tx-muted">mtlxrgbtohsv</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>RGB → HSV</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxrgbtohsv.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxhsvtorgb <span class="tx-muted">mtlxhsvtorgb</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>HSV → RGB</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxhsvtorgb.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxsrgb_texture_to_lin_rec709 <span class="tx-muted">mtlxsrgb_texture_to_lin_rec709</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>sRGB のテクスチャをリニアに変換する</td></tr>
+    <tr><td>使いどころ</td><td><strong>色空間の変換。</strong>画像を読んだ直後に必要になることがある</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxsrgb_texture_to_lin_rec709.html">公式リファレンス（英語）</a></p>
+
+<h2>7. ランプ（Houdini 独自）</h2>
+
+<p>MaterialX の標準にはランプがないので、Houdini が足しています。</p>
+
+<h3>hmtlxrampc <span class="tx-muted">hmtlxrampc</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>色のランプ</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>注意</td><td><strong>キーは 10 個までです。</strong>超えると「先頭 9 個と末尾だけ使う」と警告が出て、<strong>カーブの後半が消えます</strong>（実測）。細かいカーブは間引いてから渡してください。スクリプトから組むときは <code>voptoolutils.setMtlxRamp()</code> を明示的に呼ぶ必要があります。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxrampc.html">公式リファレンス（英語）</a></p>
+
+<h3>hmtlxrampf <span class="tx-muted">hmtlxrampf</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>float のランプ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxrampf.html">公式リファレンス（英語）</a></p>
+
+<h3>hmtlxcubicrampc <span class="tx-muted">hmtlxcubicrampc</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3次補間の色ランプ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxcubicrampc.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxhuniformramp <span class="tx-muted">mtlxhuniformramp</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>等間隔のランプ</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxhuniformramp.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxramplr <span class="tx-muted">mtlxramplr</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>左右のグラデーション</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxramplr.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxramptb <span class="tx-muted">mtlxramptb</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>上下のグラデーション</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxramptb.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxramp4 <span class="tx-muted">mtlxramp4</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>四隅からのグラデーション</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxramp4.html">公式リファレンス（英語）</a></p>
+
+<h3>mtlxcurveadjust <span class="tx-muted">mtlxcurveadjust</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>カーブで値を調整する</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxcurveadjust.html">公式リファレンス（英語）</a></p>
+
+<h3>hmtlxbias <span class="tx-muted">hmtlxbias</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>バイアス（片寄せ）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxbias.html">公式リファレンス（英語）</a></p>
+
+<h3>hmtlxgain <span class="tx-muted">hmtlxgain</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ゲイン（中央のコントラスト）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxgain.html">公式リファレンス（英語）</a></p>
+
+<h3>hmtlxfacingratio <span class="tx-muted">hmtlxfacingratio</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>Houdini 版の facing ratio</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxfacingratio.html">公式リファレンス（英語）</a></p>
+
+<h3>hmtlxcolorcorrect <span class="tx-muted">hmtlxcolorcorrect</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>Houdini 版のカラーコレクト</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/hmtlxcolorcorrect.html">公式リファレンス（英語）</a></p>
+
+<h2>8. 数学</h2>
+
+<h3>四則と基本</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxadd</code></td><td>足す</td></tr><tr><td><code>mtlxsubtract</code></td><td>引く</td></tr><tr><td><code>mtlxmultiply</code></td><td>掛ける</td></tr><tr><td><code>mtlxdivide</code></td><td>割る</td></tr><tr><td><code>mtlxpower</code></td><td>べき乗</td></tr><tr><td><code>mtlxsafepower</code></td><td>負の底でも落ちないべき乗</td></tr><tr><td><code>mtlxabsval</code></td><td>絶対値</td></tr><tr><td><code>mtlxsign</code></td><td>符号</td></tr><tr><td><code>mtlxfloor</code></td><td>切り捨て</td></tr><tr><td><code>mtlxceil</code></td><td>切り上げ</td></tr><tr><td><code>mtlxround</code></td><td>四捨五入</td></tr><tr><td><code>mtlxfract</code></td><td>小数部</td></tr><tr><td><code>mtlxmodulo</code></td><td>剰余</td></tr><tr><td><code>mtlxsqrt</code></td><td>平方根</td></tr><tr><td><code>mtlxexp</code></td><td>指数</td></tr><tr><td><code>mtlxln</code></td><td>自然対数</td></tr><tr><td><code>mtlxmin</code></td><td>小さいほう</td></tr><tr><td><code>mtlxmax</code></td><td>大きいほう</td></tr><tr><td><code>mtlxclamp</code></td><td>範囲で止める</td></tr><tr><td><code>mtlxinvert</code></td><td>1 から引く（反転）</td></tr><tr><td><code>hmtlxcomplement</code></td><td>補数（1 - x）</td></tr></tbody></table></div>
+
+<h3>三角関数・ベクトル</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxsin</code></td><td>サイン</td></tr><tr><td><code>mtlxcos</code></td><td>コサイン</td></tr><tr><td><code>mtlxtan</code></td><td>タンジェント</td></tr><tr><td><code>mtlxasin</code></td><td>アークサイン</td></tr><tr><td><code>mtlxacos</code></td><td>アークコサイン</td></tr><tr><td><code>mtlxatan2</code></td><td>2引数のアークタンジェント</td></tr><tr><td><code>mtlxnormalize</code></td><td>正規化</td></tr><tr><td><code>mtlxmagnitude</code></td><td>長さ</td></tr><tr><td><code>mtlxdistance</code></td><td>2点間の距離</td></tr><tr><td><code>mtlxdotproduct</code></td><td>内積</td></tr><tr><td><code>mtlxcrossproduct</code></td><td>外積</td></tr><tr><td><code>mtlxreflect</code></td><td>反射</td></tr><tr><td><code>mtlxrefract</code></td><td>屈折</td></tr></tbody></table></div>
+<p><strong><code>mtlxatan2</code> の入力は <code>in1</code> / <code>in2</code> ではなく <code>iny</code> / <code>inx</code> です</strong>（実測）。</p>
+
+<h3>行列</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxcreatematrix</code></td><td>4x4 行列を作る</td></tr><tr><td><code>mtlxcreatematrix3</code></td><td>3x3 行列を作る</td></tr><tr><td><code>mtlxtranspose</code></td><td>転置</td></tr><tr><td><code>mtlxinvertmatrix</code></td><td>逆行列</td></tr><tr><td><code>mtlxdeterminant</code></td><td>行列式</td></tr><tr><td><code>mtlxtransformmatrix</code></td><td>行列で変換する</td></tr></tbody></table></div>
+
+<h3>補間・条件</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxmix</code></td><td>2つを比率で混ぜる</td></tr><tr><td><code>mtlxsmoothstep</code></td><td>なめらかな 0→1</td></tr><tr><td><code>mtlxswitch</code></td><td>番号で入力を選ぶ</td></tr><tr><td><code>mtlxifgreater</code></td><td>大きければ A、そうでなければ B</td></tr><tr><td><code>mtlxifgreatereq</code></td><td>以上なら A</td></tr><tr><td><code>mtlxifequal</code></td><td>等しければ A</td></tr><tr><td><code>mtlxand</code></td><td>論理積</td></tr><tr><td><code>mtlxor</code></td><td>論理和</td></tr><tr><td><code>mtlxnot</code></td><td>否定</td></tr><tr><td><code>mtlxxor</code></td><td>排他的論理和</td></tr></tbody></table></div>
+
+<h2>9. 型の変換・分解・合成</h2>
+
+<p><strong>型が厳密なぶん、ここの出番が多くなります。</strong></p>
+
+<h3>分解と合成</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxcombine2</code></td><td>2つの値を1つにまとめる</td></tr><tr><td><code>mtlxcombine3</code></td><td>3つをまとめる（RGB / XYZ）</td></tr><tr><td><code>mtlxcombine4</code></td><td>4つをまとめる（RGBA）</td></tr><tr><td><code>mtlxseparate2</code></td><td>2成分に分ける</td></tr><tr><td><code>mtlxseparate3c</code></td><td>色を R / G / B に分ける</td></tr><tr><td><code>mtlxseparate3v</code></td><td>ベクトルを X / Y / Z に分ける</td></tr><tr><td><code>mtlxseparate4c</code></td><td>RGBA に分ける</td></tr><tr><td><code>mtlxseparate4v</code></td><td>4成分ベクトルに分ける</td></tr><tr><td><code>mtlxconvert</code></td><td>型を変換する（color3 ↔ vector3 など）</td></tr><tr><td><code>mtlxextract</code></td><td>1成分だけ取り出す</td></tr><tr><td><code>mtlxswizzle</code></td><td>成分を並べ替える</td></tr><tr><td><code>mtlxconstant</code></td><td>定数を置く</td></tr><tr><td><code>mtlxdot</code></td><td>何もしない中継点（配線の整理用）</td></tr></tbody></table></div>
+<p><strong><code>mtlxseparate3v</code> などは <code>signature</code> を持ちません。</strong>スクリプトで一律に signature を設定しようとすると空振りしますが、指定が余っていること自体は問題ではありません。</p>
+
+<h3>合成（レイヤーブレンド）</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxover</code></td><td>上に重ねる</td></tr><tr><td><code>mtlxin</code></td><td>内側だけ残す</td></tr><tr><td><code>mtlxout</code></td><td>外側だけ残す</td></tr><tr><td><code>mtlxmask</code></td><td>マスクを掛ける</td></tr><tr><td><code>mtlxmatte</code></td><td>マット合成</td></tr><tr><td><code>mtlxplus</code></td><td>加算</td></tr><tr><td><code>mtlxminus</code></td><td>減算</td></tr><tr><td><code>mtlxdifference</code></td><td>差の絶対値</td></tr><tr><td><code>mtlxmultiply</code></td><td>乗算</td></tr><tr><td><code>mtlxscreen</code></td><td>スクリーン</td></tr><tr><td><code>mtlxoverlay</code></td><td>オーバーレイ</td></tr><tr><td><code>mtlxburn</code></td><td>焼き込み</td></tr><tr><td><code>mtlxdodge</code></td><td>覆い焼き</td></tr><tr><td><code>mtlxdisjointover</code></td><td>重なりを持たない前提の over</td></tr><tr><td><code>mtlxinside</code></td><td>内側</td></tr><tr><td><code>mtlxoutside</code></td><td>外側</td></tr><tr><td><code>mtlxpremult</code></td><td>アルファを掛ける</td></tr><tr><td><code>mtlxunpremult</code></td><td>アルファを外す</td></tr></tbody></table></div>
+
+<h2>10. ライトと相互変換</h2>
+
+<h3>ライト</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxlight</code></td><td>汎用のライト</td></tr><tr><td><code>mtlxpoint_light</code></td><td>点光源</td></tr><tr><td><code>mtlxdirectional_light</code></td><td>平行光</td></tr><tr><td><code>mtlxspot_light</code></td><td>スポットライト</td></tr></tbody></table></div>
+
+<h3>サーフェス同士の変換</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxstandard_surface_to_open_pbr_surface</code></td><td>Standard Surface → OpenPBR</td></tr><tr><td><code>mtlxopen_pbr_surface_to_standard_surface</code></td><td>OpenPBR → Standard Surface</td></tr><tr><td><code>mtlxstandard_surface_to_UsdPreviewSurface</code></td><td>Standard Surface → USD Preview Surface</td></tr><tr><td><code>mtlxstandard_surface_to_gltf_pbr</code></td><td>Standard Surface → glTF PBR</td></tr></tbody></table></div>
+<p><strong>規格を移すときの橋渡しです。</strong>USD で他のアプリに渡すときは、Preview Surface 版も一緒に持たせておくと安全です。</p>
+
+<h3>その他の PBR モデル</h3>
+<div class="table-wrap"><table><thead><tr><th>ノード</th><th>やること</th></tr></thead><tbody><tr><td><code>mtlxdisney_principled</code></td><td>Disney Principled</td></tr><tr><td><code>mtlxdisney_brdf_2012</code></td><td>Disney BRDF (2012)</td></tr><tr><td><code>mtlxdisney_bsdf_2015</code></td><td>Disney BSDF (2015)</td></tr><tr><td><code>mtlxgooch_shade</code></td><td>Gooch シェーディング（技術イラスト調）</td></tr><tr><td><code>mtlxgltf_material</code></td><td>glTF のマテリアル</td></tr><tr><td><code>mtlxLamaDiffuse</code></td><td>Lama の拡散反射</td></tr><tr><td><code>mtlxLamaConductor</code></td><td>Lama の金属</td></tr><tr><td><code>mtlxLamaDielectric</code></td><td>Lama の誘電体</td></tr><tr><td><code>mtlxLamaSSS</code></td><td>Lama の表面下散乱</td></tr><tr><td><code>mtlxLamaSheen</code></td><td>Lama の布光沢</td></tr><tr><td><code>mtlxLamaEmission</code></td><td>Lama の発光</td></tr><tr><td><code>mtlxLamaMix</code></td><td>Lama の混合</td></tr><tr><td><code>mtlxLamaAdd</code></td><td>Lama の加算</td></tr></tbody></table></div>
+
+
+<h2>詰まりやすいところ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず見るところ</th></tr></thead>
+  <tbody>
+    <tr><td>マテリアルが真っ黒／既定の灰色</td>
+        <td><strong>出口までの線が切れていないか。</strong>
+        <code>signature</code> を変えたときに黙って外れます</td></tr>
+    <tr><td>色を繋いだのに真っ黒（OpenPBR）</td>
+        <td><code>base_weight</code> が 0 になっていないか</td></tr>
+    <tr><td>テクスチャの模様が出ない／全面単色</td>
+        <td><code>mtlxplace2d</code> の <code>scale</code>。
+        <strong>掛けるのではなく割ります</strong></td></tr>
+    <tr><td>ノイズが動かない</td>
+        <td>座標の入力は <code>in</code> ではなく <code>position</code></td></tr>
+    <tr><td>ランプのカーブの後半が消える</td>
+        <td>キーが 10 個を超えている</td></tr>
+    <tr><td>Solaris で <code>/materials</code> に何も出ない</td>
+        <td><strong>マテリアルフラグが立っていない。</strong>
+        <code>materiallibrary</code> LOP はフラグの立った子だけを拾います</td></tr>
+    <tr><td>法線の陰影が明後日の方向</td>
+        <td><code>mtlxnormalmap</code> の空間（接空間／ワールド）</td></tr>
+  </tbody>
+</table></div>
+
+<h2>スクリプトで組むときの順番</h2>
+
+<p>Blender からの変換器を書いたときに、この順番でないと通りませんでした。</p>
+
+<ol>
+  <li>ノードを作る（パラメータはまだ書かない）</li>
+  <li><strong>「結線 → <code>signature</code>」を、変化が無くなるまで交互に回す</strong></li>
+  <li><code>signature</code> 以外のパラメータを書く</li>
+  <li><strong>もう一度結線する</strong>（型の変更で外れた線を戻す）</li>
+  <li>線が本当に生きているか検証する</li>
+</ol>
+
+<p>4 と 5 を省くと、<strong>ビルドは成功したのに絵が出ない</strong>という状態になります。</p>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/solaris/materialx.html">MaterialX (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/vop/index.html">MaterialX nodes</a></li><li><a href="https://www.sidefx.com/docs/houdini/solaris/karma_materials.html">Karma materials</a></li><li><a href="https://materialx.org/">MaterialX 公式仕様</a></li><li><a href="https://academysoftwarefoundation.github.io/OpenPBR/">OpenPBR Surface</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

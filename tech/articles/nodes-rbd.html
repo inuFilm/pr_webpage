@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RBD のノード — 割る・束ねる・繋ぐ・解く | 技術メモ | makeinufilm</title>
+  <meta name="description" content="破壊まわりのノードを「割る / パックする / 拘束を作る / 解く / 仕上げ」に分けて、1ノードずつ用途と要のパラメータをまとめました。パックし忘れると重力でも落ちない話、assemble が glue を殺す話も含みます。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>RBD のノード — 割る・束ねる・繋ぐ・解く</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/dyno/rbd.html">Rigid Body Dynamics (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdbulletsolver.html">RBD Bullet Solver SOP</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdmaterialfracture.html">RBD Material Fracture SOP</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>RBD も <strong>3本の線</strong>（Geometry / Constraint / Proxy）を持ち回ること</li><li>割る・パックする・拘束を作る・解く・仕上げを<strong>1ノードずつ</strong></li><li><strong>パックし忘れると重力でも落ちない</strong>話と、その見分け方</li></ul>
+
+
+<h2>RBD も「3本の線」</h2>
+
+<p>FLIP と同じで、RBD のノードも複数の線を持ち回ります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>線</th><th>中身</th></tr></thead>
+  <tbody>
+    <tr><td>Geometry</td><td>割れた破片そのもの</td></tr>
+    <tr><td>Constraint</td><td>破片どうしを繋ぐ拘束（線のジオメトリ）</td></tr>
+    <tr><td>Proxy</td><td>衝突判定用の簡略形状</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>rbdmaterialfracture</code> / <code>rbdconstraintsfromrules</code> /
+<code>rbdconstraintproperties</code> はどれもこの3本を入出力に持ちます。
+<code>rbdbulletsolver</code> の入力は Geometry / Constraint / Proxy / Collision / Guide Sim の5本です。</p>
+
+<h2>いちばん多い落とし穴 — パックし忘れ</h2>
+
+<p><strong><code>rbdmaterialfracture</code> の出力は「生のポリゴン」です。</strong>
+ソルバの Geometry 入力は<strong>パックされた破片</strong>を期待しているので、
+間に <code>assemble</code> を挟まないとソルバが何も掴めません。</p>
+
+<p>症状は分かりにくくて、<strong>エラーが出ないまま、重力をかけても落ちない</strong>という形になります。
+球の軌道・拘束の強度・サブステップを疑う前に、まず <code>assemble</code> があるか見てください。
+実例の .hip に <code>assemble</code> が大量に入っているのはこれが理由です。</p>
+
+
+<h2>1. 割る</h2>
+
+<p>割り方が何種類もあるのは、<strong>材質によって割れ目の入り方が違う</strong>からです。</p>
+
+<h3>RBD Material Fracture <span class="tx-muted">rbdmaterialfracture</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>材質を選んで、それらしい割れ方で割る。<strong>拘束も一緒に作る</strong></td></tr>
+    <tr><td>使いどころ</td><td>コンクリート・ガラス・木を壊すとき。まずこれを試す</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>materialtype</code> — 材質。<strong>これを変えると下のパラメータ一式が入れ替わる</strong>（既定 <code>0</code>）<br><code>concrete_detailsize</code> — コンクリートの破片の大きさ（既定 <code>0.05</code>）<br><code>concrete_enablechipping</code> — 縁の欠けを作る（既定 <code>False</code>）<br><code>glass_cornerratio</code> — ガラスの角の割れ方（既定 <code>0.5</code>）<br><code>wood_cutdirvector</code> — 木目の方向（既定 <code>0.0 1.0 0.0</code>）<br><code>randomseed</code> — 乱数の種（既定 <code>0</code>）</td></tr>
+    <tr><td>注意</td><td><strong>パラメータ名は材質ごとに接頭辞が付きます</strong>（<code>concrete_</code> / <code>glass_</code> / <code>wood_</code>）。同じ「破片の大きさ」でも材質を変えると別のパラメータになります。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdmaterialfracture.html">公式リファレンス（英語）</a></p>
+
+<h3>Voronoi Fracture <span class="tx-muted">voronoifracture</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>点を種にしてボロノイ分割で割る</td></tr>
+    <tr><td>使いどころ</td><td>いちばん基本の割り方。点の分布がそのまま破片の分布になる</td></tr>
+    <tr><td>入力</td><td>2〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>cluster</code> — 破片をまとめて塊にする（既定 <code>False</code>）<br><code>addinteriordetail</code> — 断面にディテールを足す（既定 <code>False</code>）<br><code>createinside</code> — 内側の面を作る（既定 <code>True</code>）<br><code>cuspangle</code> — 折り目にする角度（既定 <code>15</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>割り方を細かく制御したいなら、種の点を自分で作って渡すのが基本です。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/voronoifracture.html">公式リファレンス（英語）</a></p>
+
+<h3>Voronoi Fracture Points <span class="tx-muted">voronoifracturepoints</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>衝突点から、ボロノイの種になる点を作る</td></tr>
+    <tr><td>使いどころ</td><td>「ぶつかったところだけ細かく割る」を作りたいとき</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>ptsperimpact</code> — 衝突1点あたりの種の数（既定 <code>False</code>）<br><code>impactradius</code> — 衝突点の影響半径（既定 <code>1.0 1.0 1.0</code>）<br><code>interiorptdensity</code> — 内部の点の密度（既定 <code>1</code>）<br><code>seed</code> — 乱数の種（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/voronoifracturepoints.html">公式リファレンス（英語）</a></p>
+
+<h3>Boolean Fracture <span class="tx-muted">booleanfracture</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>切断面（サーフェス）で割る</td></tr>
+    <tr><td>使いどころ</td><td>割れ目の形を自分で決めたいとき</td></tr>
+    <tr><td>入力</td><td>2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>cuttingsurface</code> — 切る面（既定 <code>1</code>）<br><code>detriangulate</code> — 三角形を四角に戻す（既定 <code>2</code>）<br><code>interiorgroup</code> — 内側の面のグループ名（既定 <code>inside</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/booleanfracture.html">公式リファレンス（英語）</a></p>
+
+<h3>Edge Fracture <span class="tx-muted">edgefracture</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ガイドのカーブに沿って、辺で切る</td></tr>
+    <tr><td>使いどころ</td><td>ひび割れの線を手で描いて割りたいとき</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>doresample</code> — カーブを再分割する（既定 <code>True</code>）<br><code>resampleres</code> — 再分割の細かさ（既定 <code>0.2</code>）<br><code>pieceattrib</code> — 破片の名前を入れる属性（既定 <code>piece</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/edgefracture.html">公式リファレンス（英語）</a></p>
+
+<h3>VDB Fracture <span class="tx-muted">vdbfracture</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レベルセット VDB を切る</td></tr>
+    <tr><td>使いどころ</td><td>ボリュームとして持っているものを割るとき</td></tr>
+    <tr><td>入力</td><td>2〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>separatecutters</code> — 切り手を別々に扱う（既定 <code>False</code>）<br><code>randomizerotation</code> — 切り手の向きをランダムに（既定 <code>False</code>）<br><code>seed</code> — 乱数の種（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/vdbfracture.html">公式リファレンス（英語）</a></p>
+
+<h3>Tet Fracture <span class="tx-muted">tetfracture</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>四面体メッシュを分割する</td></tr>
+    <tr><td>使いどころ</td><td>有限要素（FEM）で壊すときの下ごしらえ</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>basesize</code> — 分割の大きさ（既定 <code>1</code>）<br><code>partscale</code> — 破片の大きさ（既定 <code>0.1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/tetfracture.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Interior Detail <span class="tx-muted">rbdinteriordetail</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>割れた断面にディテール（凹凸）を足す</td></tr>
+    <tr><td>使いどころ</td><td>断面が平らすぎて嘘くさいとき</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>adddetail</code> — ディテールを足す（既定 <code>True</code>）<br><code>detailsize</code> — 細かさ（既定 <code>0.25</code>）<br><code>disp</code> — 変位の量（既定 <code>0.1</code>）<br><code>computeinteriornormals</code> — 内側の法線を作り直す（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdinteriordetail.html">公式リファレンス（英語）</a></p>
+
+<h2>2. パックする（ここを飛ばすと落ちない）</h2>
+
+<p>ソルバは<strong>パックされた破片</strong>しか扱えません。</p>
+
+<h3>Assemble <span class="tx-muted">assemble</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>割れた結果を破片ごとにまとめ、名前を付けてパックする</td></tr>
+    <tr><td>使いどころ</td><td><strong>割った直後に必ず</strong>。RBD の必須ノード</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>pack_geo</code> — パックする。<strong>これが本命</strong>（既定 <code>False</code>）<br><code>newname</code> — 名前を新しく振り直す（既定 <code>True</code>）<br><code>createpackedfragments</code> — パックドフラグメントとして作る（既定 <code>True</code>）<br><code>pieceattrib</code> — 破片の名前を入れる属性（既定 <code>__fracture_class__</code>）<br><code>viewportlod</code> — ビューポートでの表示のしかた（既定 <code>0</code>）</td></tr>
+    <tr><td>注意</td><td><strong><code>newname</code>（既定 ON）は glue 拘束を壊します。</strong><code>rbdmaterialfracture</code> が付ける名前は <code>piece0-0-1</code> のような階層式なのに、<code>piece0..</code> に付け替えられて拘束の参照名が全部切れます。<strong>強度を -1 にしても 0 にしても同じ壊れ方</strong>になり、エラーは出ません。<code>newname=0</code> + <code>pack_geo=1</code> で使ってください（実測）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/assemble.html">公式リファレンス（英語）</a></p>
+
+<h3>Pack <span class="tx-muted">pack</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリを1つのパックドプリムに詰める</td></tr>
+    <tr><td>使いどころ</td><td>RBD 以外でも、大量のコピーを軽く扱いたいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>packbyname</code> — 名前ごとに分けてパックする（既定 <code>False</code>）<br><code>nameattribute</code> — 分ける基準の属性（既定 <code>name</code>）<br><code>pivot</code> — 重心の決め方（既定 <code>1</code>）<br><code>viewportlod</code> — ビューポート表示（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pack.html">公式リファレンス（英語）</a></p>
+
+<h3>Unpack <span class="tx-muted">unpack</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>パックドプリムを中身に展開する</td></tr>
+    <tr><td>使いどころ</td><td>中の点や面を触りたいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>dotransform</code> — パックの変換を適用してから展開する（既定 <code>True</code>）<br><code>transfer_attributes</code> — パック側の属性を中身に移す</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/unpack.html">公式リファレンス（英語）</a></p>
+
+<h3>Repack <span class="tx-muted">repack</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>展開したものをもう一度パックし直す</td></tr>
+    <tr><td>使いどころ</td><td><code>unpack</code> → 加工 → <code>repack</code> の往復</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/repack.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Pack <span class="tx-muted">rbdpack</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>Geometry / Constraint / Proxy の<strong>3本を1本にまとめる</strong></td></tr>
+    <tr><td>使いどころ</td><td>キャッシュに書くときや、線を減らして見やすくしたいとき</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>name</code> — まとめたものの名前（既定 <code>fracture_$OS</code>）<br><code>geoviewportlod</code> — 本体のビューポート表示（既定 <code>0</code>）<br><code>proxyviewportlod</code> — プロキシのビューポート表示（既定 <code>4</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdpack.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Unpack <span class="tx-muted">rbdunpack</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>まとめた1本を3本に戻す</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>updaterestlengths</code> — 拘束の静止長を更新する（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdunpack.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Configure <span class="tx-muted">rbdconfigure</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>破片1つずつに、物理の性質（質量・摩擦・反発・動くか）を属性で持たせる</td></tr>
+    <tr><td>使いどころ</td><td>「この破片だけ最初は固定」「この材質だけ重い」を作るとき</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+  </tbody>
+</table></div>
+<p>パラメータは <code>add&lt;名前&gt;#</code> で「その項目を足すか」を選び、<code>&lt;名前&gt;#</code> に値を入れる形になっています（<code>addactive#</code> と <code>active#</code> など）。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdconfigure.html">公式リファレンス（英語）</a></p>
+
+<h2>3. 拘束を作る（どこが繋がっているか）</h2>
+
+<p>拘束は<strong>線のジオメトリ</strong>です。点が破片の重心、線が「繋がっている」という意味になります。</p>
+
+<h3>RBD Constraints From Rules <span class="tx-muted">rbdconstraintsfromrules</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ルールを書いて拘束を自動で張る</td></tr>
+    <tr><td>使いどころ</td><td>接している破片どうしを繋ぐ、いちばん普通のやり方</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>connectiontype</code> — 繋ぎ方（既定 <code>2</code>）<br><code>group</code> — 対象の破片（既定 <code>0</code>）<br><code>groupname</code> — できた拘束のグループ名（既定 <code>connectors</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdconstraintsfromrules.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Constraint Properties <span class="tx-muted">rbdconstraintproperties::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>拘束の強さ・種類・壊れ方を決める</td></tr>
+    <tr><td>使いどころ</td><td>「ここだけ弱くする」を作る段。<strong>破壊の演出はほぼここ</strong></td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>constrainttype</code> — 拘束の種類（glue / hard / soft など）（既定 <code>0</code>）<br><code>doglue_strength</code> — glue の強度を<strong>有効にする</strong>（既定 <code>False</code>）<br><code>constraintgroup</code> — 対象の拘束グループ<br><code>constraintname</code> — 拘束の名前（既定 <code>Glue</code>）<br><code>clusterattrib</code> — クラスタの属性名（既定 <code>parentpiece</code>）</td></tr>
+    <tr><td>注意</td><td><strong><code>doglue_strength</code> を入れないと強度は効きません。</strong>値だけ入れても素通りします。数珠つなぎにしてグループを絞りながら上書きしていくのが定石です。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdconstraintproperties-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Connect Adjacent Pieces <span class="tx-muted">connectadjacentpieces</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>近い破片どうしを線で繋ぐ</td></tr>
+    <tr><td>使いどころ</td><td>拘束のもとになる線を素朴に作りたいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>connecttype</code> — 繋ぎ方（既定 <code>0</code>）<br><code>searchradius</code> — 探す半径（既定 <code>0.1</code>）<br><code>maxconnections</code> — 1つあたりの最大接続数（既定 <code>1</code>）<br><code>pieceattrib</code> — 破片の名前の属性（既定 <code>name</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/connectadjacentpieces.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Convert Constraints <span class="tx-muted">rbdconvertconstraints</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>既存の拘束を、アンカー位置の違う別の拘束に変換する</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>constrainttype</code> — 変換先の種類（既定 <code>0</code>）<br><code>usemaxconstraints</code> — 本数に上限を設ける（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdconvertconstraints.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Group Constraints <span class="tx-muted">rbdgroupconstraints</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>破片のグループから拘束のグループを作る</td></tr>
+    <tr><td>使いどころ</td><td>「この範囲の拘束だけ」を後段で指定したいとき</td></tr>
+    <tr><td>入力</td><td>2〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>group1</code> — 片側のグループ<br><code>group2</code> — もう片側</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdgroupconstraints.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Cluster <span class="tx-muted">rbdcluster::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>破片や拘束を、より大きな塊（クラスタ）にまとめる</td></tr>
+    <tr><td>使いどころ</td><td>全部バラバラにせず、塊で崩したいとき</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>clustertype</code> — まとめ方（既定 <code>0</code>）<br><code>size</code> — 1塊の大きさ（既定 <code>1.0 1.0 1.0</code>）<br><code>detachratio</code> — 塊から外れる割合（既定 <code>0.157</code>）<br><code>clusterattribute</code> — クラスタ番号を入れる属性（既定 <code>cluster</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdcluster-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Glue Cluster <span class="tx-muted">gluecluster</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>クラスタの値に応じて glue 拘束の強度を付ける</td></tr>
+    <tr><td>使いどころ</td><td>塊の内側は硬く、塊どうしは弱く、を作るとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>intracluster</code> — 塊の<strong>内側</strong>の強度（既定 <code>-1</code>）<br><code>intercluster</code> — 塊<strong>どうし</strong>の強度（既定 <code>1</code>）<br><code>clustersize</code> — 塊の大きさ（既定 <code>1.5 1.5 1.5</code>）<br><code>detachratio</code> — 外れる割合（既定 <code>0.1</code>）</td></tr>
+    <tr><td>注意</td><td><strong>このノードは強度を「置き換え」ます。</strong>材質ごとに強度を積み上げてきた設定とは両立しません。実測では、材質別に 40.0 と 3.0 を振り分けた拘束が全部これで上書きされていました。併用するなら順番に注意してください。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/gluecluster.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Paint <span class="tx-muted">rbdpaint</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ビューポートで塗って、破片や拘束に値を書き込む</td></tr>
+    <tr><td>使いどころ</td><td>「ここだけ弱く」を手で描きたいとき</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>attribname</code> — 書き込む属性名（既定 <code>density</code>）<br><code>fgvalue</code> — 塗る値（既定 <code>1</code>）<br><code>bgvalue</code> — 塗っていないところの値（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdpaint.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Guide Setup <span class="tx-muted">rbdguidesetup</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ガイドシミュレーション用の属性を破片に付ける</td></tr>
+    <tr><td>使いどころ</td><td>低解像度で当たりを取ってから本番に反映するとき</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>mode</code> — モード（既定 <code>0</code>）<br><code>blend</code> — ガイドに従う度合い（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdguidesetup.html">公式リファレンス（英語）</a></p>
+
+<h2>4. 解く</h2>
+
+<h3>RBD Bullet Solver (SOP) <span class="tx-muted">rbdbulletsolver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>剛体を解く。SOP だけで完結する現行のやり方</td></tr>
+    <tr><td>使いどころ</td><td>3本（+コリジョン）を渡す先に置く本体</td></tr>
+    <tr><td>入力</td><td>1〜5</td></tr>
+    <tr><td>要のパラメータ</td><td><code>addgravity</code> — 重力を足す（既定 <code>True</code>）<br><code>substeps</code> — サブステップ。<strong>貫通するとき上げる</strong>（既定 <code>10</code>）<br><code>collision_friction</code> — コリジョンの摩擦（既定 <code>1</code>）<br><code>collision_bounce</code> — 反発（既定 <code>0.5</code>）<br><code>cacheenabled</code> — メモリキャッシュ（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>入力は Geometry / Constraint / Proxy / Collision / Guide Sim の5本です。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdbulletsolver.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Packed Object <span class="tx-muted">rbdpackedobject</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中で、パックされた破片群を1つのオブジェクトとして扱う</td></tr>
+    <tr><td>使いどころ</td><td>DOP で自分で組むとき</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+    <tr><td>要のパラメータ</td><td><code>bullet_georep</code> — 衝突形状の持ち方（凸包・球など）（既定 <code>convexhull</code>）<br><code>bullet_collision_margin</code> — 衝突のマージン（既定 <code>0.02</code>）<br><code>active</code> — 動くかどうか（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/rbdpackedobject.html">公式リファレンス（英語）</a></p>
+
+<h3>Constraint Network <span class="tx-muted">constraintnetwork</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>拘束のジオメトリを DOP に渡す</td></tr>
+    <tr><td>使いどころ</td><td>DOP で拘束を使うとき</td></tr>
+    <tr><td>入力</td><td>2〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>soppath</code> — 拘束ジオメトリのある SOP のパス<br><code>group</code> — 対象（既定 <code>*</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/constraintnetwork.html">公式リファレンス（英語）</a></p>
+
+<h3>DOP Import <span class="tx-muted">dopimport</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の結果を SOP に取り出す</td></tr>
+    <tr><td>使いどころ</td><td>DOP で解いたものを SOP 側で使うとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>doppath</code> — DOP ネットワークのパス<br><code>importstyle</code> — 取り込み方（既定 <code>0</code>）<br><code>objpattern</code> — 取り込む対象の名前パターン（既定 <code>*</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/dopimport.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Deforming to Animated <span class="tx-muted">rbddeformingtoanimated</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>変形するジオメトリを、フレームごとの静的パックに変換する</td></tr>
+    <tr><td>使いどころ</td><td>動くキャラや壁で壊すとき。コリジョンに渡す前段</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>referenceframe</code> — 基準フレーム（既定 <code>1</code>）<br><code>pointvels</code> — 点の速度を計算して渡す（既定 <code>1</code>）<br><code>extractionmethod</code> — 取り出し方（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbddeformingtoanimated.html">公式リファレンス（英語）</a></p>
+
+<h2>5. 仕上げ・確認</h2>
+
+<h3>RBD Deform Pieces <span class="tx-muted">rbddeformpieces</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>簡略形状で解いた結果を、<strong>本番のジオメトリ</strong>に移す</td></tr>
+    <tr><td>使いどころ</td><td>低ポリで解いて高ポリで出す、の出口</td></tr>
+    <tr><td>入力</td><td>3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>nameattrib</code> — 破片の名前の属性（既定 <code>parentpiece</code>）<br><code>restframe</code> — 静止状態のフレーム（既定 <code>0</code>）<br><code>radius</code> — 影響半径（既定 <code>0.1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbddeformpieces.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Match Transforms <span class="tx-muted">rbdmatchtransforms</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>変換されていない参照と比べて、破片ごとの変換を取り出す</td></tr>
+    <tr><td>使いどころ</td><td>解いた結果の「動き」だけを別のジオメトリに移したいとき</td></tr>
+    <tr><td>入力</td><td>4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>reference</code> — 参照の入力（既定 <code>0</code>）<br><code>doconstraints</code> — 拘束も一緒に扱う（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdmatchtransforms.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Exploded View <span class="tx-muted">rbdexplodedview</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>破片を外へ押し広げて、割れ方を確かめる</td></tr>
+    <tr><td>使いどころ</td><td><strong>割れているかどうかを目で見る</strong>とき。プロキシの確認にも使う</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>scale</code> — 広げる量（既定 <code>1</code>）<br><code>showconstraints</code> — 拘束も表示する（既定 <code>False</code>）<br><code>showproxy</code> — プロキシも表示する（既定 <code>True</code>）<br><code>showconvexhulls</code> — 凸包を表示する（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>「ちゃんと割れているのに動かない」のか「そもそも割れていない」のかを、これで先に切り分けられます。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdexplodedview.html">公式リファレンス（英語）</a></p>
+
+<h3>Exploded View <span class="tx-muted">explodedview</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>汎用の展開表示。中心から外へ押し出す</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>scale</code> — 広げる量（既定 <code>1</code>）<br><code>attribute</code> — 分ける基準の属性（既定 <code>name</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/explodedview.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Connected Faces <span class="tx-muted">rbdconnectedfaces</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>割れた面の「向かい合っている相手」と距離を記録する</td></tr>
+    <tr><td>使いどころ</td><td>接している面の情報を使って拘束や見た目を作るとき</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>createconstraints</code> — 拘束も作る（既定 <code>True</code>）<br><code>distanceattribute</code> — 距離を入れる属性名（既定 <code>primdist</code>）<br><code>maxconstraints</code> — 拘束の上限（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdconnectedfaces.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Disconnected Faces <span class="tx-muted">rbddisconnectedfaces</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>繋がっていた面が<strong>離れた</strong>ことを検出する</td></tr>
+    <tr><td>使いどころ</td><td>割れた瞬間に何かを出したいとき（砂埃・光）</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>distancethreshold</code> — 離れたと判定する距離（既定 <code>0.0005</code>）<br><code>disconnectedattribute</code> — 結果を入れる属性名（既定 <code>disconnected</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbddisconnectedfaces.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Find Instances <span class="tx-muted">rbdfindinstances</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>同じ形の破片を見つけて、インスタンスに置き換える</td></tr>
+    <tr><td>使いどころ</td><td>大量の破片でメモリを減らしたいとき</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>tolerance</code> — 同じとみなす許容差（既定 <code>0.0001</code>）<br><code>showcopies</code> — 見つかったコピーを表示する（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdfindinstances.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD Transform <span class="tx-muted">rbdxform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3本（Geometry / Constraint / Proxy）をまとめて変換する</td></tr>
+    <tr><td>使いどころ</td><td>破壊のセットアップごと移動・回転したいとき</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>t</code> — 移動（既定 <code>0.0 0.0 0.0</code>）<br><code>r</code> — 回転（既定 <code>0.0 0.0 0.0</code>）<br><code>s</code> — スケール（既定 <code>1.0 1.0 1.0</code>）<br><code>doconstraints</code> — 拘束も変換する（既定 <code>True</code>）</td></tr>
+    <tr><td>注意</td><td>普通の <code>xform</code> で本体だけ動かすと、<strong>拘束が置き去りになります</strong>。RBD のセットアップを動かすときはこちらを使ってください。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdxform.html">公式リファレンス（英語）</a></p>
+
+<h3>RBD I/O <span class="tx-muted">rbdio</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3本まとめてディスクに書き出す／読み戻す</td></tr>
+    <tr><td>使いどころ</td><td>破壊のキャッシュ</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>file</code> — ファイルパス（既定 <code>$HIP/geo/$HIPNAME.$OS.$F.bgeo.sc</code>）<br><code>filemode</code> — 書く／読む（既定 <code>3</code>）<br><code>delayload</code> — 遅延読み込み（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdio.html">公式リファレンス（英語）</a></p>
+
+
+<h2>詰まりやすいところ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず見るところ</th></tr></thead>
+  <tbody>
+    <tr><td>重力をかけても落ちない</td>
+        <td><strong><code>assemble</code> でパックしているか。</strong>
+        生ポリゴンのままだとソルバが掴めない</td></tr>
+    <tr><td>強度をいくつにしても同じ壊れ方</td>
+        <td><code>assemble</code> の <code>newname</code> が ON で、
+        拘束の参照名が切れている</td></tr>
+    <tr><td>強度が効かない</td>
+        <td><code>rbdconstraintproperties</code> の <code>doglue_strength</code></td></tr>
+    <tr><td>材質ごとの強度が全部同じになる</td>
+        <td><code>gluecluster</code> が後から上書きしていないか</td></tr>
+    <tr><td>破片が貫通する</td>
+        <td>サブステップ、次に <code>bullet_collision_margin</code></td></tr>
+    <tr><td>そもそも割れているのか分からない</td>
+        <td><code>rbdexplodedview</code> で開いて見る</td></tr>
+    <tr><td>移動したら拘束が置いていかれた</td>
+        <td><code>xform</code> ではなく <code>rbdxform</code></td></tr>
+  </tbody>
+</table></div>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/dyno/rbd.html">Rigid Body Dynamics (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdbulletsolver.html">RBD Bullet Solver SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdmaterialfracture.html">RBD Material Fracture SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/assemble.html">Assemble SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/rbdconstraintproperties.html">RBD Constraint Properties SOP</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

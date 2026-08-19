@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pyro のノード — どれが何をするのか | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Pyro 関連のノードを「発生源 / 焼く / 解く / 見た目 / ボリューム操作」の5段に分けて、1ノードずつ用途と要のパラメータをまとめました。名前と既定値は Houdini 22.0.368 の実機で照合しています。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Pyro のノード — どれが何をするのか</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/dyno/pyro.html">Pyro (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosolver.html">Pyro Solver SOP</a> /
+<a href="https://www.sidefx.com/docs/houdini/model/volumes.html">Volumes</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>Pyro が<strong>5段</strong>でできていること、どの段にどのノードが属するか</li><li>発生源・焼き込み・ソルバ・後処理・ボリューム操作を<strong>1ノードずつ</strong></li><li>各ノードの<strong>要のパラメータ</strong>（名前は実機で照合済み）</li></ul>
+
+
+<h2>まず、Pyro は5段でできている</h2>
+
+<p>ノードの数は多いのですが、並び方はいつも同じです。
+どのノードも、この5段のどこかに属しています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>段</th><th>やること</th><th>代表ノード</th></tr></thead>
+  <tbody>
+    <tr><td>1. 発生源</td><td>「どこから」「何が」出るかを<strong>点</strong>で決める</td>
+        <td><code>pyrosource</code> / <code>pyroburstsource</code></td></tr>
+    <tr><td>2. 焼く</td><td>点を<strong>ボリューム</strong>に変換する</td>
+        <td><code>volumerasterizeattributes</code></td></tr>
+    <tr><td>3. 解く</td><td>ボリュームを時間方向に解く</td>
+        <td><code>pyrosolver</code></td></tr>
+    <tr><td>4. 見た目</td><td>温度を炎の色にする / レンダー用の属性に焼く</td>
+        <td><code>pyropostprocess</code> / <code>pyrobakevolume</code></td></tr>
+    <tr><td>5. ボリューム操作</td><td>できたボリュームを加工する（どの段でも使う）</td>
+        <td><code>volumeblur</code> / <code>volumewrangle</code> ほか</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>2段目が要ります。</strong>ソルバはボリュームしか受け取れないので、
+点のまま <code>pyrosolver</code> に差しても何も起きません。ここを飛ばすのが最初のつまずきどころです。</p>
+
+
+<h2>1. 発生源をつくる（点をつくる段）</h2>
+
+<p>ここで作るのは<strong>点</strong>です。density や temperature を点属性として持たせておき、次の段でボリュームに焼きます。</p>
+
+<h3>Pyro Source <span class="tx-muted">pyrosource</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>入力の形から、Pyro の発生源になる点を作る</td></tr>
+    <tr><td>使いどころ</td><td>煙・炎を出したいものが決まったら、いちばん最初に通すノード</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>initialize</code> — 使い道のプリセット。ここを選ぶと下のパラメータ一式が切り替わる（既定 <code>0</code>）<br><code>mode</code> — 点をどう作るか。表面に撒く / 体積に撒く / 入力の点をそのまま使う（既定 <code>1</code>）<br><code>particlesep</code> — 点の間隔。<strong>この値がそのまま発生源の細かさ</strong>になる（既定 <code>0.1</code>）<br><code>particlescale</code> — 点の大きさ。<code>pscale</code> は particlesep × particlescale になる（既定 <code>2</code>）<br><code>attributes</code> — density / temperature など、点に持たせる属性の並び</td></tr>
+  </tbody>
+</table></div>
+<p>出てくるのは点であってボリュームではありません。<code>density</code> や <code>temperature</code> を<strong>点属性として</strong>持っています。この後に焼く段が必ず要ります。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosource.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Burst Source <span class="tx-muted">pyroburstsource</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>一瞬だけ出る発生源の点を作る</td></tr>
+    <tr><td>使いどころ</td><td>爆発・銃口炎・衝撃波・爆轟リング。<strong>出続けない</strong>ものはこちら</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>shapetype</code> — 発生源の形。球 / リング / 線など（既定 <code>0</code>）<br><code>size</code> — 大きさ（既定 <code>1</code>）<br><code>dir</code> — 向き。銃口炎のように方向のあるものはここ（既定 <code>0.0 1.0 0.0</code>）<br><code>spreadangle</code> — 広がりの角度。0 に近いほど細く飛ぶ（既定 <code>90</code>）<br><code>copynum</code> — いくつ出すか（既定 <code>5</code>）</td></tr>
+  </tbody>
+</table></div>
+<p><code>pyrosource</code> との違いは<strong>時間の扱い</strong>です。あちらは出し続ける前提、こちらは1回で終わる前提で作られています。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyroburstsource.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Trail Source <span class="tx-muted">pyrotrailsource</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>爆発から尾を引く発生源の点を作る</td></tr>
+    <tr><td>使いどころ</td><td>爆発の破片が煙を引きながら飛んでいく表現</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>quicksetups</code> — 用途別のプリセット（既定 <code>0</code>）<br><code>guidepath</code> — 尾の経路になるカーブ</td></tr>
+  </tbody>
+</table></div>
+<p>経路のカーブは <code>pyrotrailpath</code> で作ります。2つで1組のノードです。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrotrailsource.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Trail Path <span class="tx-muted">pyrotrailpath</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>尾を引く経路になるカーブを作る</td></tr>
+    <tr><td>使いどころ</td><td><code>pyrotrailsource</code> に渡す経路がほしいとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>shapetype</code> — 経路の散らし方（既定 <code>0</code>）<br><code>dodirnoise</code> — 経路の向きにノイズを入れて真っ直ぐさを崩す（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrotrailpath.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Scatter from Burst <span class="tx-muted">pyroscatterfromburst</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>burst の点のまわりに、雲のように点をばらまく</td></tr>
+    <tr><td>使いどころ</td><td>爆発の煙を厚くしたいとき、粒っぽさを足したいとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>shapetype</code> — 撒く形（既定 <code>0</code>）<br><code>donoiseprune</code> — ノイズで間引いて、均一さを崩す（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyroscatterfromburst.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Source Spread <span class="tx-muted">pyrosourcespread</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>点群の上を炎が広がっていく様子を解く</td></tr>
+    <tr><td>使いどころ</td><td>紙・布・草が端から燃え広がる表現</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>burnrate</code> — 燃える速さ（既定 <code>0.5</code>）<br><code>fuel_initial</code> — 最初に持っている燃料の量（既定 <code>0</code>）<br><code>igniteattrib</code> — 火が点いたことを表す属性の名前（既定 <code>ignite</code>）<br><code>coolingrate</code> — 冷める速さ（既定 <code>0.8</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>これ自体がソルバです（フレームを進めながら解きます）。出てくるのは「いつ燃え始めたか」を持った点で、それを発生源として次の段に渡します。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosourcespread.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Thruster Exhaust <span class="tx-muted">pyrothrusterexhaust</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td><strong>シミュレーションせずに</strong>ノズルの噴射を作る</td></tr>
+    <tr><td>使いどころ</td><td>ロケット・ジェットの定常的な噴射。解かないので巻き戻しが自由</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>length</code> — 噴射の長さ（既定 <code>1</code>）<br><code>thickness</code> — 太さ（既定 <code>0.25</code>）<br><code>noisestrength</code> — 揺らぎの強さ（既定 <code>1</code>）<br><code>speed</code> — 流れる速さ（既定 <code>10</code>）</td></tr>
+    <tr><td>注意</td><td>ソルバを通さないので<strong>待ち時間がありません</strong>。定常的な噴射ならまずこれを試す価値があります。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrothrusterexhaust.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Spawn Sources <span class="tx-muted">pyrospawnsources</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>パックした発生源セットを配るための、種になる点を作る</td></tr>
+    <tr><td>使いどころ</td><td>同じ爆発を大量にばらまきたいとき（packed source set の入口）</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>startframe</code> — 出し始めるフレーム（既定 <code>1</code>）<br><code>sourcespeed</code> — 湧く速さ（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrospawnsources.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Source Instance <span class="tx-muted">pyrosourceinstance</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>種の点から、実際に差し込む発生源のインスタンス点を作る</td></tr>
+    <tr><td>使いどころ</td><td><code>pyrospawnsources</code> の次に置く</td></tr>
+    <tr><td>入力</td><td>2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>referenceframe</code> — 基準にするフレーム（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosourceinstance.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Source Pack <span class="tx-muted">pyrosourcepack</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームをまとめて1つの「発生源セット」にパックする</td></tr>
+    <tr><td>使いどころ</td><td>使い回す発生源を作っておくとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>framerange</code> — パックに含めるフレーム範囲（既定 <code>1.0 12.0</code>）<br><code>voxelsize</code> — パックするボリュームのボクセルサイズ（既定 <code>0.1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p><code>pyrospawnsources</code> / <code>pyrosourceinstance</code> / <code>pyrosourcepack</code> の3つで1組です。同じ爆発を何十個も配るときだけ出番があります。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosourcepack.html">公式リファレンス（英語）</a></p>
+
+<h2>2. ボリュームに焼く（ここを飛ばすと動かない）</h2>
+
+<p>ソルバはボリュームしか受け取れません。前の段で作った<strong>点をボリュームに変換</strong>します。</p>
+
+<h3>Volume Rasterize Attributes <span class="tx-muted">volumerasterizeattributes</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>点の属性を VDB に焼く</td></tr>
+    <tr><td>使いどころ</td><td>Pyro の標準ルート。<code>pyrosource</code> の次はほぼこれ</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>attributes</code> — 焼く属性の名前。<code>density temperature</code> のように並べる<br><code>voxelsize</code> — ボクセルの大きさ。<strong>ソルバ側と揃える</strong>（既定 <code>0.1</code>）<br><code>particlescale</code> — 点の影響半径の倍率。小さいと粒が分離して見える（既定 <code>1</code>）<br><code>velocityblur</code> — 点の <code>v</code> を使って、動きの方向に伸ばして焼く（既定 <code>False</code>）</td></tr>
+    <tr><td>注意</td><td><strong>ボクセルサイズをソルバと揃えること。</strong>別々に持っているので、片方だけ変えると発生源が粗いまま（または無駄に細かいまま）になります。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumerasterizeattributes.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Rasterize Particles <span class="tx-muted">volumerasterizeparticles</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>点群をボリュームにする</td></tr>
+    <tr><td>使いどころ</td><td>属性の細かい制御が要らない、単純な焼き込み</td></tr>
+    <tr><td>入力</td><td>2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>particlescale</code> — 点の影響半径（既定 <code>1</code>）<br><code>densityattrib</code> — 密度に使う属性名（既定 <code>density</code>）<br><code>velocityblur</code> — 速度方向に伸ばす（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumerasterizeparticles.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Rasterize Curve <span class="tx-muted">volumerasterizecurve</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>カーブをボリュームにする</td></tr>
+    <tr><td>使いどころ</td><td>線に沿った煙や炎の帯を作りたいとき</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumerasterizecurve.html">公式リファレンス（英語）</a></p>
+
+<h2>3. 解く</h2>
+
+<p>Houdini 20 以降、Pyro は <strong>SOP の <code>pyrosolver</code> 1個</strong>で完結します。DOP を開く必要があるのは、微調整のために中の部品を差し替えたいときだけです。</p>
+
+<h3>Pyro Solver (SOP) <span class="tx-muted">pyrosolver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>Pyro を解く。中に DOP ネットワークを持っている</td></tr>
+    <tr><td>使いどころ</td><td>煙・炎を解くときの本体。まずこれを置く</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>divsize</code> — ボクセルサイズ。<strong>計算時間の主犯</strong>。まず粗く当たりを見る（既定 <code>0.1</code>）<br><code>substep</code> — サブステップ。速い動きで破綻するとき上げる（既定 <code>1</code>）<br><code>opencl</code> — GPU で解く（既定 <code>False</code>）<br><code>col_divsize</code> — コリジョンのボクセルサイズ。<strong><code>divsize</code> と連動しない</strong>（既定 <code>0.1</code>）<br><code>clampsize</code> — 解く領域の上限を設ける（既定 <code>False</code>）<br><code>cacheenabled</code> — メモリ上のキャッシュ（既定 <code>True</code>）</td></tr>
+    <tr><td>注意</td><td><strong><code>col_divsize</code> は既定のままだと <code>divsize</code> と食い違います。</strong>本体を細かくしてもコリジョンが粗いままだと、発生源が壁に埋もれて煙が消えます。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosolver.html">公式リファレンス（英語）</a></p>
+
+<h3>DOP Network <span class="tx-muted">dopnet</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>シミュレーションの中身を入れる箱</td></tr>
+    <tr><td>使いどころ</td><td>ソルバ・力・コリジョンを自分で組みたいとき</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>cacheenabled</code> — メモリキャッシュを使う（既定 <code>True</code>）<br><code>cachemaxsize</code> — キャッシュの上限（MB）（既定 <code>5000</code>）<br><code>cachetodisk</code> — ディスクに逃がす（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>SOP から見ると1ノードですが、中は別世界です。<code>pyrosolver</code> SOP も中身はこれです。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/dopnet.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Solver (DOP) <span class="tx-muted">pyrosolver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中に置く Pyro のソルバ本体</td></tr>
+    <tr><td>使いどころ</td><td>SOP 版では届かないところを触りたいとき</td></tr>
+    <tr><td>入力</td><td>1〜5</td></tr>
+  </tbody>
+</table></div>
+<p>SOP 版の <code>pyrosolver</code> はこれを内側に持っています。<strong>先に SOP 版で足りるか確かめてから</strong>降りてくるほうが早いです。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/pyrosolver.html">公式リファレンス（英語）</a></p>
+
+<h3>Smoke Object <span class="tx-muted">smokeobject</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中で「煙のオブジェクト」を定義する</td></tr>
+    <tr><td>使いどころ</td><td>解く対象の器（フィールドの入れ物）を用意するとき</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/smokeobject.html">公式リファレンス（英語）</a></p>
+
+<h3>DOP Import Fields <span class="tx-muted">dopimportfield</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中のフィールドを SOP 側に取り出す</td></tr>
+    <tr><td>使いどころ</td><td>DOP で解いた結果を SOP で加工したいとき</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/dopimportfield.html">公式リファレンス（英語）</a></p>
+
+<h2>4. 見た目にする</h2>
+
+<p>解いた直後のボリュームは、密度と温度が入っているだけです。<strong>炎の色は自動では付きません。</strong></p>
+
+<h3>Pyro Post-Process <span class="tx-muted">pyropostprocess::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>解いた結果に後処理をかける。温度から炎のフィールドを作るのが主な仕事</td></tr>
+    <tr><td>使いどころ</td><td>ソルバの直後。ここを切ると煙だけになる</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>flamedensity</code> — 炎として扱う密度のしきい値（既定 <code>0.0001</code>）<br><code>conv_vdb</code> — VDB に変換する（既定 <code>False</code>）<br><code>conv_usefp16</code> — 16bit で持つ。容量が半分になる（既定 <code>False</code>）<br><code>bind_density</code> — 密度フィールドの名前（既定 <code>density</code>）<br><code>bind_flame</code> — 炎フィールドの名前（既定 <code>flame</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyropostprocess-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Pyro Bake Volume <span class="tx-muted">pyrobakevolume</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レンダーとビューポート用に、見た目のパラメータをボリュームに焼き込む</td></tr>
+    <tr><td>使いどころ</td><td>ルックを決める段。散乱・煙の色・影の濃さはここ</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>densityscale</code> — 密度の倍率。<strong>濃さの主役</strong>（既定 <code>1</code>）<br><code>smokecolor</code> — 煙の色（既定 <code>1.0 1.0 1.0</code>）<br><code>enablescatter</code> — 散乱を有効にする。火の芯の明るさが変わる（既定 <code>False</code>）<br><code>maxres</code> — ビューポート表示用の解像度上限（既定 <code>128</code>）<br><code>shop_materialpath</code> — 使うマテリアル（既定 <code>matnet/Pyro_Shader</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrobakevolume.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Visualization <span class="tx-muted">volumevisualization</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ビューポートでの見え方だけを変える</td></tr>
+    <tr><td>使いどころ</td><td>数値を確かめたいとき。<strong>レンダーには影響しない</strong></td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>vismode</code> — 表示のしかた（既定 <code>1</code>）<br><code>rangemin</code> — 表示する値の下限（既定 <code>0</code>）<br><code>rangemax</code> — 上限（既定 <code>1</code>）<br><code>densityfield</code> — 密度として表示するフィールド（既定 <code>density</code>）<br><code>emitfield</code> — 発光として表示するフィールド</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumevisualization.html">公式リファレンス（英語）</a></p>
+
+<h2>5. ボリュームを触る（どの段でも使う道具）</h2>
+
+<p>Pyro 専用ではありませんが、Pyro を触っていると必ず出てきます。</p>
+
+<h3>Volume Wrangle <span class="tx-muted">volumewrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボクセル1つずつに VEX を書く</td></tr>
+    <tr><td>使いどころ</td><td>「この範囲だけ密度を落とす」のような、式で書ける加工</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>group</code> — 対象のボリューム名<br><code>bindeach</code> — 複数ボリュームを1つずつ別々に処理する（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p><code>@density</code> のように<strong>ボリューム名がそのまま変数名</strong>になります。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumewrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume VOP <span class="tx-muted">volumevop</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームに VOP ネットワークをかける</td></tr>
+    <tr><td>使いどころ</td><td>VEX を書かずにノードで組みたいとき</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumevop.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Blur <span class="tx-muted">volumeblur</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボクセルをぼかす</td></tr>
+    <tr><td>使いどころ</td><td>焼いた発生源の粒々をならす、輪郭を柔らかくする</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>usevoxelradius</code> — 半径をボクセル数で指定する（既定 <code>False</code>）<br><code>voxelradius</code> — ボクセル数でのぼかし半径（既定 <code>1.0 1.0 1.0</code>）<br><code>radius</code> — 実寸でのぼかし半径（既定 <code>1</code>）<br><code>useopencl</code> — GPU を使う（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumeblur.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Adjust Fog <span class="tx-muted">volumeadjustfog</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>フォグボリュームの値を加工する（ランプ・倍率・クランプ）</td></tr>
+    <tr><td>使いどころ</td><td>密度の分布を作り変えたいとき。縁を薄く、芯を濃く</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>adjustvalue</code> — 調整を有効にする（既定 <code>True</code>）<br><code>remapramp</code> — ランプで値を入れ替える<br><code>scalevalue</code> — 倍率（既定 <code>1</code>）<br><code>clampmaxvalue</code> — 上限で止める（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumeadjustfog.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Mix <span class="tx-muted">volumemix</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>スカラーのボリューム同士を混ぜる</td></tr>
+    <tr><td>使いどころ</td><td>2つの密度を足す・掛ける・最大を取る</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>mixmethod</code> — 混ぜ方（加算・乗算・最大など）（既定 <code>0</code>）<br><code>blend</code> — 混ぜる比率（既定 <code>0.5</code>）<br><code>group</code> — 混ぜられる側<br><code>mixgrp</code> — 混ぜる側</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumemix.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Combine <span class="tx-muted">volumecombine</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>1つのジオメトリの中にある複数のボリュームをまとめる</td></tr>
+    <tr><td>使いどころ</td><td>フィールドを整理して1本にしたいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>dstvolume</code> — 行き先のボリューム名<br><code>numcombines</code> — 組み合わせる本数</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumecombine.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Ramp <span class="tx-muted">volumeramp</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ランプで値を入れ替える</td></tr>
+    <tr><td>使いどころ</td><td>温度を色に変える、密度にコントラストを付ける</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>srcmin</code> — 入力の下限（既定 <code>0</code>）<br><code>srcmax</code> — 入力の上限（既定 <code>1</code>）<br><code>destmin</code> — 出力の下限（既定 <code>0</code>）<br><code>destmax</code> — 出力の上限（既定 <code>1</code>）<br><code>usecolor</code> — 色ランプを使う（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumeramp.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Noise Fog <span class="tx-muted">volumenoisefog</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームにノイズを足す / ノイズから作る</td></tr>
+    <tr><td>使いどころ</td><td>のっぺりした煙に細かさを足す</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>amplitude</code> — ノイズの強さ（既定 <code>1</code>）<br><code>basis</code> — ノイズの種類（既定 <code>5</code>）<br><code>blendmode</code> — 元の値との混ぜ方（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumenoisefog.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Resample <span class="tx-muted">volumeresample</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボクセル解像度を変える</td></tr>
+    <tr><td>使いどころ</td><td>解いた後に軽くする、または細かくする</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>divsize</code> — 新しいボクセルサイズ（既定 <code>0.1</code>）<br><code>scale</code> — 倍率で指定する（既定 <code>1</code>）<br><code>filter</code> — 補間の種類（既定 <code>box</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumeresample.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Resize <span class="tx-muted">volumeresize</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td><strong>ボクセルはそのままで</strong>、ボリュームの範囲だけ変える</td></tr>
+    <tr><td>使いどころ</td><td>煙がはみ出して切れているとき</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>usepoints</code> — 入力の点が入る範囲に合わせる（既定 <code>True</code>）</td></tr>
+    <tr><td>注意</td><td><code>volumeresample</code> と紛らわしいですが別物です。こちらは解像度を変えません（範囲だけ）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumeresize.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Compress <span class="tx-muted">volumecompress</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームを圧縮して軽くする</td></tr>
+    <tr><td>使いどころ</td><td>キャッシュに書く直前</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>compression</code> — 圧縮方式（既定 <code>1</code>）<br><code>quantizetol</code> — 量子化の許容誤差。<strong>上げると軽くなるが階調が飛ぶ</strong>（既定 <code>0</code>）<br><code>usefp16</code> — 16bit で持つ（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumecompress.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Vector Split <span class="tx-muted">volumevectorsplit</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ベクトルボリュームを x / y / z の3本に分ける</td></tr>
+    <tr><td>使いどころ</td><td>速度場の1成分だけ触りたいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>group</code> — 対象<br><code>keep</code> — 元も残す（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumevectorsplit.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Vector Join <span class="tx-muted">volumevectorjoin</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3本のスカラーを1本のベクトルボリュームに戻す</td></tr>
+    <tr><td>使いどころ</td><td>分けて加工した後</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>components</code> — 成分の数（既定 <code>4</code>）<br><code>xgroup</code> — x に使うボリューム（既定 <code>@name=*.x</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumevectorjoin.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Trail <span class="tx-muted">volumetrail</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>速度場の中を点が流れる軌跡を作る</td></tr>
+    <tr><td>使いどころ</td><td>速度場が意図どおり流れているか<strong>目で確かめる</strong>とき</td></tr>
+    <tr><td>入力</td><td>2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>colormapping</code> — 軌跡の色付け</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumetrail.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Surface <span class="tx-muted">volumesurface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームから三角形メッシュを作る</td></tr>
+    <tr><td>使いどころ</td><td>煙の形をポリゴンとして取り出したいとき</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>minedge</code> — 最小の辺長（既定 <code>0</code>）<br><code>maxedge</code> — 最大の辺長（既定 <code>1</code>）<br><code>offset</code> — 等値面の位置（既定 <code>0</code>）<br><code>closegap</code> — 隙間を閉じる（既定 <code>True</code>）</td></tr>
+    <tr><td>注意</td><td>フォグボリューム（SDF ではないもの）からは<strong>面が出ないことがあります</strong>。しきい値を振っても 0 プリムのままなら、先に SDF に変換する必要があります。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumesurface.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Reduce <span class="tx-muted">volumereduce</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリューム全体を1つの数値にまとめる</td></tr>
+    <tr><td>使いどころ</td><td>平均密度・最大値を測る。<strong>検証に使う</strong></td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>reduction</code> — 集計方法（平均・最大・合計など）（既定 <code>0</code>）<br><code>percentile</code> — パーセンタイルを取る（既定 <code>50</code>）<br><code>resultattrib</code> — 結果を書き込む detail 属性名（既定 <code>density</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumereduce.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Analysis <span class="tx-muted">volumeanalysis</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>勾配・発散・回転など、解析的な量を計算する</td></tr>
+    <tr><td>使いどころ</td><td>速度場の性質を見たいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>analysis</code> — 計算する量（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumeanalysis.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Slice <span class="tx-muted">volumeslice</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボリュームを平面で切って断面を取り出す</td></tr>
+    <tr><td>使いどころ</td><td>中身がどうなっているか<strong>断面で確かめる</strong>とき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>plane</code> — 切る平面（既定 <code>0</code>）<br><code>planeoffset</code> — 平面の位置（既定 <code>0</code>）<br><code>method</code> — 取り出し方（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumeslice.html">公式リファレンス（英語）</a></p>
+
+
+<h2>詰まりやすいところ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず見るところ</th></tr></thead>
+  <tbody>
+    <tr><td>何も出ない</td><td>点のまま <code>pyrosolver</code> に差していないか。
+        <strong>焼く段</strong>（<code>volumerasterizeattributes</code>）が要る</td></tr>
+    <tr><td>煙は出るが炎が無い</td><td><code>pyropostprocess</code> を通しているか。
+        温度から炎を作るのはこのノード</td></tr>
+    <tr><td>細かくしたのに変わらない</td><td><code>col_divsize</code>。
+        コリジョン側は <code>divsize</code> と<strong>連動しない</strong></td></tr>
+    <tr><td>発生源のあたりで煙が消える</td><td>同上。粗いコリジョンに発生源が埋もれている</td></tr>
+    <tr><td>煙が箱で切れる</td><td><code>volumeresize</code>、または解く領域の上限
+        （<code>clampsize</code> / <code>maxsize</code>）</td></tr>
+    <tr><td>粒々に見える</td><td>焼くときの <code>particlescale</code>。
+        小さすぎると点が分離して見える</td></tr>
+  </tbody>
+</table></div>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/dyno/pyro.html">Pyro (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosolver.html">Pyro Solver SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/model/volumes.html">Volumes</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrosource.html">Pyro Source SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyropostprocess.html">Pyro Post-Process SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pyrobakevolume.html">Pyro Bake Volume SOP</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

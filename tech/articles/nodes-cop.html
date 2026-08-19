@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COP のノード — テクスチャを作る道具 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Copernicus のノードを「入口・生成・色・フィルタ・変形・合成・PBR・ジオメトリ連携」に分けて、1ノードずつ用途と要のパラメータをまとめました。タイリングと法線の向き、書き出しの色空間の話も含みます。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>COP のノード — テクスチャを作る道具</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/copernicus/index.html">Copernicus (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/cop/index.html">COP nodes</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/cop/bakegeometrytextures.html">Texture baking</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>COP を流れているものが<strong>レイヤー</strong>であること</li><li>生成・色・フィルタ・変形・合成・PBR を<strong>1ノードずつ</strong></li><li><strong>タイリング</strong>と<strong>法線の向き</strong>、書き出しの<strong>色空間</strong>の落とし穴</li></ul>
+
+
+<h2>COP を流れているのは「レイヤー」</h2>
+
+<p>SOP がジオメトリを流すように、COP は<strong>レイヤー</strong>（名前つきの画像）を流します。
+1本の線に複数のレイヤーが乗っていて、ノードは名前で選んで処理します。</p>
+
+<p>Copernicus は<strong>GPU で走ります</strong>。ノードを繋いだ結果がその場で更新されるので、
+数値を振りながら見た目を決める作業に向いています。</p>
+
+<h2>テクスチャを作るときの並び</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>段</th><th>やること</th><th>代表ノード</th></tr></thead>
+  <tbody>
+    <tr><td>1. 生成</td><td>模様のもとを作る</td>
+        <td><code>fractalnoise</code> / <code>worleynoise</code> / <code>ramp</code></td></tr>
+    <tr><td>2. 加工</td><td>コントラスト・ぼかし・歪み</td>
+        <td><code>remap</code> / <code>blur</code> / <code>distort</code></td></tr>
+    <tr><td>3. 合成</td><td>重ねる・マスクで混ぜる</td><td><code>layer</code></td></tr>
+    <tr><td>4. PBR 化</td><td>高さから法線、AO、曲率</td>
+        <td><code>heighttonormal</code> / <code>curvature</code></td></tr>
+    <tr><td>5. 書き出し</td><td>ファイルにする</td><td><code>rop_image</code></td></tr>
+  </tbody>
+</table></div>
+
+
+<h2>1. 入口と出口</h2>
+
+<h3>File <span class="tx-muted">file</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>画像ファイルを読み込む</td></tr>
+    <tr><td>使いどころ</td><td>既存のテクスチャを持ち込むとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/file.html">公式リファレンス（英語）</a></p>
+
+<h3>ROP Image Output <span class="tx-muted">rop_image</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レイヤーを画像ファイルに書き出す</td></tr>
+    <tr><td>使いどころ</td><td><strong>出口。</strong>PBR マップ一式もここから出す</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>copoutput</code> — 出力ファイルのパス（既定 <code>$HIP/comp/$HIPNAME.$OS.$F4.exr</code>）<br><code>colorconversion</code> — 書き出す色空間（既定 <code>0</code>）<br><code>aov#</code> — 書き出すレイヤーの名前<br><code>addaovs</code> — 複数のレイヤーをまとめて出す</td></tr>
+    <tr><td>注意</td><td><strong><code>colorconversion</code> を <code>raw</code> にしないと二重にエンコードされます。</strong>ACES の設定下では、リニアのまま出したいマップ（法線・粗さ・高さ）が色変換を通ってしまい、値がずれます（実測）。パスに <code>&lt;LAYER&gt;</code> を入れると、レイヤーごとに別ファイルで一括書き出しできます。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/rop_image.html">公式リファレンス（英語）</a></p>
+
+<h3>Null <span class="tx-muted">null</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>何もしない。目印として置く</td></tr>
+    <tr><td>使いどころ</td><td>OUT の目印、参照先の固定</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/null.html">公式リファレンス（英語）</a></p>
+
+<h3>Output <span class="tx-muted">output</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>サブネットの出口</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/output.html">公式リファレンス（英語）</a></p>
+
+<h3>SOP Import <span class="tx-muted">sopimport</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>SOP のジオメトリを COP に持ち込む</td></tr>
+    <tr><td>使いどころ</td><td>モデルを見ながらテクスチャを作るとき</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/sopimport.html">公式リファレンス（英語）</a></p>
+
+<h3>Rasterize Geometry <span class="tx-muted">rasterizegeo</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリを画像として焼く</td></tr>
+    <tr><td>使いどころ</td><td>UV 空間にモデルを展開して描き込むとき</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/rasterizegeo.html">公式リファレンス（英語）</a></p>
+
+<h2>2. 模様を作る</h2>
+
+<p><strong>タイリングさせたいなら、ここで決めます。</strong>後から繋ぎ目を消すのは大変です。</p>
+
+<h3>Constant <span class="tx-muted">constant</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>単色のレイヤーを作る</td></tr>
+    <tr><td>使いどころ</td><td>土台、または値を直に入れたいとき</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/constant.html">公式リファレンス（英語）</a></p>
+
+<h3>Ramp <span class="tx-muted">ramp</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>グラデーションを作る</td></tr>
+    <tr><td>使いどころ</td><td>上下・放射のグラデーション</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/ramp.html">公式リファレンス（英語）</a></p>
+
+<h3>Fractal Noise <span class="tx-muted">fractalnoise</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>オクターブを重ねたノイズ。<strong>いちばん出番が多い</strong></td></tr>
+    <tr><td>使いどころ</td><td>岩肌・雲・汚れの基礎</td></tr>
+    <tr><td>入力</td><td>0〜5</td></tr>
+    <tr><td>要のパラメータ</td><td><code>amp</code> — 振幅（既定 <code>0.5</code>）<br><code>elementsize</code> — 模様の大きさ（既定 <code>0.1</code>）<br><code>fractaltype</code> — 重ね方の種類（既定 <code>1</code>）<br><code>dotiled</code> — <strong>タイリングさせる。</strong>繋がるテクスチャを作るなら必須（既定 <code>True</code>）<br><code>contrast</code> — コントラスト（既定 <code>0</code>）</td></tr>
+    <tr><td>注意</td><td><strong>タイリングするテクスチャを作るなら <code>dotiled</code> を入れます。</strong>後から端をぼかして繋ぐより確実です。ただし繋がる代わりに周期が見えるので、<strong>低い周波数はタイリングで作り、細かさは UV 側でタイル数を増やして稼ぐ</strong>のが現実的です（実測での結論）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/fractalnoise.html">公式リファレンス（英語）</a></p>
+
+<h3>Worley Noise <span class="tx-muted">worleynoise</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>セル状のノイズ（ボロノイ）</td></tr>
+    <tr><td>使いどころ</td><td>石畳・鱗・ひび・気泡</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>elementsize</code> — セルの大きさ（既定 <code>0.1</code>）<br><code>metric</code> — 距離の測り方。<strong>これで見た目が大きく変わる</strong>（既定 <code>0</code>）<br><code>jitter</code> — セルの乱れ（既定 <code>0.5</code>）<br><code>dotiled</code> — タイリングさせる（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/worleynoise.html">公式リファレンス（英語）</a></p>
+
+<h3>Cellular Noise <span class="tx-muted">cellularnoise</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>細胞状のノイズ</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/cellularnoise.html">公式リファレンス（英語）</a></p>
+
+<h3>Curl Noise <span class="tx-muted">curlnoise</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>渦を巻くノイズ。<strong>発散がない</strong></td></tr>
+    <tr><td>使いどころ</td><td>流れの模様、歪ませる元</td></tr>
+    <tr><td>入力</td><td>0〜5</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/curlnoise.html">公式リファレンス（英語）</a></p>
+
+<h3>Bubble Noise <span class="tx-muted">bubblenoise</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>泡状のノイズ</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/bubblenoise.html">公式リファレンス（英語）</a></p>
+
+<h3>Crystal Noise <span class="tx-muted">crystalnoise</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>結晶状のノイズ</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/crystalnoise.html">公式リファレンス（英語）</a></p>
+
+<h3>Checkerboard <span class="tx-muted">checkerboard</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>市松模様</td></tr>
+    <tr><td>使いどころ</td><td>UV の確認、当たりを見るため</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/checkerboard.html">公式リファレンス（英語）</a></p>
+
+<h3>Cell Pattern <span class="tx-muted">cellpattern</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>セル状のパターンを作る</td></tr>
+    <tr><td>入力</td><td>0〜6</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/cellpattern.html">公式リファレンス（英語）</a></p>
+
+<h3>Tile Pattern <span class="tx-muted">tilepattern</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>タイル・レンガのパターンを作る</td></tr>
+    <tr><td>使いどころ</td><td>壁・床のタイル</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/tilepattern.html">公式リファレンス（英語）</a></p>
+
+<h2>3. 色と値を調整する</h2>
+
+<h3>Color Correct <span class="tx-muted">colorcorrect</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>シャドウ・中間・ハイライトを別々に調整する</td></tr>
+    <tr><td>使いどころ</td><td>色の総合的な調整。<strong>まずこれ</strong></td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>master_mult</code> — 全体の倍率（既定 <code>1.0 1.0 1.0</code>）<br><code>master_gamma</code> — 全体のガンマ（既定 <code>1.0 1.0 1.0</code>）<br><code>shadow_gamma</code> — 暗部だけのガンマ（既定 <code>1.0 1.0 1.0</code>）<br><code>highlight_gamma</code> — 明部だけのガンマ（既定 <code>1.0 1.0 1.0</code>）<br><code>mask</code> — 効かせる範囲のマスク（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/colorcorrect.html">公式リファレンス（英語）</a></p>
+
+<h3>Remap <span class="tx-muted">remap</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>値の対応をランプで付け替える</td></tr>
+    <tr><td>使いどころ</td><td><strong>ノイズを模様に変える主役。</strong>コントラストを付けたいときもこれ</td></tr>
+    <tr><td>入力</td><td>0〜7</td></tr>
+    <tr><td>要のパラメータ</td><td><code>useramp</code> — ランプを使う（既定 <code>True</code>）<br><code>inputmin</code> — 入力の下限（既定 <code>0</code>）<br><code>inputmax</code> — 入力の上限（既定 <code>1</code>）<br><code>computerange</code> — 入力の範囲を自動で測る</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/remap.html">公式リファレンス（英語）</a></p>
+
+<h3>Bright <span class="tx-muted">bright</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>明るさを変える</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/bright.html">公式リファレンス（英語）</a></p>
+
+<h3>Contrast <span class="tx-muted">contrast</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>コントラストを変える</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/contrast.html">公式リファレンス（英語）</a></p>
+
+<h3>Gamma <span class="tx-muted">gamma</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ガンマを変える</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/gamma.html">公式リファレンス（英語）</a></p>
+
+<h3>HSV <span class="tx-muted">hsv</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>色相・彩度・明度で調整する</td></tr>
+    <tr><td>使いどころ</td><td>色味だけ振りたいとき</td></tr>
+    <tr><td>入力</td><td>0〜5</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/hsv.html">公式リファレンス（英語）</a></p>
+
+<h3>Invert <span class="tx-muted">invert</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>値を反転する</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/invert.html">公式リファレンス（英語）</a></p>
+
+<h3>Quantize <span class="tx-muted">quantize</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>値を段階に落とす（ポスタリゼーション）</td></tr>
+    <tr><td>使いどころ</td><td>トゥーン調の階調、地層のような段</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>segments</code> — 段数（既定 <code>16</code>）<br><code>method</code> — 落とし方（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/quantize.html">公式リファレンス（英語）</a></p>
+
+<h3>Tonemap <span class="tx-muted">tonemap</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>HDR を表示用のレンジに圧縮する</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/tonemap.html">公式リファレンス（英語）</a></p>
+
+<h3>OCIO Transform <span class="tx-muted">ociotransform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>色空間を変換する</td></tr>
+    <tr><td>使いどころ</td><td>ACES と sRGB を行き来するとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/ociotransform.html">公式リファレンス（英語）</a></p>
+
+<h2>4. フィルタ</h2>
+
+<h3>Blur <span class="tx-muted">blur</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ぼかす</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>size</code> — ぼかす大きさ（既定 <code>0.005</code>）<br><code>units</code> — 単位（ピクセル／実寸）（既定 <code>0</code>）<br><code>filter</code> — フィルタの種類（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/blur.html">公式リファレンス（英語）</a></p>
+
+<h3>Sharpen <span class="tx-muted">sharpen</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>輪郭を立てる</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/sharpen.html">公式リファレンス（英語）</a></p>
+
+<h3>Median <span class="tx-muted">median</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>中央値フィルタ。<strong>輪郭を保ったままノイズを消す</strong></td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/median.html">公式リファレンス（英語）</a></p>
+
+<h3>Dilate/Erode <span class="tx-muted">dilateerode</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>膨らませる／痩せさせる</td></tr>
+    <tr><td>使いどころ</td><td>マスクを広げる・縮める。<strong>縁の処理でよく使う</strong></td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>radius</code> — 半径。<strong>正で膨張、負で収縮</strong>（既定 <code>25</code>）<br><code>softedge</code> — 縁を柔らかく（既定 <code>0.5</code>）<br><code>mask</code> — 効かせる範囲（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/dilateerode.html">公式リファレンス（英語）</a></p>
+
+<h3>Edge Detect <span class="tx-muted">edgedetect</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>輪郭を抽出する</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/edgedetect.html">公式リファレンス（英語）</a></p>
+
+<h3>Glow <span class="tx-muted">glow</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>明るいところを光らせる</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/glow.html">公式リファレンス（英語）</a></p>
+
+<h3>Drop Shadow <span class="tx-muted">dropshadow</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>落ち影を付ける</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/dropshadow.html">公式リファレンス（英語）</a></p>
+
+<h3>Defocus <span class="tx-muted">defocus</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レンズのボケを作る。<strong>ただのぼかしとは形が違う</strong></td></tr>
+    <tr><td>入力</td><td>2〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/defocus.html">公式リファレンス（英語）</a></p>
+
+<h3>Streak Blur <span class="tx-muted">streakblur</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>方向のあるぼかし（流し）</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/streakblur.html">公式リファレンス（英語）</a></p>
+
+<h3>Kuwahara Filter <span class="tx-muted">kuwaharafilter</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>絵画調にする。<strong>輪郭を残して面を平らにする</strong></td></tr>
+    <tr><td>使いどころ</td><td>イラスト風の質感</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/kuwaharafilter.html">公式リファレンス（英語）</a></p>
+
+<h3>Denoise AI <span class="tx-muted">denoiseai</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>AI でノイズを除去する</td></tr>
+    <tr><td>使いどころ</td><td>レンダー結果のノイズ取り</td></tr>
+    <tr><td>入力</td><td>0〜5</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/denoiseai.html">公式リファレンス（英語）</a></p>
+
+<h2>5. 変形・タイリング</h2>
+
+<h3>Transform <span class="tx-muted">xform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>移動・回転・スケール</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>t</code> — 移動（既定 <code>0.0 0.0 0.0</code>）<br><code>r</code> — 回転（既定 <code>0.0 0.0 0.0</code>）<br><code>s</code> — スケール（既定 <code>1.0 1.0 1.0</code>）<br><code>border</code> — 端の扱い（繰り返す／伸ばす／黒）（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/xform.html">公式リファレンス（英語）</a></p>
+
+<h3>Distort <span class="tx-muted">distort</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>別のレイヤーの値で歪ませる</td></tr>
+    <tr><td>使いどころ</td><td>ノイズで模様をよじる</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/distort.html">公式リファレンス（英語）</a></p>
+
+<h3>Heat Distort <span class="tx-muted">heatdistort</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>陽炎のような歪み</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/heatdistort.html">公式リファレンス（英語）</a></p>
+
+<h3>Mirror <span class="tx-muted">mirror</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>鏡像にする</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/mirror.html">公式リファレンス（英語）</a></p>
+
+<h3>Flip <span class="tx-muted">flip</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>上下・左右を反転する</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/flip.html">公式リファレンス（英語）</a></p>
+
+<h3>Crop <span class="tx-muted">crop</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>切り抜く</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/crop.html">公式リファレンス（英語）</a></p>
+
+<h3>Resample <span class="tx-muted">resample</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>解像度を変える</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/resample.html">公式リファレンス（英語）</a></p>
+
+<h3>UV Transform <span class="tx-muted">uvxform</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>UV 座標のほうを変換する</td></tr>
+    <tr><td>使いどころ</td><td><strong>タイル数を増やすのはここ。</strong>模様そのものは変えずに繰り返し数を稼ぐ</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/uvxform.html">公式リファレンス（英語）</a></p>
+
+<h3>Hex Tile <span class="tx-muted">hextile</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>六角形のタイルでランダムに貼り、<strong>繰り返しの見えを消す</strong></td></tr>
+    <tr><td>使いどころ</td><td>タイリングの周期が目立つとき</td></tr>
+    <tr><td>入力</td><td>0〜10</td></tr>
+    <tr><td>要のパラメータ</td><td><code>size</code> — タイルの大きさ（既定 <code>1.0 1.0</code>）<br><code>rotrand</code> — 回転のばらつき（既定 <code>0</code>）<br><code>scalerand</code> — 大きさのばらつき（既定 <code>0</code>）<br><code>seed</code> — 乱数の種（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>同じ模様を並べたときの「格子っぽさ」を隠すための定番手法です。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/hextile.html">公式リファレンス（英語）</a></p>
+
+<h3>Triplanar <span class="tx-muted">triplanar</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>3軸から投影して貼る</td></tr>
+    <tr><td>使いどころ</td><td>UV の無いモデルにテクスチャを乗せるとき</td></tr>
+    <tr><td>入力</td><td>0〜6</td></tr>
+    <tr><td>要のパラメータ</td><td><code>triplanarblend</code> — 軸のまたぎの混ぜ幅（既定 <code>0.25</code>）<br><code>globalscale</code> — 全体のスケール（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/triplanar.html">公式リファレンス（英語）</a></p>
+
+<h2>6. 合成</h2>
+
+<h3>Layer <span class="tx-muted">layer</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レイヤーを重ねる。<strong>COP の合成の中心</strong></td></tr>
+    <tr><td>使いどころ</td><td>模様を積んでいくとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>res</code> — 解像度（既定 <code>1920.0 1080.0</code>）<br><code>precision</code> — ビット深度（既定 <code>2</code>）<br><code>border</code> — 端の扱い（既定 <code>3</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/layer.html">公式リファレンス（英語）</a></p>
+
+<h3>Blend <span class="tx-muted">blend</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>2つを比率で混ぜる</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/blend.html">公式リファレンス（英語）</a></p>
+
+<h3>Compare <span class="tx-muted">compare</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>2つを比較する（差分・最大・最小）</td></tr>
+    <tr><td>使いどころ</td><td>変更の前後を見る、差だけ取り出す</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/compare.html">公式リファレンス（英語）</a></p>
+
+<h3>Mask Combine <span class="tx-muted">maskcombine</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>マスク同士を論理的に組み合わせる</td></tr>
+    <tr><td>使いどころ</td><td>「AかつB」「AだがBを除く」を作るとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/maskcombine.html">公式リファレンス（英語）</a></p>
+
+<h3>Premultiply <span class="tx-muted">premult</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>アルファを掛ける／外す</td></tr>
+    <tr><td>使いどころ</td><td>合成の食い違いが出るとき。<strong>縁が黒く/白く縁取られたら疑う</strong></td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/premult.html">公式リファレンス（英語）</a></p>
+
+<h3>Wipe <span class="tx-muted">wipe</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>画面を割って2つを並べる</td></tr>
+    <tr><td>使いどころ</td><td><strong>前後の比較を1枚で見る</strong>とき</td></tr>
+    <tr><td>入力</td><td>2〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/wipe.html">公式リファレンス（英語）</a></p>
+
+<h3>Contact Sheet <span class="tx-muted">contactsheet</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数のレイヤーをタイル状に並べる</td></tr>
+    <tr><td>使いどころ</td><td>一覧で確認するとき</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/contactsheet.html">公式リファレンス（英語）</a></p>
+
+<h2>7. チャンネル</h2>
+
+<h3>Channel Split <span class="tx-muted">channelsplit</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>RGBA を別々のレイヤーに分ける</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/channelsplit.html">公式リファレンス（英語）</a></p>
+
+<h3>Channel Join <span class="tx-muted">channeljoin</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>別々のレイヤーを1つにまとめる</td></tr>
+    <tr><td>使いどころ</td><td><strong>チャンネルパッキング。</strong>粗さ・金属・AO を RGB に詰める</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/channeljoin.html">公式リファレンス（英語）</a></p>
+
+<h3>Channel Swap <span class="tx-muted">channelswap</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>チャンネルを入れ替える</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/channelswap.html">公式リファレンス（英語）</a></p>
+
+<h3>Mono <span class="tx-muted">mono</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>モノクロにする</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/mono.html">公式リファレンス（英語）</a></p>
+
+<h2>8. PBR マップを作る・焼く</h2>
+
+<p>ここが Copernicus をゲームアセットに使う理由です。</p>
+
+<h3>Bake Geometry Textures <span class="tx-muted">bakegeometrytextures::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ハイポリからローポリへ、法線・AO・曲率などを焼く</td></tr>
+    <tr><td>使いどころ</td><td>ゲームアセットの仕上げ</td></tr>
+    <tr><td>入力</td><td>0〜5</td></tr>
+    <tr><td>要のパラメータ</td><td><code>bakenormal</code> — 法線を焼く（既定 <code>True</code>）<br><code>bakeocclusion</code> — AO を焼く（既定 <code>True</code>）<br><code>bakecurvature</code> — 曲率を焼く（既定 <code>False</code>）<br><code>bakecavity</code> — 窪みを焼く（既定 <code>False</code>）<br><code>bounds</code> — ケージ（探索範囲）。<strong>近すぎると欠け、遠すぎると混ざる</strong>（既定 <code>0</code>）</td></tr>
+    <tr><td>注意</td><td><strong>接空間法線が真っ黒になるときは接線の設定を疑ってください。</strong>既定の接線の作り方によっては、焼いた法線がゼロになります（実測で踏みました）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/bakegeometrytextures-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Height to Normal <span class="tx-muted">heighttonormal</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>高さマップから法線マップを作る</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>scale</code> — 起伏の強さ（既定 <code>1</code>）<br><code>normaltype</code> — 法線の種類（接空間／ワールド）（既定 <code>1</code>）<br><code>kernel</code> — 傾きの取り方（既定 <code>1</code>）</td></tr>
+    <tr><td>注意</td><td><strong>出てくる法線の Y の向きに注意。</strong>OpenGL 版（Y+）と DirectX 版（Y-）があり、エンジンによって求めるものが違います。次の <code>convertnormal</code> で揃えます。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/heighttonormal.html">公式リファレンス（英語）</a></p>
+
+<h3>Convert Normal <span class="tx-muted">convertnormal</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>法線マップの流儀を変換する</td></tr>
+    <tr><td>使いどころ</td><td><strong>OpenGL ↔ DirectX の変換。</strong>Y を反転するかどうか</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>conversion</code> — 変換の種類（既定 <code>0</code>）<br><code>normalize</code> — 正規化する（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/convertnormal.html">公式リファレンス（英語）</a></p>
+
+<h3>Normal to Height <span class="tx-muted">normaltoheight</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>法線マップから高さを復元する</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/normaltoheight.html">公式リファレンス（英語）</a></p>
+
+<h3>Height to Ambient Occlusion <span class="tx-muted">heighttoambientocclusion</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>高さマップから AO を作る</td></tr>
+    <tr><td>使いどころ</td><td>焼かずに AO がほしいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/heighttoambientocclusion.html">公式リファレンス（英語）</a></p>
+
+<h3>Curvature <span class="tx-muted">curvature</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>曲率を計算する</td></tr>
+    <tr><td>使いどころ</td><td><strong>角の塗装剥げ、窪みの汚れ。</strong>エッジ検出よりも物理的</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>curvaturetype</code> — 曲率の種類（既定 <code>1</code>）<br><code>outputtype</code> — 出力のしかた（既定 <code>0</code>）<br><code>normalize</code> — 正規化する（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/curvature.html">公式リファレンス（英語）</a></p>
+
+<h3>Position Map <span class="tx-muted">posmap</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>位置をマップに焼く</td></tr>
+    <tr><td>使いどころ</td><td>ワールド座標を後段で使いたいとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/posmap.html">公式リファレンス（英語）</a></p>
+
+<h3>UDIM Pack <span class="tx-muted">udimpack</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数の UDIM タイルをまとめる</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/udimpack.html">公式リファレンス（英語）</a></p>
+
+<h3>Match UDIM <span class="tx-muted">matchudim</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>UDIM タイルの並びを合わせる</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/matchudim.html">公式リファレンス（英語）</a></p>
+
+<h2>9. ジオメトリとの行き来</h2>
+
+<h3>Geometry to Layer <span class="tx-muted">geotolayer::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリをレイヤーに変換する</td></tr>
+    <tr><td>使いどころ</td><td>SOP で作ったものを画像として扱うとき</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/geotolayer-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Layer to Geometry <span class="tx-muted">layertogeo::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レイヤーをジオメトリに変換する</td></tr>
+    <tr><td>使いどころ</td><td>画像の値を点属性として SOP に戻すとき</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/layertogeo-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Rasterize Curves <span class="tx-muted">rasterizecurves</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>カーブを画像に焼く</td></tr>
+    <tr><td>使いどころ</td><td>線で描いた模様をテクスチャにする</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/rasterizecurves.html">公式リファレンス（英語）</a></p>
+
+<h3>Layer from Curves <span class="tx-muted">layerfromcurves</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>カーブからレイヤーを作る</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/layerfromcurves.html">公式リファレンス（英語）</a></p>
+
+<h2>10. プログラムで書く</h2>
+
+<h3>Wrangle <span class="tx-muted">wrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ピクセルごとに VEX を書く</td></tr>
+    <tr><td>使いどころ</td><td>ノードで組むと面倒な計算</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+    <tr><td>要のパラメータ</td><td><code>vexsnippet</code> — VEX のコード</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/wrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>OpenCL <span class="tx-muted">opencl</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>OpenCL のカーネルを書く</td></tr>
+    <tr><td>使いどころ</td><td>重い処理を GPU で回すとき</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/opencl.html">公式リファレンス（英語）</a></p>
+
+<h3>Function <span class="tx-muted">function</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>処理をまとめて関数として再利用する</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/function.html">公式リファレンス（英語）</a></p>
+
+<h3>Switch <span class="tx-muted">switch</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>入力を選ぶ</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/switch.html">公式リファレンス（英語）</a></p>
+
+<h3>Camera <span class="tx-muted">camera</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>COP の中でカメラを定義する</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/camera.html">公式リファレンス（英語）</a></p>
+
+<h3>Lens Distort <span class="tx-muted">lensdistort</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レンズ歪みを付ける／取り除く</td></tr>
+    <tr><td>入力</td><td>1〜12</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/lensdistort.html">公式リファレンス（英語）</a></p>
+
+<h3>Vignette <span class="tx-muted">vignette</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>周辺光量落ちを付ける</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/cop/vignette.html">公式リファレンス（英語）</a></p>
+
+
+<h2>詰まりやすいところ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず見るところ</th></tr></thead>
+  <tbody>
+    <tr><td>書き出した画像の明るさがおかしい</td>
+        <td><code>rop_image</code> の <code>colorconversion</code>。
+        リニアで出したいものは <code>raw</code></td></tr>
+    <tr><td>タイルの継ぎ目が出る</td>
+        <td>ノイズ側の <code>dotiled</code>。生成の段で決める</td></tr>
+    <tr><td>タイルの繰り返しが目立つ</td>
+        <td><code>hextile</code>、または <code>uvxform</code> でタイル数を上げて模様を小さく見せる</td></tr>
+    <tr><td>法線マップの凹凸が逆</td>
+        <td><code>convertnormal</code> で Y を反転（OpenGL ↔ DirectX）</td></tr>
+    <tr><td>焼いた法線が真っ黒</td>
+        <td>接線の設定。<code>bakegeometrytextures</code> の既定を疑う</td></tr>
+    <tr><td>合成すると縁が黒く縁取られる</td>
+        <td><code>premult</code>。アルファの掛かり方が食い違っている</td></tr>
+    <tr><td>数値は合っているのに見た目が違う</td>
+        <td><strong>等倍で縁をまたいでクロップして目視する。</strong>
+        統計値だけでは継ぎ目を見逃します</td></tr>
+  </tbody>
+</table></div>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/copernicus/index.html">Copernicus (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/cop/index.html">COP nodes</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/cop/bakegeometrytextures.html">Texture baking</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/cop/rop_image.html">ROP Image Output COP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/cop/fractalnoise.html">Fractal Noise COP</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

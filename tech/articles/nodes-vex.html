@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VEX — よく使う関数と、行列まわりの実例 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="wrangle 系ノードの使い分けから、アトリビュートの読み書き・数学・乱数・ベクトル・行列と回転まで。よく使う VEX 関数を用途別にまとめ、行列操作は動くサンプルを添えました。関数名は Houdini 22.0.368 の同梱ヘルプと照合済みです。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>VEX — よく使う関数と、行列まわりの実例</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/vex/index.html">VEX (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/vex/functions/index.html">VEX functions</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/sop/attribwrangle.html">Attribute Wrangle SOP</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>wrangle 系ノードの<strong>使い分け</strong>（どこで走るか）</li><li><code>@</code> 記法と、型を明示しないと壊れる話</li><li>よく使う関数を<strong>用途別</strong>に（数学・乱数・ベクトル・近傍・ボリューム・グループ）</li><li><strong>行列と回転</strong>は動くサンプル付きで</li><li>覚えておくと便利な短い書き方</li></ul>
+
+
+<h2>VEX は「1要素につき1回」走る</h2>
+
+<p>VEX のコードは、点なら点ごと、プリムならプリムごとに<strong>独立して1回ずつ</strong>走ります。
+for ループを書かなくていいのはそのためです。</p>
+
+<p>何を単位にするかは wrangle ノードの <strong>Run Over</strong>（内部名 <code>class</code>）で決めます。
+ここを間違えると「動いているのに何も起きない」になります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Run Over</th><th><code>class</code> の値</th><th>1回ぶんの単位</th></tr></thead>
+  <tbody>
+    <tr><td>Detail (only once)</td><td>0</td><td>ジオメトリ全体で1回だけ</td></tr>
+    <tr><td>Primitives</td><td>1</td><td>プリムごと</td></tr>
+    <tr><td>Points</td><td>2</td><td>点ごと（既定）</td></tr>
+    <tr><td>Vertices</td><td><strong>3</strong></td><td>頂点ごと</td></tr>
+    <tr><td>Numbers</td><td>4</td><td>指定した回数だけ</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted"><strong>Vertices は 3 です。</strong>
+「Detail / Prim / Point」の並びから 2 と思いこみやすいのですが、
+スクリプトから <code>class</code> を設定するときにここを外すと静かに別の単位で走ります（実測で踏みました）。</p>
+
+<h2>使える変数</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>変数</th><th>中身</th></tr></thead>
+  <tbody>
+    <tr><td><code>@ptnum</code> / <code>@primnum</code> / <code>@vtxnum</code></td><td>今の要素の番号</td></tr>
+    <tr><td><code>@numpt</code> / <code>@numprim</code> / <code>@numvtx</code></td><td>総数</td></tr>
+    <tr><td><code>@P</code></td><td>位置（vector）</td></tr>
+    <tr><td><code>@N</code> / <code>@v</code> / <code>@Cd</code></td><td>法線 / 速度 / 色</td></tr>
+    <tr><td><code>@pscale</code> / <code>@id</code> / <code>@age</code></td><td>大きさ / 識別子 / 年齢</td></tr>
+    <tr><td><code>@Time</code> / <code>@Frame</code> / <code>@TimeInc</code></td><td>時間 / フレーム / 1フレームの秒数</td></tr>
+    <tr><td><code>@elemnum</code> / <code>@numelem</code></td><td>単位によらない番号と総数</td></tr>
+    <tr><td><code>@ix</code> / <code>@iy</code> / <code>@iz</code></td><td>ボリュームのボクセル添字（Volume Wrangle）</td></tr>
+  </tbody>
+</table></div>
+
+<h2><code>@</code> は型を明示する</h2>
+
+<p>既存のアトリビュートを読むだけなら <code>@name</code> でよいのですが、
+<strong>新しく作るときは型を書かないと float になります。</strong></p>
+
+<pre><code>v@up      = {0, 1, 0};   // vector（3成分）
+f@mass    = 1.5;         // float
+i@piece   = 3;           // int
+s@name    = "rock";      // string
+p@orient  = {0,0,0,1};   // vector4（クォータニオン）
+4@xform   = ident();     // matrix（4x4）
+3@rot     = ident();     // matrix3（3x3）
+2@uv      = {0.5, 0.5};  // vector2
+f[]@radii = {1, 2, 3};   // 配列</code></pre>
+
+<p><code>v@up</code> と書くべきところを <code>@up</code> と書くと、
+<strong>float の up が作られて、後段が読めずに 0 になります。</strong>エラーは出ません。</p>
+
+
+<h2>1. VEX を書く場所（wrangle 系ノード）</h2>
+
+<p>どれも「VEX スニペットを走らせる」だけのノードですが、<strong>走る文脈が違います</strong>。</p>
+
+<h3>Attribute Wrangle <span class="tx-muted">attribwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリのアトリビュートを VEX で書き換える。<strong>SOP の主力</strong></td></tr>
+    <tr><td>使いどころ</td><td>点・プリム・頂点・detail のどれでも。迷ったらこれ</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>class</code> — Run Over。<strong>Vertices は 3</strong>（既定 <code>2</code>）<br><code>snippet</code> — VEX のコード本体<br><code>group</code> — 対象を絞る<br><code>vex_updatenmls</code> — 位置を動かしたら法線も作り直す（既定 <code>False</code>）</td></tr>
+    <tr><td>注意</td><td><strong>入力は 0 番だけが出力されます。</strong>入力1・2 に別のジオメトリを差して <code>@inputnum</code> で分けたつもりでも、<strong>入力1側はシーンに出てきません</strong>（実測で踏みました）。種類ごとに wrangle を分けて <code>merge</code> するのが正解です。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/attribwrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Point Wrangle <span class="tx-muted">pointwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>点専用の Attribute Wrangle（<code>class</code> が Points 固定のプリセット）</td></tr>
+    <tr><td>使いどころ</td><td>点だけを触ると分かっているとき</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/pointwrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Volume Wrangle <span class="tx-muted">volumewrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ボクセル1つずつに VEX を走らせる</td></tr>
+    <tr><td>使いどころ</td><td>ボリュームの値を場所ごとに書き換える</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>group</code> — 対象のボリューム名<br><code>bindeach</code> — 複数ボリュームを1本ずつ別々に処理する（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p><strong>ボリューム名がそのまま変数名</strong>になります（<code>density</code> という名前なら <code>@density</code>）。位置は <code>@P</code>、ボクセルの添字は <code>@ix</code> / <code>@iy</code> / <code>@iz</code> です。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/volumewrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Deformation Wrangle <span class="tx-muted">deformationwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリを変形させる用の wrangle</td></tr>
+    <tr><td>使いどころ</td><td>位置を動かすことが目的のとき</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/deformationwrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>POP Wrangle <span class="tx-muted">popwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>パーティクル1粒ずつに VEX を走らせる</td></tr>
+    <tr><td>使いどころ</td><td>POP ネットワークの中。<strong>1粒ごとの挙動はだいたいこれで足りる</strong></td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/popwrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Geometry Wrangle <span class="tx-muted">geometrywrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中のジオメトリに VEX を走らせる</td></tr>
+    <tr><td>使いどころ</td><td>シミュレーション中のジオメトリを直接触るとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/geometrywrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Gas Field Wrangle <span class="tx-muted">gasfieldwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP のフィールドに CVEX を走らせる</td></tr>
+    <tr><td>使いどころ</td><td>Pyro / FLIP の速度場や密度場を自分で書き換えるとき</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/gasfieldwrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Attribute Wrangle (LOP) <span class="tx-muted">attribwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>USD のプリムのアトリビュートを VEX で作る・編集する</td></tr>
+    <tr><td>使いどころ</td><td>Solaris で属性をまとめて書き換えるとき</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/lop/attribwrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Channel Wrangle <span class="tx-muted">channelwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>チャンネル（時系列データ）を VEX で書き換える</td></tr>
+    <tr><td>使いどころ</td><td>アニメーションカーブを式で加工するとき</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/chop/channelwrangle.html">公式リファレンス（英語）</a></p>
+
+<h3>Snippet (VOP) <span class="tx-muted">snippet</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>VOP ネットワークの中に VEX を1枚差し込む</td></tr>
+    <tr><td>使いどころ</td><td>VOP で組んでいる途中、ノードで書くと面倒な計算だけ VEX にしたいとき</td></tr>
+    <tr><td>入力</td><td>0〜2048</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/vop/snippet.html">公式リファレンス（英語）</a></p>
+
+<h3>Rig Attribute Wrangle <span class="tx-muted">kinefx::rigattribwrangle</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>KineFX のリグ（スケルトン）の変換アトリビュートを VEX で触る</td></tr>
+    <tr><td>使いどころ</td><td>ジョイントの位置・回転を式で操作するとき</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/kinefx-rigattribwrangle.html">公式リファレンス（英語）</a></p>
+
+<h2>2. パラメータを引く</h2>
+
+<p>ノードのパラメータや、ほかのノードの値を VEX から読みます。<strong>CTRL に値を集める作り方はこれで成り立っています。</strong></p>
+
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>chf("name")</code></td><td>float を引く。<strong>そのノードに無い名前なら、Create Spare Parameters で作れる</strong></td></tr><tr><td><code>chi("name")</code></td><td>int を引く</td></tr><tr><td><code>chv("name")</code></td><td>vector を引く</td></tr><tr><td><code>chs("name")</code></td><td>string を引く</td></tr><tr><td><code>chp("name")</code></td><td>vector4 を引く</td></tr><tr><td><code>ch("../CTRL/size")</code></td><td>パスで他ノードのパラメータを引く。<strong>相対パスが書ける</strong></td></tr><tr><td><code>chramp("ramp", pos)</code></td><td>ランプパラメータを位置 0〜1 で評価する</td></tr></tbody></table></div>
+<p><code>chf("radius")</code> と書いてからノードの <strong>Create Spare Parameters</strong> を押すと、その名前のパラメータが自動で生えます。CTRL に集める作りはこの往復で作ります。</p>
+<pre><code>// CTRL の値を引いて使う。ノードには値を直に書かない
+float r    = chf("../CTRL/radius");
+int   seed = chi("../CTRL/seed");
+vector up  = chv("../CTRL/up");
+
+@P += up * r * rand(@ptnum + seed);</code></pre>
+
+<h2>3. ジオメトリを読む</h2>
+
+<p><strong>別の入力や別のノードから値を持ってくる</strong>のがここです。第1引数の <code>0</code> <code>1</code> <code>2</code> は入力の番号、文字列ならノードのパスです。</p>
+
+<h3>アトリビュートを読む</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>point(0, "P", i)</code></td><td>入力0の点 i の <code>P</code> を読む</td></tr><tr><td><code>prim(0, "name", i)</code></td><td>プリム i の属性を読む</td></tr><tr><td><code>vertex(0, "uv", i)</code></td><td>頂点 i の属性を読む</td></tr><tr><td><code>detail(0, "count", 0)</code></td><td>detail 属性を読む</td></tr><tr><td><code>pointattrib(0, "Cd", i, ok)</code></td><td>読めたかどうかも受け取る（<code>ok</code> に 0/1 が入る）</td></tr><tr><td><code>primattrib(0, "Cd", i, ok)</code></td><td>同上のプリム版</td></tr><tr><td><code>haspointattrib(0, "Cd")</code></td><td>その属性があるか</td></tr><tr><td><code>hasprimattrib(0, "name")</code></td><td>プリム版</td></tr><tr><td><code>hasdetailattrib(0, "count")</code></td><td>detail 版</td></tr><tr><td><code>npoints(0)</code></td><td>点の数</td></tr><tr><td><code>nprimitives(0)</code></td><td>プリムの数</td></tr><tr><td><code>primpoints(0, i)</code></td><td>プリム i を構成する点番号の配列</td></tr><tr><td><code>pointprims(0, i)</code></td><td>点 i が属するプリム番号の配列</td></tr><tr><td><code>primuv(0, "P", prim, uv)</code></td><td>プリム上の<strong>任意の位置</strong>で属性を補間して読む</td></tr></tbody></table></div>
+<p><strong>属性が無いときは黙って 0 が返ります。</strong>「値が全部 0 になる」ときは、まず <code>haspointattrib()</code> で存在を確かめてください。</p>
+
+<h3>書く</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>setpointattrib(0, "Cd", i, v)</code></td><td>点 i に書く。<strong>detail 実行のときによく使う</strong></td></tr><tr><td><code>setprimattrib(0, "name", i, s)</code></td><td>プリムに書く</td></tr><tr><td><code>setdetailattrib(0, "count", n)</code></td><td>detail に書く</td></tr><tr><td><code>setattrib(0, "point", "Cd", i, -1, v)</code></td><td>汎用。書き込み方（set/add/max…）も選べる</td></tr></tbody></table></div>
+<p><strong>書き込み先の <code>0</code> は「自分の出力」です。</strong>入力を書き換えているわけではありません。</p>
+<pre><code>// detail で1回だけ走らせて、全部の点に書く
+int n = npoints(0);
+for (int i = 0; i &lt; n; i++) {
+    vector p = point(0, "P", i);
+    setpointattrib(0, "Cd", i, set(p.y, 0, 1 - p.y));
+}</code></pre>
+
+<h3>作る・消す</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>addpoint(0, pos)</code></td><td>点を足す。戻り値が新しい点番号</td></tr><tr><td><code>addprim(0, "polyline", a, b)</code></td><td>プリムを足す</td></tr><tr><td><code>addvertex(0, prim, pt)</code></td><td>プリムに頂点を足す</td></tr><tr><td><code>removepoint(0, i)</code></td><td>点を消す</td></tr><tr><td><code>removeprim(0, i, 1)</code></td><td>プリムを消す（第3引数が1なら点も一緒に）</td></tr></tbody></table></div>
+<pre><code>// 各点から法線方向に線を1本ずつ生やす
+int a = addpoint(0, @P);
+int b = addpoint(0, @P + @N * chf("len"));
+int l = addprim(0, "polyline", a, b);</code></pre>
+
+<h2>4. 数学 — 値をならす・範囲を移す</h2>
+
+<p><strong>いちばん出番が多いのはここ</strong>です。ノイズや距離を「使える範囲」に押し込む道具が揃っています。</p>
+
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>fit(x, omin, omax, nmin, nmax)</code></td><td>範囲を移し替える。<strong>範囲外はクランプされる</strong></td></tr><tr><td><code>fit01(x, nmin, nmax)</code></td><td>0〜1 を新しい範囲へ。<code>rand()</code> の後にほぼ必ず使う</td></tr><tr><td><code>fit11(x, nmin, nmax)</code></td><td>-1〜1 を新しい範囲へ。<strong>ノイズの後はこちら</strong></td></tr><tr><td><code>efit(x, omin, omax, nmin, nmax)</code></td><td><code>fit</code> のクランプなし版</td></tr><tr><td><code>clamp(x, lo, hi)</code></td><td>範囲で止める</td></tr><tr><td><code>lerp(a, b, t)</code></td><td>線形補間</td></tr><tr><td><code>smooth(lo, hi, x)</code></td><td>0→1 のなめらかな立ち上がり（S字）。<strong><code>smoothstep</code> という名前は無い</strong></td></tr><tr><td><code>abs(x)</code></td><td>絶対値</td></tr><tr><td><code>sign(x)</code></td><td>符号（-1 / 0 / 1）</td></tr><tr><td><code>min(a, b)</code></td><td>小さいほう</td></tr><tr><td><code>max(a, b)</code></td><td>大きいほう</td></tr><tr><td><code>floor(x)</code></td><td>切り捨て</td></tr><tr><td><code>ceil(x)</code></td><td>切り上げ</td></tr><tr><td><code>rint(x)</code></td><td>四捨五入。<strong><code>round</code> という関数は無い</strong></td></tr><tr><td><code>frac(x)</code></td><td>小数部だけ</td></tr><tr><td><code>pow(x, n)</code></td><td>べき乗</td></tr><tr><td><code>sqrt(x)</code></td><td>平方根</td></tr><tr><td><code>exp(x)</code></td><td>指数</td></tr><tr><td><code>log(x)</code></td><td>自然対数</td></tr><tr><td><code>sin(x)</code></td><td>サイン。<strong>引数はラジアン</strong></td></tr><tr><td><code>cos(x)</code></td><td>コサイン</td></tr><tr><td><code>atan2(y, x)</code></td><td>2引数のアークタンジェント。<strong>角度を出すならこれ</strong></td></tr><tr><td><code>radians(deg)</code></td><td>度 → ラジアン</td></tr><tr><td><code>degrees(rad)</code></td><td>ラジアン → 度</td></tr><tr><td><code>sum(arr)</code></td><td>配列の合計</td></tr><tr><td><code>avg(arr)</code></td><td>配列の平均</td></tr></tbody></table></div>
+<p><strong><code>round</code> は無い</strong>ので <code>rint()</code> を使います。<strong><code>fmod</code> も無い</strong>ので剰余は <code>%</code> 演算子（float でも使えます）。</p>
+<pre><code>// 高さでグラデーションを作る典型
+float h = fit(@P.y, 0, 2, 0, 1);      // 0〜2m を 0〜1 に
+h = smooth(0.2, 0.8, h);              // 端をなめらかに
+@Cd = lerp({0.2,0.1,0.05}, {0.6,0.9,0.4}, h);
+
+// 角度で分ける
+float ang = degrees(atan2(@P.z, @P.x));   // -180〜180
+i@side = ang &gt; 0 ? 1 : 0;</code></pre>
+
+<h2>5. 乱数とノイズ</h2>
+
+<p><strong>同じ入力なら必ず同じ結果</strong>が返ります（疑似乱数）。フレームが進んでもチラつかないのはこのためです。</p>
+
+<h3>乱数</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>rand(seed)</code></td><td>0〜1。<strong>seed には <code>@ptnum</code> や <code>@id</code> を入れる</strong></td></tr><tr><td><code>nrandom("twister")</code></td><td>呼ぶたびに違う値。順序に依存するので基本は使わない</td></tr><tr><td><code>random(pos)</code></td><td>位置を種にした乱数</td></tr></tbody></table></div>
+<p><strong>種を変えるときは足し算ではなく別の数を混ぜます。</strong><code>rand(@ptnum + 1)</code> は隣の点と同じ値になるので、<code>rand(@ptnum + seed * 7919)</code> のように素数を掛けるのが定石です。</p>
+<pre><code>int   sd = chi("seed");
+float f  = fit01(rand(@ptnum + sd * 7919), 0.6, 1.6);   // 0.6〜1.6 倍
+vector r = set(rand(@ptnum), rand(@ptnum + 101), rand(@ptnum + 337));</code></pre>
+
+<h3>ノイズ</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>noise(pos)</code></td><td>0〜1 のパーリンノイズ</td></tr><tr><td><code>onoise(pos)</code></td><td>-1〜1 の原点対称ノイズ。<strong>中心が 0 なので足し込みに向く</strong></td></tr><tr><td><code>snoise(pos)</code></td><td>スパースコンボリューションノイズ</td></tr><tr><td><code>vnoise(pos, period)</code></td><td>周期のあるノイズ（タイリングする）</td></tr><tr><td><code>anoise(pos)</code></td><td>エイリアスの少ないノイズ</td></tr><tr><td><code>pnoise(pos, period)</code></td><td>周期指定のパーリンノイズ</td></tr><tr><td><code>curlnoise(pos)</code></td><td><strong>発散のない</strong>ノイズ。渦を作るのに使う</td></tr><tr><td><code>flownoise(pos, t)</code></td><td>時間で流れるノイズ</td></tr></tbody></table></div>
+<p><strong><code>turb</code> という関数はありません。</strong>乱流（fBm）はオクターブを自分で重ねて作ります（下のサンプルの最後）。<strong>ノイズは引数の型で結果が変わります。</strong><code>noise(vector)</code> と <code>noise(vector4)</code> は別の関数で、4番目の成分を時間にすると「動くノイズ」になります。</p>
+<pre><code>// 表面をノイズで押し出す。振幅と周波数は必ず分けて持つ
+float amp  = chf("amp");
+float freq = chf("freq");
+float n = onoise(@P * freq);       // -1〜1
+@P += @N * n * amp;
+
+// 時間で動くノイズ（4成分目に時間を入れる）
+float n2 = onoise(set(@P.x, @P.y, @P.z, @Time * 0.5) * freq);
+
+// 渦を巻く速度場
+@v = curlnoise(@P * freq) * amp;
+
+// fBm（乱流）は自分で重ねる。周波数を2倍、振幅を半分にしながら足していく
+float n3 = 0, w = 1, f = freq;
+for (int i = 0; i &lt; 5; i++) {
+    n3 += onoise(@P * f) * w;
+    f *= 2.0;
+    w *= 0.5;
+}</code></pre>
+
+<h2>6. ベクトル</h2>
+
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>length(v)</code></td><td>長さ</td></tr><tr><td><code>length2(v)</code></td><td>長さの2乗。<strong>比較だけなら <code>sqrt</code> を省けて速い</strong></td></tr><tr><td><code>distance(a, b)</code></td><td>2点間の距離</td></tr><tr><td><code>distance2(a, b)</code></td><td>距離の2乗</td></tr><tr><td><code>normalize(v)</code></td><td>長さ1にする</td></tr><tr><td><code>dot(a, b)</code></td><td>内積。<strong>正規化してあれば cos(角度)</strong></td></tr><tr><td><code>cross(a, b)</code></td><td>外積。<strong>2つに垂直なベクトル</strong></td></tr><tr><td><code>reflect(i, n)</code></td><td>法線 n で反射させる</td></tr><tr><td><code>refract(i, n, eta)</code></td><td>屈折</td></tr><tr><td><code>set(x, y, z)</code></td><td>成分から vector を作る</td></tr><tr><td><code>getcomp(v, i)</code></td><td>i 番目の成分</td></tr><tr><td><code>setcomp(v, i, x)</code></td><td>i 番目の成分に代入</td></tr></tbody></table></div>
+<p><strong><code>set(vector, float)</code> は vector2 になります。</strong>vector4 を式の途中で作ろうとして 4 引数の <code>set()</code> を書くと「どの型か決まらない」と怒られるので、いったん変数に受けてください（実測）。</p>
+<pre><code>// 法線と上方向から接線の枠（TBN）を作る
+vector up = {0, 1, 0};
+vector t  = normalize(cross(up, @N));    // 接線
+vector b  = cross(@N, t);                // 従法線
+
+// 上を向いている面だけ色を付ける
+float d = dot(normalize(@N), up);        // 1 で真上、0 で横、-1 で真下
+@Cd = d &gt; 0.7 ? {1,1,1} : {0.2,0.2,0.2};
+
+// 距離の比較は length2 で足りる（sqrt を省ける）
+if (length2(@P - target) &lt; r * r) { ... }</code></pre>
+
+<h2>7. 行列と回転 — ここだけサンプル多め</h2>
+
+<p><strong>Houdini の行列は「行ベクトル × 行列」です。</strong><code>v * m</code> と書きます（<code>m * v</code> ではありません）。ここを逆にすると結果が転置されます。</p>
+
+<h3>作る・分解する</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>ident()</code></td><td>単位行列。<strong>行列は必ずこれで初期化してから積む</strong></td></tr><tr><td><code>maketransform(t, r, s)</code></td><td>移動・回転・スケールから行列を作る</td></tr><tr><td><code>instance(pos, dir, scale, up, rot)</code></td><td>点に置くためのインスタンス行列を作る</td></tr><tr><td><code>cracktransform(0, 0, c, pivot, m)</code></td><td>行列から移動(c=0)/回転(c=1)/スケール(c=2)を取り出す</td></tr><tr><td><code>invert(m)</code></td><td>逆行列</td></tr><tr><td><code>transpose(m)</code></td><td>転置</td></tr><tr><td><code>determinant(m)</code></td><td>行列式。<strong>負なら裏返っている</strong></td></tr><tr><td><code>polardecomp(m)</code></td><td>回転成分とスケール成分に分ける</td></tr></tbody></table></div>
+
+<h3>回す</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>rotate(m, angle, axis)</code></td><td>行列に回転を<strong>積む</strong>（引数の m が書き換わる）</td></tr><tr><td><code>prerotate(m, angle, axis)</code></td><td>回転を前から積む</td></tr><tr><td><code>scale(m, s)</code></td><td>スケールを積む</td></tr><tr><td><code>translate(m, t)</code></td><td>移動を積む</td></tr><tr><td><code>dihedral(a, b)</code></td><td><strong>ベクトル a を b に向ける回転</strong>を作る。向き合わせの定番</td></tr><tr><td><code>lookat(from, to, up)</code></td><td>from から to を見る回転行列</td></tr><tr><td><code>qrotate(q, v)</code></td><td>クォータニオンでベクトルを回す</td></tr><tr><td><code>quaternion(angle, axis)</code></td><td>軸と角度からクォータニオンを作る</td></tr><tr><td><code>quaternion(m)</code></td><td>行列からクォータニオンへ</td></tr><tr><td><code>qconvert(q)</code></td><td>クォータニオンから行列へ</td></tr><tr><td><code>qmultiply(a, b)</code></td><td>クォータニオンの合成</td></tr><tr><td><code>qinvert(q)</code></td><td>逆クォータニオン</td></tr><tr><td><code>slerp(a, b, t)</code></td><td>クォータニオンの補間。<strong>回転を混ぜるならこれ</strong></td></tr><tr><td><code>eulertoquaternion(r, order)</code></td><td>オイラー角からクォータニオン</td></tr><tr><td><code>quaterniontoeuler(q, order)</code></td><td>クォータニオンからオイラー角</td></tr></tbody></table></div>
+<p><strong>行列の行を取り出すのに <code>m[0]</code> は書けません。</strong><code>set(1,0,0) * m</code> のように単位ベクトルを掛けて取り出します（実測）。</p>
+
+<h3>サンプル1 — 点を軸まわりに回す</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>rotate(m, angle, axis)</code></td><td>上と同じ関数。ここでは実際の使い方</td></tr></tbody></table></div>
+<pre><code>// Y 軸まわりに、中心からの距離に応じてねじる
+float amount = chf("twist");        // 度
+vector pivot = {0, 0, 0};
+
+matrix3 m = ident();
+rotate(m, radians(amount) * @P.y, {0, 1, 0});
+
+@P = (@P - pivot) * m + pivot;      // **行ベクトル × 行列**
+@N = @N * m;                        // 法線も同じ行列で回す（移動は掛からない）</code></pre>
+
+<h3>サンプル2 — 向きを合わせる（dihedral）</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>dihedral(a, b)</code></td><td>a を b に向ける最短回転</td></tr></tbody></table></div>
+<pre><code>// 上向きに作ったカードを、点の法線の向きに寝かせる
+matrix3 m = dihedral({0, 1, 0}, normalize(@N));
+@P = @P * m;
+
+// copytopoints に渡すときは orient を作っておくと確実
+p@orient = quaternion(dihedral({0, 0, 1}, normalize(@v)));</code></pre>
+
+<h3>サンプル3 — 行列から成分を取り出す</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>cracktransform(0, 0, c, pivot, m)</code></td><td>0=移動 / 1=回転 / 2=スケール</td></tr></tbody></table></div>
+<pre><code>// パックプリムの変換から、位置・回転・スケールを取り出す
+matrix m = primintrinsic(0, "transform", @primnum);
+vector t = cracktransform(0, 0, 0, {0,0,0}, m);   // 移動
+vector r = cracktransform(0, 0, 1, {0,0,0}, m);   // 回転（度）
+vector s = cracktransform(0, 0, 2, {0,0,0}, m);   // スケール
+
+// 行を取り出す。**m[0] とは書けない**
+matrix3 m3 = matrix3(m);
+vector row_x = set(1, 0, 0) * m3;
+vector row_y = set(0, 1, 0) * m3;</code></pre>
+
+<h3>サンプル4 — 2つの回転を混ぜる</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>slerp(a, b, t)</code></td><td>クォータニオン同士の補間</td></tr></tbody></table></div>
+<pre><code>// 「今の向き」と「目標の向き」を少しずつ混ぜて追従させる
+vector4 cur  = quaternion(dihedral({0,1,0}, normalize(@N)));
+vector4 goal = quaternion(dihedral({0,1,0}, normalize(@v)));
+
+float t = chf("follow");            // 0 で今のまま、1 で目標
+p@orient = slerp(cur, goal, t);
+
+// 角度と軸から直接作ることもできる
+vector4 spin = quaternion(radians(45), {0, 1, 0});
+p@orient = qmultiply(p@orient, spin);</code></pre>
+
+<h3>サンプル5 — インスタンスの行列を自分で組む</h3>
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>instance(pos, dir, scale, up, rot)</code></td><td>1発でインスタンス行列を作る</td></tr></tbody></table></div>
+<pre><code>// copytopoints に頼らず、自分で置き場所の行列を作る
+vector pos   = @P;
+vector dir   = normalize(@v);            // 向ける方向
+vector scale = set(1, 1, 1) * @pscale;
+vector up    = {0, 1, 0};
+vector4 rot  = {0, 0, 0, 1};             // 追加の回転
+
+4@xform = instance(pos, dir, scale, up, rot);</code></pre>
+
+<h2>8. 近傍・空間検索</h2>
+
+<p><strong>「近くの点を探す」はここ</strong>です。パーティクルや散らしでよく使います。</p>
+
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>nearpoint(0, pos)</code></td><td>いちばん近い点の番号</td></tr><tr><td><code>nearpoints(0, pos, r)</code></td><td>半径 r 以内の点番号の配列</td></tr><tr><td><code>nearpoints(0, pos, r, n)</code></td><td>近い順に最大 n 個</td></tr><tr><td><code>xyzdist(0, pos)</code></td><td><strong>面までの最短距離</strong>。プリム番号と uv も受け取れる</td></tr><tr><td><code>primuv(0, "P", prim, uv)</code></td><td><code>xyzdist</code> で得た位置の属性を読む</td></tr><tr><td><code>minpos(0, pos)</code></td><td>いちばん近い面上の位置</td></tr><tr><td><code>neighbours(0, i)</code></td><td>点 i と辺で繋がっている点の配列</td></tr><tr><td><code>neighbourcount(0, i)</code></td><td>その数</td></tr><tr><td><code>pcopen(0, "P", pos, r, n)</code></td><td>点群検索を開く（古い書き方）</td></tr><tr><td><code>pcfilter(h, "Cd")</code></td><td>開いた検索の結果を平均で読む</td></tr><tr><td><code>intersect(0, orig, dir)</code></td><td>レイを飛ばして当たった位置を得る</td></tr></tbody></table></div>
+<p><strong><code>xyzdist</code> + <code>primuv</code> の組み合わせを覚えておくと応用が広いです。</strong>「相手の面のどこがいちばん近いか」を求めて、そこの属性を読む、という形。</p>
+<pre><code>// 相手のジオメトリ(入力1)の、いちばん近い面の色を持ってくる
+int   prim;
+vector uv;
+float d = xyzdist(1, @P, prim, uv);
+@Cd     = primuv(1, "Cd", prim, uv);
+f@dist  = d;
+
+// 半径内の隣人の平均位置に寄せる（かたまり感を作る）
+int pts[] = nearpoints(0, @P, 0.5);
+vector sum = 0;
+foreach (int p; pts) sum += point(0, "P", p);
+if (len(pts) &gt; 0) @P = lerp(@P, sum / len(pts), 0.3);</code></pre>
+
+<h2>9. ボリューム</h2>
+
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>volumesample(0, "density", pos)</code></td><td>位置での float 値を読む</td></tr><tr><td><code>volumesamplev(0, "vel", pos)</code></td><td>ベクトル値を読む</td></tr><tr><td><code>volumegradient(0, "density", pos)</code></td><td>勾配（濃くなる向き）</td></tr><tr><td><code>volumeindex(0, "density", idx)</code></td><td>ボクセル添字で読む</td></tr><tr><td><code>volumeindextopos(0, "density", idx)</code></td><td>添字 → 位置</td></tr><tr><td><code>volumepostoindex(0, "density", pos)</code></td><td>位置 → 添字</td></tr><tr><td><code>volumeres(0, "density")</code></td><td>解像度</td></tr></tbody></table></div>
+<pre><code>// 密度の濃いほうへ点を寄せる
+vector g = volumegradient(1, "density", @P);
+@P += normalize(g) * chf("step");
+
+// ボリュームの値で点を消す
+if (volumesample(1, "density", @P) &lt; 0.1) removepoint(0, @ptnum);</code></pre>
+
+<h2>10. グループ</h2>
+
+<div class="table-wrap"><table><thead><tr><th>関数</th><th>説明</th></tr></thead><tbody><tr><td><code>inpointgroup(0, "grp", i)</code></td><td>点 i がグループに入っているか</td></tr><tr><td><code>inprimgroup(0, "grp", i)</code></td><td>プリム版</td></tr><tr><td><code>setpointgroup(0, "grp", i, 1)</code></td><td>グループに入れる（0 で外す）</td></tr><tr><td><code>setprimgroup(0, "grp", i, 1)</code></td><td>プリム版</td></tr><tr><td><code>addgroup("point", "grp", i)</code></td><td>グループを作って入れる</td></tr><tr><td><code>removegroup("point", "grp", i)</code></td><td>外す</td></tr><tr><td><code>expandpointgroup(0, "grp")</code></td><td>グループの点番号を配列で取る</td></tr></tbody></table></div>
+<p><strong>グループの式に <code>&amp;&amp;</code> を書いても期待どおりに絞れません。</strong>条件は VEX で1つの属性にまとめてから、グループ側は <code>@rim&gt;0</code> の1条件で書くのが確実です（実測）。</p>
+<pre><code>// 条件をひとつの属性にまとめてから、グループは1条件で書く
+float d = dot(normalize(@N), {0,1,0});
+i@rim = (d &gt; 0.3 &amp;&amp; @P.y &gt; 0.5) ? 1 : 0;
+// → blast / group のフィールドには @rim&gt;0 とだけ書く</code></pre>
+
+<h2>11. 覚えておくと便利なもの</h2>
+
+
+<h3>短く書ける記法</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>書き方</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>@P.y</code></td><td>成分アクセス。<code>.x .y .z .w</code> と <code>.r .g .b .a</code> の両方が使える</td></tr>
+    <tr><td><code>vector v = 0;</code></td><td>全成分に 0 が入る（スカラーからの昇格）</td></tr>
+    <tr><td><code>@Cd = {1, 0, 0};</code></td><td>波括弧は<strong>定数</strong>のベクトル。変数は入れられない</td></tr>
+    <tr><td><code>set(a, b, c)</code></td><td>変数からベクトルを作るときはこちら</td></tr>
+    <tr><td><code>foreach (int p; pts)</code></td><td>配列を回す</td></tr>
+    <tr><td><code>len(arr)</code></td><td>配列の長さ（<code>length()</code> はベクトルの長さなので別物）</td></tr>
+    <tr><td><code>x % y</code></td><td>剰余。<strong>float でも使える。<code>fmod</code> という関数は無い</strong></td></tr>
+    <tr><td><code>cond ? a : b</code></td><td>三項演算子は使える（HScript には無い）</td></tr>
+  </tbody>
+</table></div>
+
+<h3>デバッグ</h3>
+
+<pre><code>// detail 実行にして1回だけ出す。点ごとに出すとログが埋まる
+if (@ptnum == 0) printf("P=%g  n=%d\n", @P, npoints(0));
+
+// 値を色にして目で見るのがいちばん早い
+@Cd = set(f@myvalue, 0, 0);           // 赤の濃さで確認
+@Cd = fit(f@myvalue, 0, 10, 0, 1);    // 範囲が分からないときは fit で潰す</code></pre>
+
+<h3>踏みやすい落とし穴</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>書いたもの</th><th>何が起きるか</th></tr></thead>
+  <tbody>
+    <tr><td><code>@up = {0,1,0};</code></td>
+        <td><strong>float の up ができる。</strong><code>v@up</code> と書く</td></tr>
+    <tr><td><code>m[0]</code> で行を取る</td>
+        <td>書けない。<code>set(1,0,0) * m</code> で取り出す</td></tr>
+    <tr><td><code>m * v</code></td>
+        <td>順序が逆。Houdini は <strong><code>v * m</code></strong></td></tr>
+    <tr><td><code>(@P)-(x)</code></td>
+        <td><strong>キャストと誤解釈される。</strong><code>@P - x</code> と素直に書く</td></tr>
+    <tr><td><code>set(a, b, c, d)</code></td>
+        <td>型が決まらずエラー。vector4 は変数に受けてから組む</td></tr>
+    <tr><td><code>detail("../meta", "iteration", 0)</code> を<br>for-each の外で読む</td>
+        <td><strong>全反復で 0 が返る。</strong>メタデータノードは<br><strong>入力で繋ぐ</strong>こと。エラーは出ない</td></tr>
+    <tr><td><code>rand(@ptnum + 1)</code></td>
+        <td>隣の点と同じ値になる。<code>+ seed * 7919</code> のように混ぜる</td></tr>
+  </tbody>
+</table></div>
+
+
+
+<h2>型の早見表</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>接頭辞</th><th>型</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><code>f@</code></td><td>float</td><td>質量・年齢・しきい値</td></tr>
+    <tr><td><code>i@</code></td><td>int</td><td>番号・フラグ・ピース</td></tr>
+    <tr><td><code>v@</code></td><td>vector</td><td>位置・法線・速度・色</td></tr>
+    <tr><td><code>p@</code></td><td>vector4</td><td><strong>クォータニオン（<code>orient</code>）</strong></td></tr>
+    <tr><td><code>2@</code></td><td>vector2</td><td>UV</td></tr>
+    <tr><td><code>3@</code></td><td>matrix3</td><td>回転・スケールだけの行列</td></tr>
+    <tr><td><code>4@</code></td><td>matrix</td><td>移動を含む 4x4</td></tr>
+    <tr><td><code>s@</code></td><td>string</td><td>名前・パス</td></tr>
+    <tr><td><code>u@</code></td><td>vector4</td><td>（<code>p@</code> と同じ4成分。用途で使い分ける）</td></tr>
+    <tr><td><code>f[]@</code></td><td>float の配列</td><td>可変長のデータ</td></tr>
+  </tbody>
+</table></div>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/vex/index.html">VEX (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/vex/functions/index.html">VEX functions</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/attribwrangle.html">Attribute Wrangle SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/vex/lang.html">VEX の型と演算子</a></li><li><a href="https://www.sidefx.com/docs/houdini/vex/snippets.html">Attribute の @ 記法</a></li><li><a href="https://www.sidefx.com/docs/houdini/vex/functions/index.html">Matrix functions</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

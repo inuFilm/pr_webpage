@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FLIP のノード — 3本の線を通す形を覚える | 技術メモ | makeinufilm</title>
+  <meta name="description" content="FLIP と白泡のノードを「器 / 解く / 面にする / 白泡 / 軽くする」に分けて、1ノードずつ用途と要のパラメータをまとめました。配線が3本1組になっている理由と、止めた境界が水を消す話も含みます。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>FLIP のノード — 3本の線を通す形を覚える</h1>
+        <p class="tech-meta">houdini-nodes / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/fluid/index.html">Fluids (Houdini 公式)</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipsolver.html">FLIP Solver SOP</a> /
+<a href="https://www.sidefx.com/docs/houdini/fluid/whitewater.html">Whitewater</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータ名は Houdini 22.0.368 の同梱ヘルプと実機で照合しています。</p>
+
+<h2>この記事で扱うこと</h2>
+<ul><li>FLIP の配線が<strong>3本1組</strong>になっている理由</li><li>器・発生・コリジョン・ソルバ・サーフェス・白泡を<strong>1ノードずつ</strong></li><li>止めた境界が<strong>水を消す</strong>話、泡の量を決めているパラメータ</li></ul>
+
+
+<h2>まず、FLIP は「3本の線」を通す</h2>
+
+<p>FLIP でいちばん最初につまずくのは配線です。
+<code>flipcontainer</code> の出力は<strong>3本</strong>あります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>本数</th><th>流れているもの</th><th>途中で挟むノード</th></tr></thead>
+  <tbody>
+    <tr><td>1本目</td><td>Sources（水を足すもの）</td><td><code>flipboundary</code></td></tr>
+    <tr><td>2本目</td><td>Container（解く領域そのもの）</td><td>—</td></tr>
+    <tr><td>3本目</td><td>Collisions（ぶつかるもの）</td><td><code>flipcollide</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>3本まとめて次のノードへ渡します。</strong>
+「水を足すノードだけソルバに繋ぐ」といった個別配線をすると、
+<code>Domain is missing resolution attributes</code> で止まります。
+線の途中に挟んでいく、と覚えるのが早いです。</p>
+
+<p>粒子（パーティクル）と速度場（ボリューム）の両方を同時に持っているのが FLIP の特徴で、
+そのせいで扱うデータが多く、線も太くなっています。</p>
+
+
+<h2>1. 器と水を用意する</h2>
+
+<p>解く範囲を決め、そこに水と障害物を入れる段です。</p>
+
+<h3>FLIP Container <span class="tx-muted">flipcontainer</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>液体を解く領域（ドメイン）を作る。<strong>3本の線はここから出る</strong></td></tr>
+    <tr><td>使いどころ</td><td>FLIP を組むときの起点</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>gridscale</code> — ボクセルの大きさを粒子間隔の何倍にするか（既定 <code>2</code>）<br><code>particlesep</code> — 粒子の間隔。<strong>細かさと重さを決める主役</strong>（既定 <code>0.1</code>）<br><code>gravity</code> — 重力（既定 <code>9.80665</code>）<br><code>density</code> — 液体の密度（既定 <code>1000</code>）<br><code>default_viscosity</code> — 粘り気の値（既定 <code>0</code>）</td></tr>
+    <tr><td>注意</td><td><strong><code>viscosity</code> は「粘りを有効にする」チェックボックスで、値は <code>default_viscosity</code> のほうです。</strong>ラベルと名前が食い違っているので、<code>viscosity</code> に値を繋ぐと常に 0 のまま効きません（実測で踏みました）。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipcontainer.html">公式リファレンス（英語）</a></p>
+
+<h3>FLIP Source <span class="tx-muted">flipsource</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>形から、水を湧かせるための VDB（サーフェス／密度）を作る</td></tr>
+    <tr><td>使いどころ</td><td>「ここから水が出る」を決めるとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>initialize</code> — 使い道のプリセット（既定 <code>0</code>）<br><code>particlesep</code> — 粒子間隔。<strong>コンテナと揃える</strong>（既定 <code>0.1</code>）<br><code>createparticles</code> — 粒子も一緒に作る（既定 <code>True</code>）<br><code>velocity</code> — 湧く水に与える初速（既定 <code>0.0 0.0 0.0</code>）<br><code>voxelsize</code> — 作る VDB のボクセルサイズ（既定 <code>0.1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipsource.html">公式リファレンス（英語）</a></p>
+
+<h3>FLIP Boundary <span class="tx-muted">flipboundary</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>領域の境界で、水を足す／消す／圧力を与える</td></tr>
+    <tr><td>使いどころ</td><td>水を湧かせ続ける、または領域の端で水を捨てる</td></tr>
+    <tr><td>入力</td><td>3〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>boundarytype</code> — 境界の種類（既定 <code>0</code>）<br><code>activate</code> — 有効にするフレームの条件（既定 <code>1</code>）<br><code>velocity</code> — 境界で与える速度（既定 <code>0.0 0.0 0.0</code>）<br><code>pressure</code> — 圧力を与える（既定 <code>1</code>）</td></tr>
+    <tr><td>注意</td><td><strong>止めた <code>flipboundary</code> は「穴」になります。</strong>1フレーム目だけ湧かせるつもりで <code>activate</code> を切ったら、領域内の水が 12,890 → 1,924 粒に減りました（実測）。出しっぱなしにして、水が残らない場所でだけ止めるのが安全です。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipboundary.html">公式リファレンス（英語）</a></p>
+
+<h3>FLIP Collide <span class="tx-muted">flipcollide</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ジオメトリやボリュームを、液体がぶつかる障害物に変換する</td></tr>
+    <tr><td>使いどころ</td><td>器・地面・キャラクターに水を当てるとき</td></tr>
+    <tr><td>入力</td><td>3〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>dosurface</code> — サーフェスを衝突に使う（既定 <code>True</code>）<br><code>dovolume</code> — ボリュームを衝突に使う（既定 <code>True</code>）<br><code>computevel</code> — 障害物の速度を計算して水に伝える（既定 <code>True</code>）<br><code>velscale</code> — 伝える速度の倍率（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipcollide.html">公式リファレンス（英語）</a></p>
+
+<h3>Particle Fluid Tank <span class="tx-muted">particlefluidtank</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>直方体を粒子で満たす。プールの水をそのまま作る</td></tr>
+    <tr><td>使いどころ</td><td>最初から水が張ってある状態を作りたいとき</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+    <tr><td>要のパラメータ</td><td><code>size</code> — タンクの大きさ（既定 <code>5.0 5.0 5.0</code>）<br><code>particlesep</code> — 粒子間隔（既定 <code>0.25</code>）<br><code>waterlevel</code> — 水面の高さ（既定 <code>0</code>）<br><code>relaxiterations</code> — 粒子をならす回数。格子状の並びを崩す（既定 <code>10</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/particlefluidtank.html">公式リファレンス（英語）</a></p>
+
+<h2>2. 解く</h2>
+
+<h3>FLIP Solver (SOP) <span class="tx-muted">flipsolver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>液体を解く。SOP だけで完結する現行のやり方</td></tr>
+    <tr><td>使いどころ</td><td>3本の線を通した先に置く本体</td></tr>
+    <tr><td>入力</td><td>3〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>collision</code> — 衝突の扱い（既定 <code>1</code>）<br><code>donarrowband</code> — 粒子を水面付近だけに持つ。<strong>大量に軽くなる</strong>（既定 <code>True</code>）<br><code>doreseeding</code> — 粒子が足りない／多すぎる場所で足す・間引く（既定 <code>True</code>）<br><code>dodroplets</code> — 飛沫を別扱いにする（既定 <code>False</code>）<br><code>cacheenabled</code> — メモリキャッシュ（既定 <code>True</code>）</td></tr>
+    <tr><td>注意</td><td>重い処理なので、まず <code>particlesep</code> を粗くして形だけ見ます。細かくするのは動きが決まってからです。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipsolver.html">公式リファレンス（英語）</a></p>
+
+<h3>FLIP Solver (DOP) <span class="tx-muted">flipsolver::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中に置く FLIP ソルバ本体</td></tr>
+    <tr><td>使いどころ</td><td>SOP 版で届かないところを触りたいとき</td></tr>
+    <tr><td>入力</td><td>0〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/flipsolver-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>FLIP Object <span class="tx-muted">flipobject</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中で「液体のオブジェクト」を定義する</td></tr>
+    <tr><td>使いどころ</td><td>DOP で自分で組むとき</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/flipobject.html">公式リファレンス（英語）</a></p>
+
+<h3>FLIP Volume Combine <span class="tx-muted">flipvolumecombine</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>解像度の違う FLIP のフィールドをまとめる</td></tr>
+    <tr><td>使いどころ</td><td>サーフェス用と速度用で解像度を変えているとき</td></tr>
+    <tr><td>入力</td><td>3〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>field_surfaceres</code> — サーフェスの解像度（既定 <code>1</code>）<br><code>field_velres</code> — 速度場の解像度（既定 <code>0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipvolumecombine.html">公式リファレンス（英語）</a></p>
+
+<h3>FLIP Modify Volume <span class="tx-muted">flipmodifyvolume</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>FLIP のボリュームを属性や別ボリュームで書き換える</td></tr>
+    <tr><td>使いどころ</td><td>特定の場所だけ水を消す・足すなどの細工</td></tr>
+    <tr><td>入力</td><td>0〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>mode</code> — 書き換え方（既定 <code>0</code>）<br><code>attributename</code> — 使う属性の名前（既定 <code>v</code>）<br><code>gradient_dir</code> — 勾配の向き（既定 <code>0.0 1.0 0.0</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipmodifyvolume.html">公式リファレンス（英語）</a></p>
+
+<h2>3. 面にする</h2>
+
+<p>粒子のままでは絵になりません。<strong>見た目はこの段でほぼ決まります。</strong></p>
+
+<h3>Particle Fluid Surface <span class="tx-muted">particlefluidsurface</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>粒子群からポリゴンの水面を作る</td></tr>
+    <tr><td>使いどころ</td><td>FLIP の出力をレンダーできる形にする、標準の出口</td></tr>
+    <tr><td>入力</td><td>1〜2</td></tr>
+    <tr><td>要のパラメータ</td><td><code>method</code> — 作り方（平均位置・球の合成など）（既定 <code>0</code>）<br><code>stepsize</code> — 面を作るときのボクセルの大きさ。<strong>細かさと重さを決める</strong>（既定 <code>0.1 0.1 0.1</code>）<br><code>radiusscale</code> — 粒子の半径倍率。<strong>大きいと膜っぽく、小さいと粒っぽくなる</strong>（既定 <code>1.5</code>）<br><code>surfdistance</code> — 等値面の位置。水面を内側／外側にずらす（既定 <code>0.5</code>）<br><code>dofilter</code> — 表面をならす（既定 <code>False</code>）<br><code>filterwidth</code> — ならす幅（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/particlefluidsurface.html">公式リファレンス（英語）</a></p>
+
+<h3>VDB from Particle Fluid <span class="tx-muted">vdbfromparticlefluid</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>粒子から SDF の VDB を作る</td></tr>
+    <tr><td>使いどころ</td><td>面ではなくボリュームとして持っておきたいとき</td></tr>
+    <tr><td>入力</td><td>1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>particlesep</code> — 粒子間隔（既定 <code>0.1</code>）<br><code>voxelsize</code> — ボクセルサイズ（既定 <code>0.75</code>）<br><code>influenceradius</code> — 1粒が影響する半径（既定 <code>3</code>）<br><code>surfacedistance</code> — 等値面の位置（既定 <code>1</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/vdbfromparticlefluid.html">公式リファレンス（英語）</a></p>
+
+<h3>Particle Fluid Mask <span class="tx-muted">particlefluidmask</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>液体シミュレーションからマスクのボリュームを作る</td></tr>
+    <tr><td>使いどころ</td><td>「泡が出そうなところ」「速いところ」を取り出すとき</td></tr>
+    <tr><td>入力</td><td>0〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>dovel</code> — 速度からマスクを作る（既定 <code>True</code>）<br><code>dovorticity</code> — 渦度からマスクを作る（既定 <code>False</code>）<br><code>doheight</code> — 高さからマスクを作る（既定 <code>False</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/particlefluidmask.html">公式リファレンス（英語）</a></p>
+
+<h2>4. 白泡（しぶき・泡・泡沫）</h2>
+
+<p>白泡は<strong>別のシミュレーション</strong>です。FLIP の結果を入力にして、もう一度解きます。</p>
+
+<h3>Whitewater Source <span class="tx-muted">whitewatersource::3.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>FLIP の結果から「泡になりそうなところ」の発生源を作る</td></tr>
+    <tr><td>使いどころ</td><td>白泡の1段目。速度・曲率・渦度から候補を出す</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+    <tr><td>要のパラメータ</td><td><code>emissionamount</code> — 泡の量。<strong>ここが量を決めている主役</strong>（既定 <code>1</code>）<br><code>curvaturerange</code> — 曲率のどの範囲を泡にするか（既定 <code>8.0 10.0</code>）<br><code>accelerationrange</code> — 加速度のどの範囲を泡にするか（既定 <code>30.0 60.0</code>）<br><code>dosmooth</code> — 発生源をならす（既定 <code>False</code>）</td></tr>
+    <tr><td>注意</td><td><strong>泡の量はしきい値ではなく <code>emissionamount</code> です。</strong>1.0 で 30〜54 粒、20.0 で 620〜900 粒（実測）。曲率や速度のしきい値をいじり回しても量は変わりません。</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/whitewatersource-3.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Whitewater Solver (SOP) <span class="tx-muted">whitewatersolver</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>白泡を解く。しぶき・泡・泡沫の3種類に分かれる</td></tr>
+    <tr><td>使いどころ</td><td>白泡の2段目</td></tr>
+    <tr><td>入力</td><td>3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>buoyancy</code> — 浮力。泡が浮き上がる強さ（既定 <code>0.0 13.08 0.0</code>）<br><code>airresist</code> — 空気抵抗（既定 <code>1</code>）<br><code>bounce</code> — 跳ね返り（既定 <code>0.5</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/whitewatersolver.html">公式リファレンス（英語）</a></p>
+
+<h3>Whitewater Post-Process <span class="tx-muted">whitewaterpostprocess</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>白泡をレンダーできる形に整える</td></tr>
+    <tr><td>使いどころ</td><td>白泡の3段目。密度や大きさを年齢・深さで振る</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>density_byage</code> — 年齢で密度を変える（既定 <code>True</code>）<br><code>density_bydepth</code> — 深さで密度を変える（既定 <code>True</code>）<br><code>displayassphere</code> — 球として表示する（既定 <code>True</code>）</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/whitewaterpostprocess.html">公式リファレンス（英語）</a></p>
+
+<h3>Whitewater Solver (DOP) <span class="tx-muted">whitewatersolver::2.0</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>DOP の中に置く白泡ソルバ本体</td></tr>
+    <tr><td>入力</td><td>1〜4</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/whitewatersolver-2.0.html">公式リファレンス（英語）</a></p>
+
+<h3>Whitewater Emitter <span class="tx-muted">whitewateremitter</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>白泡の粒子を生成する POP ソルバ</td></tr>
+    <tr><td>使いどころ</td><td>DOP で白泡を自分で組むとき</td></tr>
+    <tr><td>入力</td><td>0</td></tr>
+  </tbody>
+</table></div>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/dop/whitewateremitter.html">公式リファレンス（英語）</a></p>
+
+<h2>5. 軽くする</h2>
+
+<h3>Fluid Compress <span class="tx-muted">fluidcompress</span></h3>
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>液体シミュレーションの出力を圧縮してディスク容量を減らす</td></tr>
+    <tr><td>使いどころ</td><td>キャッシュに書く直前</td></tr>
+    <tr><td>入力</td><td>1〜3</td></tr>
+    <tr><td>要のパラメータ</td><td><code>docompressto16bit</code> — 16bit に落とす（既定 <code>False</code>）<br><code>dovolumeband</code> — 水面付近のボリュームだけ残す（既定 <code>True</code>）<br><code>doparticleband</code> — 水面付近の粒子だけ残す（既定 <code>True</code>）<br><code>particleband</code> — 残す帯の幅（既定 <code>4</code>）</td></tr>
+  </tbody>
+</table></div>
+<p>水面から離れた粒子とボクセルは絵に出ないので捨てられます。<strong>容量が桁で変わる</strong>ことがあります。</p>
+<p class="tx-muted"><a href="https://www.sidefx.com/docs/houdini/nodes/sop/fluidcompress.html">公式リファレンス（英語）</a></p>
+
+
+<h2>詰まりやすいところ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず見るところ</th></tr></thead>
+  <tbody>
+    <tr><td><code>Domain is missing resolution attributes</code></td>
+        <td>3本の線を個別に配線している。<strong>まとめて通す</strong></td></tr>
+    <tr><td>水がだんだん減る</td>
+        <td>止めた <code>flipboundary</code> が穴になっていないか</td></tr>
+    <tr><td>粘りが効かない</td>
+        <td><code>viscosity</code> はチェックボックス。値は <code>default_viscosity</code></td></tr>
+    <tr><td>泡が少ない／多い</td>
+        <td><code>whitewatersource</code> の <code>emissionamount</code></td></tr>
+    <tr><td>水面が膜っぽい／粒っぽい</td>
+        <td><code>particlefluidsurface</code> の <code>radiusscale</code></td></tr>
+    <tr><td>とにかく重い</td>
+        <td><code>particlesep</code> を粗く。次に <code>donarrowband</code></td></tr>
+  </tbody>
+</table></div>
+
+
+<h2>関連リンク</h2>
+<ul><li><a href="https://www.sidefx.com/docs/houdini/fluid/index.html">Fluids (Houdini 公式)</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipsolver.html">FLIP Solver SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/fluid/whitewater.html">Whitewater</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/flipcontainer.html">FLIP Container SOP</a></li><li><a href="https://www.sidefx.com/docs/houdini/nodes/sop/particlefluidsurface.html">Particle Fluid Surface SOP</a></li></ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
