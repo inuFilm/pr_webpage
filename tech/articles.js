@@ -11,6 +11,34 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "rtvfx-01-getting-started",
+    "title": "リアルタイムVFXの学び始め — Real Time VFX の定番スレッドから",
+    "category": "realtime-vfx",
+    "date": "2026-08-19",
+    "description": "リアルタイムVFXを学び始めるための道案内です。コミュニティフォーラム Real Time VFX の定番スレッドを読み、何をどの順番で押さえるかと、2016〜2018年の情報をいま読むときの注意点をまとめました。"
+  },
+  {
+    "slug": "rtvfx-02-textures-flipbooks",
+    "title": "リアルタイムVFX 2 — テクスチャとフリップブック",
+    "category": "realtime-vfx",
+    "date": "2026-08-19",
+    "description": "Real Time VFX の定番スレッドから、VFX のテクスチャ制作とフリップブックの基礎をまとめました。GDC 2022 の講演と公開資料、チャンネルパッキングで RGB 192コマ・RGBA 256コマを詰める手法について。"
+  },
+  {
+    "slug": "rtvfx-03-timing-principles",
+    "title": "リアルタイムVFX 3 — タイミングと演出の原則",
+    "category": "realtime-vfx",
+    "date": "2026-08-19",
+    "description": "Real Time VFX で実際に交わされたタイミングの批評を追いながら、何が判断されているのかをまとめました。要素を足すより寿命を延ばす、口で音を出して間隔を測る、といった具体的な手立てについて。"
+  },
+  {
+    "slug": "rtvfx-04-reading-old-posts",
+    "title": "リアルタイムVFX 4 — 古い記事を読むための読み替えガイド",
+    "category": "realtime-vfx",
+    "date": "2026-08-19",
+    "description": "Real Time VFX の定番スレッドは 2016〜2018年のものが多く、Cascade 前提の記述が残っています。何が古びて何が古びないかを整理し、古い記事から意図を読み取って現行ドキュメントで裏を取る読み方をまとめました。"
+  },
+  {
     "slug": "simon-axe-01-curve",
     "title": "Houdini で斧を作る 1 — 参照画像とカーブで輪郭を取る",
     "category": "houdini-modeling",

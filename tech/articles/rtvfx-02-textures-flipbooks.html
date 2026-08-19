@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リアルタイムVFX 2 — テクスチャとフリップブック | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Real Time VFX の定番スレッドから、VFX のテクスチャ制作とフリップブックの基礎をまとめました。GDC 2022 の講演と公開資料、チャンネルパッキングで RGB 192コマ・RGBA 256コマを詰める手法について。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>リアルタイムVFX 2 — テクスチャとフリップブック</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-19</p>
+<p class="tx-muted">この記事は <a href="https://realtimevfx.com/">Real Time VFX</a> のスレッドを読んでまとめた個人的な学習メモです。
+<strong>解説は自分の言葉で書き、出典スレッドへリンクしています。</strong>
+各スレッドの画像・動画・配布ファイルは投稿者本人のものなので転載していません。
+入門の全体像は<a href="rtvfx-01-getting-started.html">前回の道案内</a>にあります。</p>
+
+<h2>なぜテクスチャの話が重要か</h2>
+
+<p>エフェクトの見た目は、突き詰めると<strong>どんなテクスチャを、どう動かすか</strong>で決まります。
+ところが、この領域は 長らく語られてこなかった、という指摘があります。</p>
+
+<p>Simon Schreibt さんが GDC 2022 / ADDON 2022 で行った講演
+<strong>「How to (Not) Create Textures for VFX」</strong>の紹介スレッドで、本人がこう書いています。</p>
+
+<blockquote>この話題は過去にあまり議論されてきませんでした。
+私自身もかっこいいテクスチャを作るのに苦労してきた（している）ので、
+<strong>講演にすれば誰かの助けになるかもしれないし、
+この分野についてもっと語り、知識を共有するきっかけになるかもしれない</strong>と思いました。</blockquote>
+
+<p>タイトルに「How to <strong>(Not)</strong>」と入っているのが示唆的で、
+うまくいかないやり方も含めて扱う構成になっています。</p>
+
+<h3>付随する資料が充実している</h3>
+
+<p>このスレッドの価値は、講演本体よりも<strong>付属資料</strong>にあるかもしれません。
+投稿には次のものへのリンクがまとめられています。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>資料</th><th>内容</th></tr>
+    <tr><td>スライド</td><td><span class="tx-blue">講演では話されなかった追加セクションが含まれています</span></td></tr>
+    <tr><td>Textures for VFX Resource Database</td><td>テクスチャ制作の参考資料集</td></tr>
+    <tr><td>Unreal プロジェクトファイル</td><td>UE4 版（GDC）と UE5 版（ADDON）の両方</td></tr>
+    <tr><td>Substance Designer ファイル</td><td>実際の制作データ</td></tr>
+    <tr><td>ArtStation の投稿</td><td>ミニブレイクダウン</td></tr>
+  </table>
+</div>
+
+<p>出典: <a href="https://realtimevfx.com/t/talk-how-not-to-create-textures-for-vfx-gdc-addon-2022/20043">Talk: How (not) to create Textures for VFX (GDC/ADDON 2022)</a>
+（simonschreibt さん / 2022-05）</p>
+
+<h2>フリップブックとは</h2>
+
+<p>フリップブックは<strong>連番の画像を1枚のテクスチャに並べたもの</strong>です。
+爆発や煙のように、形が時間で変化するものを表現するのに使います。
+シミュレーションした結果を書き出して並べる、というのが基本の流れです。</p>
+
+<h3>作り方の現在地</h3>
+
+<p>mammad さんが 2025年に投稿したチュートリアルが、現在の作り方を追うのに向いていそうです。</p>
+
+<ul>
+  <li><a href="https://realtimevfx.com/t/create-flipbook-textures-tutorial/28873">Create Flipbook Textures! (Tutorial)</a>（2025-04）
+      — <strong>Blender</strong> で爆発の火球を作る流れ。シミュレーション → レンダリング →
+      <span class="tx-blue"><strong>モーションベクターの生成</strong></span> → ゲームエンジンでの使用まで</li>
+  <li><a href="https://realtimevfx.com/t/make-seamless-looping-flipbooks-tutorial/29109">Make Seamless Looping Flipbooks! (Tutorial)</a>（2025-06）
+      — <strong>動画からループするフリップブックを作る</strong>方法</li>
+</ul>
+
+<p class="tx-muted">モーションベクターは、フレーム間を補間してなめらかに見せるための追加情報です。
+コマ数を減らしても破綻しにくくなるので、実用上とても効いてきます。</p>
+
+<h2>チャンネルパッキング — 枚数を詰め込む</h2>
+
+<p>フリップブックはコマ数が増えるほど容量を食います。
+そこで<strong>RGBA の各チャンネルに別々のコマを詰める</strong>という手法があります。</p>
+
+<p>sethhall さんが、この処理を行う無料スクリプトを配布しているスレッドで、
+3つの詰め方を整理しています。</p>
+
+<h3>Atlas Packing</h3>
+
+<p>いわゆる普通のテクスチャアトラスです。RGB と RGBA のレイアウトに対応します。
+<span class="tx-muted">「典型的なフリップブックのレイアウトで、特別なことはしていません」とのこと。</span></p>
+
+<h3>Super Packing</h3>
+
+<p>ここが本題です。<strong>利用できるすべてのチャンネルに画像を詰め込みます。</strong></p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>形式</th><th>格納できるコマ数</th></tr>
+    <tr><td>RGB</td><td><strong>192コマ</strong></td></tr>
+    <tr><td>RGBA</td><td><strong>256コマ</strong></td></tr>
+  </table>
+</div>
+
+<p>1チャンネルあたり <strong>64コマ</strong>を詰め、8×8 のチャンネルパック済みアトラスになります。
+赤チャンネルに 1〜64コマ目、というように割り当てられます。</p>
+
+<p>利点と欠点が明確に書かれていました。</p>
+
+<ul>
+  <li><span class="tx-blue">処理が速く、シェーダーの命令数も少なめ</span></li>
+  <li><span class="tx-red">ただしピクセルの詰まり方が緩いため、アーティファクトが出やすい</span></li>
+</ul>
+
+<h3>Stagger Packing</h3>
+
+<p>3つ目の手法として挙げられていますが、
+<span class="tx-muted">この記事を書くにあたって参照した投稿からは詳細を読み取れませんでした。</span>
+実際の説明はスレッド本文をご確認ください。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/flipbook-texture-packing-atlas-super-pack-and-stagger-pack/5609">Flipbook texture packing, atlas, super pack and stagger pack</a>
+（sethhall さん / 2018-09）</p>
+
+<blockquote>このスレッドで面白かったのは、<strong>作った動機</strong>です。
+既存のツールは有料だったり、Mac で動かなかったりする。
+Houdini のコンポジタでやると簡単だが「無料であるべきものに高い解決策を使っている」。
+だから自分で書いた、という経緯が説明されていました。</blockquote>
+
+<h3>専用ツール</h3>
+
+<p>スクリプトではなく GUI のツールも投稿されています。</p>
+
+<p><a href="https://realtimevfx.com/t/flipbook-texture-tool-v3-0-now-with-gui/18673">Flipbook Texture Tool v3.0 - Now with GUI!</a>（2021-12）</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>テクスチャ制作は<strong>長く語られてこなかった領域</strong>だという認識が、当事者から表明されています</li>
+  <li>Simon Schreibt さんの GDC 2022 講演は、<span class="tx-blue">スライド・データベース・UE4/UE5 プロジェクト・Substance ファイルまで公開</span>されています</li>
+  <li>フリップブックの作り方は 2025年のチュートリアルが追いやすく、<strong>モーションベクター</strong>まで扱っています</li>
+  <li>チャンネルパッキングを使うと、<strong>RGB で192コマ、RGBA で256コマ</strong>を1枚に詰められます</li>
+  <li><span class="tx-red">ただし Super Packing はアーティファクトが出やすい</span>というトレードオフがあります</li>
+</ul>
+
+<h2>おことわり</h2>
+
+<blockquote>この記事は個人的な学習メモで、Real Time VFX や各投稿者の方々とは関係がありません。
+要約と解釈の責任はこちらにあります。正確な内容はリンク先をご確認ください。</blockquote>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

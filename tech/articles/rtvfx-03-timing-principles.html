@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リアルタイムVFX 3 — タイミングと演出の原則 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Real Time VFX で実際に交わされたタイミングの批評を追いながら、何が判断されているのかをまとめました。要素を足すより寿命を延ばす、口で音を出して間隔を測る、といった具体的な手立てについて。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>リアルタイムVFX 3 — タイミングと演出の原則</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-19</p>
+<p class="tx-muted">この記事は <a href="https://realtimevfx.com/">Real Time VFX</a> のスレッドを読んでまとめた個人的な学習メモです。
+<strong>解説は自分の言葉で書き、出典スレッドへリンクしています。</strong>
+各スレッドの画像・動画は投稿者本人のものなので転載していません。
+入門の全体像は<a href="rtvfx-01-getting-started.html">第1回の道案内</a>にあります。</p>
+
+<h2>技術より先に効いてくるもの</h2>
+
+<p>手法を覚えれば作れるようにはなりますが、
+<strong>良し悪しを判断する基準</strong>は別に必要です。
+このことを端的に表しているコメントが、原則を扱うスレッドに付いていました。</p>
+
+<blockquote>これこそが大事なところです。
+<strong>私たちはこういうことを忘れて、技術的な細部にばかり注目してしまいます。</strong></blockquote>
+
+<p>この記事では、フォーラム上で実際に交わされた
+<strong>タイミングについての批評のやりとり</strong>を追いながら、
+何が判断されているのかを見ていきます。</p>
+
+<h2>1. 原則を体系的に扱った資料</h2>
+
+<p>まず土台になるのが、Keyserito さんが公開した<strong>5本の動画シリーズ</strong>です。</p>
+
+<ul>
+  <li>League of Legends を題材にした、リアルタイムVFXの<strong>造形的な原則</strong>の解説</li>
+  <li>GDC での講演（@hadidjah さんとの共同）がもとになっています</li>
+  <li>そこに <strong>League of Legends のスタイルガイド</strong>から得た知見が加えられています</li>
+</ul>
+
+<p><span class="tx-blue">エンジンに依存しない内容なので、公開が2018年でも古びていません。</span></p>
+
+<p>出典: <a href="https://realtimevfx.com/t/artistic-principles-of-vfx/4081">Artistic Principles of VFX</a>
+（Keyserito さん / 2018-02）</p>
+
+<h2>2. 実際の批評を追う</h2>
+
+<p>ここからが本題です。2025年に、学習中の DanielB さんが
+<strong>最初から最後まで通して作った初めてのエフェクト</strong>を投稿し、
+タイミングについて意見を求めました。</p>
+
+<p>本人の説明が、狙いを明確にしていて参考になります。</p>
+
+<blockquote>スタイライズド寄りにして、<strong>アニメーションの原則を意識的に適用できる</strong>ようにしました。
+タイミングとモーションが重要だと何度も聞いてきたので、それを最初の焦点にすることにしました。
+<span class="tx-muted">テーマは特に決めず、スタイライズドな爆発を作ることだけが目標です。
+感覚を鍛えたかったので、<strong>参照を使わず直感だけでタイミングを調整</strong>しました。約25時間かかりました。</span></blockquote>
+
+<h3>指摘1: 追加した要素が勢いを殺す</h3>
+
+<p>MadVFX さんの返信が、最初の具体的な指摘でした。</p>
+
+<blockquote>タイミングはほぼ合っていると思います。狙いどおり力強く感じます。
+ただ、<strong>小さな火花を追加でスポーンさせているせいで、勢い（momentum）が失われています。</strong></blockquote>
+
+<p>そのうえで、代わりの手を提案しています。</p>
+
+<blockquote>インパクトがありつつ、きれいに消えていく感じにしたいなら、
+<span class="tx-blue">そのスポーンレートを止めて、
+最初の爆発から出た火花の寿命を少し延ばす</span>ほうがいいと思います。
+そのほうがまとまりが出ます。</blockquote>
+
+<p><span class="tx-red">要素を足すのではなく、既にあるものを延ばす。</span>
+これは初学者がやりがちな「情報を足して豪華にする」の逆方向で、覚えておきたい判断です。</p>
+
+<h3>投稿者の理解</h3>
+
+<p>DanielB さんの返答が、なぜそれが問題なのかを言語化しています。</p>
+
+<blockquote>追加の火花が実際に勢いを壊していると気づきました。
+視覚的な面白さの層を足すつもりでしたが、この場合は使い方を間違えていました。
+<strong>展開の速い状況で、爆発が焦点であるべきときには、
+追加の火花は不要なノイズと注意の分散を生むだけ</strong>で、
+意図したインパクトを高めることにはならないのだと思います。</blockquote>
+
+<h2>3. 音で考える</h2>
+
+<p>このスレッドで最も印象に残ったのが、bgolus さんの返信でした。</p>
+
+<blockquote>VFX について考えるとき、少し変わったやり方かもしれませんが、
+<strong>それがどう聞こえるかを考えます。</strong>
+見た目をどうするか、タイミングを探るときに、私はよくこれをやります。
+音のことを同時に考えていたり、<span class="tx-blue">文字どおり口で音を出していたりします。</span></blockquote>
+
+<blockquote>最終的に音響担当が付ける音になるとは限りませんが、
+<strong>さっと息を吸うのにかかる時間、
+違う音を出すために口の形を変えるのにかかる時間</strong>——
+それが、要素と要素の間隔として最低限必要な長さにかなり近いのです。</blockquote>
+
+<p>そして、DanielB さんの火花についてはこう続けています。</p>
+
+<blockquote>追加の残り火は使えると思いますが、<strong>もっと遅らせる必要があります。</strong>
+いわば<span class="tx-blue">「ひと息」を置いてやることです。</span></blockquote>
+
+<p>「勢いが失われる」という感覚的な指摘に対して、
+<strong>口で音を出して間隔を測る</strong>という具体的な手段が示されているのが、この助言の良いところだと思います。</p>
+
+<p class="tx-muted">DanielB さんも「効果の土台を作るときは同じように音を出してリズムを探っていたが、
+終盤ではやめてしまっていた」と応じていました。</p>
+
+<h2>4. 二次要素の選び方</h2>
+
+<p>Augie さん（<a href="rtvfx-01-getting-started.html">第1回</a>で触れた VFX Basics の投稿者）からも助言が付いています。</p>
+
+<blockquote><strong>火花以外の二次的な要素</strong>があると、もう少し埋まって、独自性が出ると思います。
+たとえば<strong>渦を巻く炎混じりの煙</strong>のような。
+効果をさらになだらかに終わらせる助けになります。</blockquote>
+
+<p>そのうえで、良い点も具体的に挙げています。</p>
+
+<blockquote>メインのインパクトの打撃感がとても良く、色の遷移も気に入っています。
+2回目の投稿の火花に出ていた<strong>深い赤</strong>が良かったです。</blockquote>
+
+<p><span class="tx-blue">同じ種類の要素（火花）を増やすのではなく、
+性質の違う要素（煙）を足す</span>——という方向の提案になっています。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/are-there-any-experienced-vfx-artists-here-who-excel-at-timing/28575">Are there any experienced VFX artists here who excel at timing?</a>
+（DanielB さん / 2025-02）</p>
+
+<h2>このやりとりから読み取れること</h2>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>判断</th><th>内容</th></tr>
+    <tr><td>足すか、延ばすか</td><td>勢いが途切れるなら、<strong>要素を足すより既存のものの寿命を延ばす</strong></td></tr>
+    <tr><td>間隔の測り方</td><td><strong>口で音を出す。</strong>息継ぎや口の形を変える時間が、最低限必要な間隔に近い</td></tr>
+    <tr><td>焦点を守る</td><td>展開が速い場面では、副次的な要素が<strong>ノイズになって焦点を奪う</strong></td></tr>
+    <tr><td>二次要素の性質</td><td>同種を増やすのではなく、<strong>違う性質のもの</strong>（火花に対して煙）を足す</td></tr>
+    <tr><td>終わり方</td><td>インパクトの直後だけでなく、<strong>どう消えていくか</strong>まで設計する</td></tr>
+  </table>
+</div>
+
+<h2>批評の受け方について</h2>
+
+<p>内容とは別に、このスレッドの進み方自体が参考になりました。</p>
+
+<ul>
+  <li>投稿者が<strong>何を狙ったかを明示</strong>している（タイミングに絞った、参照を使わなかった、25時間かけた）</li>
+  <li>指摘を受けて<strong>自分の言葉で理由を言い直している</strong></li>
+  <li>試した結果を投稿し直し、さらに助言を受けている</li>
+</ul>
+
+<p><span class="tx-blue">「見てください」ではなく「ここを狙ったので、そこを見てください」と出すと、
+返ってくるものが具体的になる</span>——という例になっていると思います。</p>
+
+<h2>おことわり</h2>
+
+<blockquote>この記事は個人的な学習メモで、Real Time VFX や各投稿者の方々とは関係がありません。
+引用は要旨を日本語にしたもので、要約と解釈の責任はこちらにあります。
+実際のエフェクトの動画と正確なやりとりはリンク先をご確認ください。</blockquote>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

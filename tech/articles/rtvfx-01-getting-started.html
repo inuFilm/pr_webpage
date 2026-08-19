@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リアルタイムVFXの学び始め — Real Time VFX の定番スレッドから | 技術メモ | makeinufilm</title>
+  <meta name="description" content="リアルタイムVFXを学び始めるための道案内です。コミュニティフォーラム Real Time VFX の定番スレッドを読み、何をどの順番で押さえるかと、2016〜2018年の情報をいま読むときの注意点をまとめました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>リアルタイムVFXの学び始め — Real Time VFX の定番スレッドから</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-19</p>
+<p class="tx-muted">この記事は <a href="https://realtimevfx.com/">Real Time VFX</a>（リアルタイムVFXアーティストのコミュニティフォーラム）で
+定番とされているスレッドを読んで、学び始めの道筋としてまとめたものです。
+<strong>解説は自分の言葉で書き、各項目に出典スレッドへのリンクを付けています。</strong>
+各スレッドの画像や動画は投稿者本人の著作物なので転載していません。中身はリンク先でご覧ください。</p>
+
+<h2>この記事の位置づけ</h2>
+
+<p>リアルタイムVFXを学び始めようとすると、情報が散らばっていてどこから手を付けるか迷います。
+Real Time VFX には10年分の蓄積があり、定番と呼ばれるスレッドがいくつかあります。
+それを<strong>「何を、どの順番で読むか」という地図</strong>にしたのがこの記事です。</p>
+
+<blockquote><span class="tx-red">先に重要な注意点をひとつ。</span>
+定番スレッドの多くは <strong>2016〜2020年</strong>のものです。
+<span class="tx-blue">考え方や原則は今も有効ですが、ツールやエンジンの記述は古くなっています。</span>
+具体的には記事の最後にまとめました。</blockquote>
+
+<h2>1. そもそも何をする仕事か</h2>
+
+<p>映像のVFXと違い、リアルタイムVFXは<strong>ゲームエンジンの中で、実際に動いている最中に計算される</strong>エフェクトを作ります。
+そのため制約が違い、優先されるものも違います。</p>
+
+<p>この違いをよく表しているのが、Riot Games で League of Legends のVFXを担当していた
+ShannonBerke さんの言葉です。自身のデモリールを紹介するスレッドの中で、こう書いています。</p>
+
+<blockquote>League ではゲームプレイが王様なので、<strong>派手すぎたりコントラストが強すぎたりするものは何もありません。</strong></blockquote>
+
+<p><span class="tx-blue">きれいなエフェクトを作ることと、ゲームとして成立させることは別</span>という前提が、
+最初に押さえておくべきところだと思います。プレイヤーが状況を読み取れなくなるエフェクトは、
+どれだけ美しくても採用されません。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/shannon-mcsheehan-lol-fx-knowledge-share/1133">Shannon McSheehan - LoL FX + Knowledge Share</a>
+（ShannonBerke さん / 2016-11）。<span class="tx-muted">このサイトで最も反応が多いスレッドで、
+332件の投稿が付いています。作例の GIF コレクションが集められていて、
+「どう作ったか質問があれば答えます」と書かれているのも参考になります。</span></p>
+
+<h2>2. 道具を揃える</h2>
+
+<p>何が必要かは、Travis さんによる入門スレッドにまとまっています。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>区分</th><th>内容</th></tr>
+    <tr><td>必須のソフト</td><td>画像編集ソフト、3Dパッケージ（Blender / Maya / Max / Houdini）、ゲームエンジン</td></tr>
+    <tr><td>ハードウェア</td><td>そこそこのスペックのデスクトップ。<strong>ペンタブは必須ではありません</strong>（手描き系のスタイライズドをやるなら欲しい）</td></tr>
+    <tr><td>あると便利</td><td>フリップブック作成ツール、ボリューム系のシミュレーションツールなど</td></tr>
+  </table>
+</div>
+
+<h3>エンジンはどちらを選ぶか</h3>
+
+<p>よくある質問への回答として、大意こう書かれています。</p>
+
+<ul>
+  <li><strong>Unreal</strong> — アーティストにとって扱いやすく、標準機能だけでできることが多い。
+      ただし<strong>機能が多くエンジンが巨大なので、圧倒されることがある</strong></li>
+  <li><strong>Unity</strong> — やや技術寄り。<strong>自分でシェーダーを書いたり構成を組んだりする自由度が高い</strong></li>
+</ul>
+
+<p>ただし「違いは小さいので、好きなほうでよい」という結論でした。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/getting-started-in-real-time-vfx-start-here/3415">Getting Started in Real Time VFX? Start Here!</a>
+（Travis さん / 2018-04）</p>
+
+<h2>3. まず理解すべき2つの基本テクニック</h2>
+
+<p>Augie さんが「新しく入ってくる人が多いので、日常的に使う基本を書く」として
+2つのチュートリアルを投稿しています。<span class="tx-blue">この2つは、多くのエフェクトの土台になります。</span></p>
+
+<h3>スクロールするテクスチャ＋マスク</h3>
+
+<p>ノイズテクスチャを流し、その上からマスクで形を切り抜く手法です。
+投稿者本人が<strong>「Diablo 3 のプレゼンで出てきたあの手法」</strong>と呼んでいます。</p>
+
+<p>炎、煙、魔法陣、オーラ——見た目がまったく違うものが、
+実は<strong>同じ「流す＋抜く」の組み合わせ</strong>でできていることが分かります。
+最初にこれを理解しておくと、他人のエフェクトを見たときに構造が読めるようになります。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/vfx-basics-creating-the-scrolling-texture-with-mask-setup/1966">VFX Basics - Creating the scrolling texture with mask setup</a>
+（Augie さん / 2017-03）</p>
+
+<h3>メッシュに沿ってテクスチャを流す</h3>
+
+<p>Augie さんが <strong>Soulercoaster</strong> と呼んでいる手法です。
+<span class="tx-muted">「ジェットコースターみたいなものだから」という命名だそうです。</span></p>
+
+<p>平坦な UV を持つメッシュを自作し、そこにテクスチャを流します。</p>
+
+<blockquote>パーティクルのトレイルのような見た目でありながら、
+<strong>メッシュエフェクトの自由な複雑さを持てます。</strong></blockquote>
+
+<p>用途として挙げられているのは、<strong>武器の斬撃、鬼火のようなトレイル、魔法陣のディテール</strong>です。
+使う元のメッシュは「引き伸ばしたポリゴン平面」で構いませんが、
+<span class="tx-red">UV が平坦でまっすぐなことと、上端が UV の上端に揃っていることが条件</span>です。
+横方向ではなく、メッシュに沿って流したいためです。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/vfx-basics-mesh-soulercoasters/1987">VFX Basics - Mesh Soulercoasters</a>
+（Augie さん / 2017-03）</p>
+
+<h2>4. 技術ではなく原則を学ぶ</h2>
+
+<p>手法を覚えると作れるようにはなりますが、良し悪しの判断はできません。
+そこを扱っているのが Keyserito さんの投稿です。</p>
+
+<p>League of Legends を題材にした<strong>5本の動画シリーズ</strong>で、
+リアルタイムVFXの<strong>造形的な原則</strong>を扱っています。
+GDC での講演をもとに、League of Legends のスタイルガイドから得た知見を加えたもの、と説明されています。</p>
+
+<p>スレッドに付いたコメントが、この分野の性質をよく表していました。</p>
+
+<blockquote>これこそが大事なところです。<strong>私たちはこういうことを忘れて、技術的な細部にばかり注目してしまいます。</strong></blockquote>
+
+<p><span class="tx-blue">エンジンに依存しない話なので、ここは今読んでも古びていません。</span>
+むしろ最初に見ておくと、手法を学ぶときの軸ができると思います。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/artistic-principles-of-vfx/4081">Artistic Principles of VFX</a>
+（Keyserito さん / 2018-02）</p>
+
+<h2>5. 実際の仕事は何をするのか</h2>
+
+<p>これは学習段階では見えにくい部分で、個人的にいちばん参考になったスレッドです。</p>
+
+<p>Travis さんが、新人VFXアーティストとして入社してから何をしていたかを具体的に書いています。
+大学を出たばかりで、実務経験はポートフォリオの個人制作のみ、という状態からのスタートでした。</p>
+
+<h3>最初にやることは地味</h3>
+
+<ul>
+  <li><strong>環境用のループするアンビエントエフェクト</strong>や、<strong>ヒット時の小さなエフェクト</strong>を大量に作る</li>
+  <li><span class="tx-blue">すでにゲーム内にあるテクスチャやフリップブックを再利用する</span></li>
+  <li>デザイナーが用意した仕掛けに対して、どこから再生されるか・何秒必要か・どんな見た目かを聞いて作る</li>
+</ul>
+
+<h3>プレースホルダーの作り方が実務的</h3>
+
+<p>新人が多くやることとして挙げられていたのが、仮のエフェクト作りです。ただし作り方に工夫があります。</p>
+
+<blockquote>素早く、機能する（ループして呼び出しで止められるなど）エフェクトを作ります。
+このとき<strong>最終的な命名規則を付けておき</strong>、Blueprint やアニメーションの呼び出しに紐づけ、
+向きとサイズを正しく合わせておきます。</blockquote>
+
+<p><span class="tx-blue">こうしておけば、あとから自分や先輩が
+テクスチャとマテリアルを差し替えるだけで完成品にできる</span>という考え方です。
+仮のものを作るときに、後工程を楽にする形で作っておく。ここは覚えておきたいところでした。</p>
+
+<p>フォルダとエフェクトの整理も仕事のうち、と明記されているのも実態が伝わってきます。</p>
+
+<p>出典: <a href="https://realtimevfx.com/t/beginning-vfx-artist-advice-for-beginners-from-a-beginner/3081">Beginning VFX Artist - Advice for beginners, from a beginner</a>
+（Travis さん / 2017-09）</p>
+
+<h2>情報の鮮度について</h2>
+
+<p><span class="tx-red">ここは必ず読んでおいたほうがよい部分です。</span></p>
+
+<p>上に挙げたスレッドは、いずれも<strong>2016〜2018年</strong>のものです。
+このサイトで反応が多い投稿は 2016〜2020年に集中しており、
+それだけ長く参照され続けている良質な内容である一方、
+<strong>ツールやエンジンの記述は現在と食い違っています。</strong></p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>種類</th><th>今読むときの扱い</th></tr>
+    <tr><td><strong>原則・考え方</strong><br>ゲームプレイの可読性、造形の原則、仕事の進め方</td><td>そのまま有効</td></tr>
+    <tr><td><strong>手法の考え方</strong><br>スクロール＋マスク、メッシュに流す</td><td>考え方は有効。実装の手順はエンジンの現行版で読み替える</td></tr>
+    <tr><td><strong>ツール名・エンジンの機能</strong></td><td><span class="tx-red">要確認。</span>入門スレッドは Unreal の旧パーティクルエディタ <code>Cascade</code> を前提に書かれていますが、現在は <code>Niagara</code> が標準です</td></tr>
+  </table>
+</div>
+
+<p>つまり<span class="tx-blue">「なぜそうするか」は読み、「どのボタンを押すか」は現行のドキュメントで確認する</span>——
+という読み方が現実的だと思います。</p>
+
+<h2>読む順番のまとめ</h2>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>順</th><th>スレッド</th><th>目的</th></tr>
+    <tr><td>1</td><td><a href="https://realtimevfx.com/t/artistic-principles-of-vfx/4081">Artistic Principles of VFX</a></td><td>判断の軸を作る。エンジン非依存で古びない</td></tr>
+    <tr><td>2</td><td><a href="https://realtimevfx.com/t/getting-started-in-real-time-vfx-start-here/3415">Getting Started in Real Time VFX? Start Here!</a></td><td>道具立てとエンジン選び。ツール名は要確認</td></tr>
+    <tr><td>3</td><td><a href="https://realtimevfx.com/t/vfx-basics-creating-the-scrolling-texture-with-mask-setup/1966">VFX Basics - scrolling texture with mask setup</a></td><td>最も基本的な組み合わせを理解する</td></tr>
+    <tr><td>4</td><td><a href="https://realtimevfx.com/t/vfx-basics-mesh-soulercoasters/1987">VFX Basics - Mesh Soulercoasters</a></td><td>メッシュ主体のエフェクトの作り方</td></tr>
+    <tr><td>5</td><td><a href="https://realtimevfx.com/t/shannon-mcsheehan-lol-fx-knowledge-share/1133">Shannon McSheehan - LoL FX + Knowledge Share</a></td><td>実際の作例を大量に見る</td></tr>
+    <tr><td>6</td><td><a href="https://realtimevfx.com/t/beginning-vfx-artist-advice-for-beginners-from-a-beginner/3081">Beginning VFX Artist</a></td><td>仕事として何をするのかを知る</td></tr>
+  </table>
+</div>
+
+<p class="tx-muted">フォーラムには <code>Resources &amp; Knowledge</code>（約700トピック）や
+<code>References</code>、エンジン別のヘルプカテゴリもあります。
+この記事で挙げたのはその入口にあたる部分です。</p>
+
+<h2>おことわり</h2>
+
+<blockquote>この記事は Real Time VFX のスレッドを読んでまとめた個人的な学習メモで、
+同サイトや各投稿者の方々とは関係がありません。
+<strong>要約や解釈の責任はこちらにあります。</strong>
+正確な内容と、各スレッドの画像・動画・作例はリンク先でご確認ください。</blockquote>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

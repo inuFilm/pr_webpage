@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リアルタイムVFX 4 — 古い記事を読むための読み替えガイド | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Real Time VFX の定番スレッドは 2016〜2018年のものが多く、Cascade 前提の記述が残っています。何が古びて何が古びないかを整理し、古い記事から意図を読み取って現行ドキュメントで裏を取る読み方をまとめました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>リアルタイムVFX 4 — 古い記事を読むための読み替えガイド</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-19</p>
+<p class="tx-muted">この記事は <a href="https://realtimevfx.com/">Real Time VFX</a> を調べてまとめた個人的な学習メモです。
+<strong>フォーラムの投稿が書かれた時期と、その後に何が変わったか</strong>を整理しました。
+入門の全体像は<a href="rtvfx-01-getting-started.html">第1回の道案内</a>にあります。</p>
+
+<h2>この記事の目的</h2>
+
+<p>Real Time VFX には10年分の蓄積があり、参照される定番スレッドの多くは
+<strong>2016〜2018年</strong>のものです。長く読まれ続けているだけの価値がある一方で、
+<span class="tx-red">ツールやエンジンの記述は現在と食い違っています。</span></p>
+
+<p>古い記事を捨てる必要はありません。必要なのは<strong>読み替えの目安</strong>です。
+この記事はそのための整理です。</p>
+
+<h2>1. フォーラム自身が示している「現在」</h2>
+
+<p>推測ではなく、フォーラムの実際の状態を確認しました。
+最近投稿されたスレッドのタイトルを見ると、話題の中心がはっきりします。</p>
+
+<blockquote>2026年6月〜8月に投稿されたスレッドを見ると、
+Unreal 関連は<strong>ほぼすべて Niagara</strong> についてのものでした。
+「Niagara: スケルタルメッシュの頂点カラーでパーティクルを消す」
+「Niagara のプレビュータイムラインを再生し直すショートカット」
+といった、実務的な質問が並んでいます。</blockquote>
+
+<p>つまり<span class="tx-blue">コミュニティの現在地は Niagara にあります。</span>
+ところが<a href="rtvfx-01-getting-started.html">入門の定番スレッド</a>（2018年）は
+<strong>Cascade</strong> を前提に書かれています。ここが最も大きな食い違いです。</p>
+
+<h2>2. Unreal — Cascade から Niagara へ</h2>
+
+<p>Cascade は Unreal の旧パーティクルエディタです。
+2021年にフォーラムで「UE5 で Cascade が消えるのか」という質問が立ち、
+返答は端的なものでした。</p>
+
+<blockquote>間違いなくレガシー扱いになるでしょう。</blockquote>
+
+<p>出典: <a href="https://realtimevfx.com/t/ue5-cascade-is-dispear/16114">UE5 cascade is dispear?</a>（2021-02）</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>古い記事に出てくる語</th><th>いま読むときの扱い</th></tr>
+    <tr><td><strong>Cascade</strong></td><td>Unreal の旧パーティクルシステム。<span class="tx-red">UE5 ではレガシー</span>。現在は <strong>Niagara</strong></td></tr>
+    <tr><td>「モジュール」を積む話</td><td>Niagara にも同様の概念はあるが、構成と名前が異なる。<strong>考え方は流用できるが、手順は読み替えが必要</strong></td></tr>
+    <tr><td>Cascade 前提のチュートリアル</td><td>「何をやろうとしているか」を読み取り、実装は Niagara の現行ドキュメントで確認する</td></tr>
+  </table>
+</div>
+
+<h2>3. Unity — シェーダーとエフェクトの作り方</h2>
+
+<p>2018年の入門スレッドには、Unity 側の補足として
+<strong>Shader Forge</strong>（ノードベースでシェーダーを組むアセット）が挙げられています。
+「これを使えば UE4 に近いマテリアル制作ができる」という文脈でした。</p>
+
+<p>現在の Unity では、フォーラムの投稿を見るかぎり
+<strong>VFX Graph</strong> と <strong>Shader Graph</strong> が中心です。</p>
+
+<p>VFX Graph を使ったスレッドは2020年以降に多く見られます。</p>
+
+<ul>
+  <li><a href="https://realtimevfx.com/t/unity-vfx-graph-study/12688">Unity VFX Graph study</a>（2020-04）</li>
+  <li><a href="https://realtimevfx.com/t/meteor-rain-with-unity-vfx-graph-trigger-events-and-trails/18165">Meteor Rain with Unity VFX Graph (Trigger Events and Trails)</a>（2021-09）</li>
+  <li><a href="https://realtimevfx.com/t/procedural-electricity-in-unity-vfx-graph/19966">Procedural Electricity in Unity VFX Graph!</a>（2022-05）</li>
+</ul>
+
+<div class="table-wrap">
+  <table>
+    <tr><th>古い記事に出てくる語</th><th>いま読むときの扱い</th></tr>
+    <tr><td><strong>Shader Forge</strong></td><td>ノードベースのシェーダー作成アセット。現在は <strong>Shader Graph</strong> が標準的な選択肢</td></tr>
+    <tr><td>パーティクルシステム全般</td><td>従来の仕組みに加えて <strong>VFX Graph</strong> がある。<span class="tx-muted">大量のパーティクルを扱う場合に選択肢になります</span></td></tr>
+  </table>
+</div>
+
+<h2>4. 何が古びて、何が古びないか</h2>
+
+<p>ここが読み替えの本質だと思います。</p>
+
+<div class="table-wrap">
+  <table>
+    <tr><th></th><th>内容</th><th>扱い</th></tr>
+    <tr><td><strong>古びない</strong></td><td>ゲームプレイの可読性、造形の原則、タイミングの考え方、仕事の進め方、批評の受け方</td><td><span class="tx-blue">そのまま読める</span></td></tr>
+    <tr><td><strong>ほぼ古びない</strong></td><td>スクロール＋マスク、メッシュにテクスチャを流す、チャンネルパッキングといった<strong>手法の考え方</strong></td><td>考え方は有効。<span class="tx-muted">実装のUIは読み替える</span></td></tr>
+    <tr><td><strong>古びる</strong></td><td>エディタ名、モジュール名、パラメータ名、メニューの場所、アセットの名前</td><td><span class="tx-red">現行のドキュメントで確認</span></td></tr>
+  </table>
+</div>
+
+<p>言い換えると、<span class="tx-blue"><strong>「なぜそうするか」は古い記事から読み、
+「どのボタンを押すか」は現行のドキュメントで確認する</strong></span>——という分業になります。</p>
+
+<h2>5. 古い記事を読むときのチェックリスト</h2>
+
+<ol>
+  <li><strong>投稿日を最初に見る。</strong>Real Time VFX ではスレッドタイトルの近くに表示されます</li>
+  <li>2020年より前なら、<span class="tx-red">エンジンの記述はそのまま信じない</span></li>
+  <li>それでも読む価値はある。<strong>やろうとしていることの意図</strong>を読み取る</li>
+  <li>同じ話題で<strong>最近のスレッドがないか探す</strong>。フォーラムの検索は日付順に並べ替えられます</li>
+  <li>実装は現行エンジンのドキュメントで裏を取る</li>
+</ol>
+
+<h3>最近の投稿の探し方</h3>
+
+<p>Discourse ベースなので、カテゴリごとの新着や検索の並べ替えが使えます。
+たとえば <code>Unreal Engine Help</code>（約590トピック）や
+<code>Unity Help</code>（約250トピック）を新着順で見ると、
+<strong>いま実際に何が問題になっているか</strong>が分かります。</p>
+
+<h2>この記事のまとめ</h2>
+
+<ul>
+  <li>定番スレッドの多くは <strong>2016〜2018年</strong>。長く読まれているが、ツールの記述は古い</li>
+  <li>フォーラムの最近の投稿は<strong>ほぼすべて Niagara</strong>。コミュニティの現在地はそこにあります</li>
+  <li><span class="tx-red">Cascade は UE5 でレガシー扱い</span>。入門スレッドはこれを前提に書かれています</li>
+  <li>Unity は <strong>VFX Graph</strong> と <strong>Shader Graph</strong> が中心。<code>Shader Forge</code> の記述は読み替えが必要</li>
+  <li><strong>原則・考え方は古びず、UI と名前が古びる</strong></li>
+  <li>「なぜ」は古い記事から、「どうやって」は現行ドキュメントから</li>
+</ul>
+
+<h2>おことわり</h2>
+
+<blockquote>この記事は、Real Time VFX のスレッドの投稿日と内容を照合して整理した個人的なメモです。
+<span class="tx-muted">エンジンの最新仕様そのものを保証するものではありません。</span>
+実装にあたっては、必ず Epic Games / Unity の公式ドキュメントで現行の情報をご確認ください。</blockquote>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
