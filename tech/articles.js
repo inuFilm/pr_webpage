@@ -11,6 +11,76 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "solaris-00-map",
+    "title": "Solaris と Karma の地図 — 何が複雑なのかを先に整理する",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "Solaris が難しく感じる理由を USD / LOPs / Karma の3層に切り分けて、まず1枚レンダリングするまでの最小構成をまとめます。ノード名と既定値は Houdini 22.0.368 の実機で確認しました。"
+  },
+  {
+    "slug": "solaris-01-stage",
+    "title": "ステージに載せる — SOP から LOP への4つの入口",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "SOP Import / SOP Create / SOP Modify / Scene Import をノード単位で解説します。USD の階層が SOP 側のアトリビュートで決まること、効きそうで効かないパラメータを実機で検証しました。"
+  },
+  {
+    "slug": "solaris-02-layer",
+    "title": "レイヤーと Layer Break — 編集はどこに書かれるのか",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "USD には「消す」が無いという話から、LOP の編集がどのレイヤーに書かれるのかを整理します。Layer Break の前後でレイヤーの中身がどう変わるかを実機で書き出して確認しました。"
+  },
+  {
+    "slug": "solaris-03-scenegraph",
+    "title": "シーングラフを読む・選ぶ — プリムパターンの5段階",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "Solaris のほぼ全ノードで使う「どのプリムに効かせるか」の書き方を5段階で整理します。13種類のパターンを実機で評価して、当たるもの・当たらないものを確認しました。"
+  },
+  {
+    "slug": "solaris-04-reference",
+    "title": "リファレンスとバリアント — アセットを組み合わせる",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "SubLayer と Reference の違い、そして1つのアセットに複数の姿を持たせるバリアントを扱います。実機で棚に2つ並べ、上流を1か所いじると両方が変わることを確認しました。"
+  },
+  {
+    "slug": "solaris-05-material",
+    "title": "マテリアル — MaterialX と Material Library",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "USD のマテリアルが Material プリムと Shader プリムの2階建てになっている話から、MaterialX / Principled / USD Preview Surface の使い分けまで。実機で1つ作り、プリムパターンで3つに割り当てました。"
+  },
+  {
+    "slug": "solaris-06-light-camera",
+    "title": "ライトとカメラ — 型の対応と、数字が変わる話",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "ライトのノードが USD 側でどの型になるかを実測し、Intensity と Exposure の関係を整理します。カメラの Focal Length が 50 と 0.5 で食い違う理由も確認しました。"
+  },
+  {
+    "slug": "solaris-07-karma",
+    "title": "Karma を回す — 4つの詰め合わせを分解する",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "karma LOP に入っている Render Var / Render Product / Render Settings / USD Render ROP の役割を分けて整理します。標準 AOV セットの中身も実機で確認しました。"
+  },
+  {
+    "slug": "solaris-08-sampling",
+    "title": "サンプリングとノイズ — どのノイズにどれが効くのか",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "Karma のサンプルが Primary と Secondary の2階建てになっていること、Quality が本数ではなく倍率であることを整理し、症状別にどのパラメータを触るかの早見表を作りました。"
+  },
+  {
+    "slug": "solaris-09-output",
+    "title": "書き出しとワークフローへの組み込み",
+    "category": "houdini-solaris",
+    "date": "2026-08-19",
+    "description": "USD ROP の Save Style 4種類で出力ファイルがどう変わるかを整理し、husk でのバッチレンダリングまで。既存のワークフローにどこから Solaris を差し込むかを3段階で提案します。シリーズ最終回。"
+  },
+  {
     "slug": "rtvfx-01-getting-started",
     "title": "リアルタイムVFXの学び始め — Real Time VFX の定番スレッドから",
     "category": "realtime-vfx",

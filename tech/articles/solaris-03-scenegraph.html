@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>シーングラフを読む・選ぶ — プリムパターンの5段階 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Solaris のほぼ全ノードで使う「どのプリムに効かせるか」の書き方を5段階で整理します。13種類のパターンを実機で評価して、当たるもの・当たらないものを確認しました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>シーングラフを読む・選ぶ — プリムパターンの5段階</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/solaris/pattern.html">Primitive matching patterns</a> /
+<a href="https://www.sidefx.com/docs/houdini/ref/panes/scenegraphtree.html">Scene Graph Tree pane</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/configureprimitive.html">Configure Primitive</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/collection.html">Collection</a>。
+このページは上記を日本語で要約・再構成した学習メモです。
+パターンの一致結果は Houdini 22.0.368 の実機で1つずつ評価して確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li>Scene Graph Tree と Scene Graph Details の<strong>役割の違い</strong></li>
+  <li><strong>プリムパターン</strong> — Solaris のほぼ全ノードで使う「どのプリムに効かせるか」の書き方</li>
+  <li>実機で13種類のパターンを評価して、何が当たって何が当たらないかを確認します</li>
+  <li><code>collection</code> / <code>configureprimitive</code> のノード解説</li>
+</ul>
+
+<h2>覚えるのはここだけ、という話</h2>
+
+<p>Solaris のノードを開くと、上のほうにたいてい <strong>Primitives</strong> という欄があります。
+「このノードをどのプリムに効かせるか」を書く欄です。</p>
+
+<p>これが<strong>ほぼ全部のノードで共通</strong>なので、書き方を1回覚えると、以降のノードが全部楽になります。
+逆にここが曖昧なままだと、ノードごとに「なぜか効かない」を繰り返すことになります。
+この回だけ少し前のめりに書いておくのは、そのためです。</p>
+
+<h2>まず、見る場所が2つある</h2>
+
+<p>シーンの中身を確認するパネルは2つあって、役割がはっきり分かれています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Scene Graph Tree</th><th>Scene Graph Details</th></tr></thead>
+  <tbody>
+    <tr><td>見るもの</td><td>プリムの<strong>並び</strong></td><td>1つのプリムの<strong>中身</strong></td></tr>
+    <tr><td>分かること</td><td>階層、型、Kind、表示・非表示</td><td>属性の名前と値、どのレイヤーから来たか</td></tr>
+    <tr><td>使うとき</td><td>「どこにあるんだっけ」</td><td>「この値、誰が書いた？」</td></tr>
+  </tbody>
+</table></div>
+
+<p>Details のほうは、第2回のレイヤーの話とつながっています。
+1つの属性が複数のレイヤーから来ているとき、どれが勝っているかがここで見えます。
+「パラメータを変えたのに反映されない」ときは、たいてい<strong>もっと強いレイヤーが上にいる</strong>ので、まずここを見ます。</p>
+
+<h2>プリムパターン — 5段階で覚える</h2>
+
+<p>いきなり全部覚える必要はなくて、下から順に足していけば大丈夫です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>段</th><th>書き方</th><th>例</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>パスをそのまま書く</td><td><code>/imported/box_geo</code></td></tr>
+    <tr><td>2</td><td>ワイルドカード</td><td><code>/imported/*</code> ／ <code>/**/*_geo</code></td></tr>
+    <tr><td>3</td><td>種類で選ぶ（オートコレクション）</td><td><code>%type:Mesh</code> ／ <code>%kind:component</code></td></tr>
+    <tr><td>4</td><td>組み合わせる</td><td><code>%type:Mesh ^ /imported/**</code></td></tr>
+    <tr><td>5</td><td>名前を付けて使い回す（コレクション）</td><td><code>%KeyLights</code></td></tr>
+  </tbody>
+</table></div>
+
+<h3>2段目 — ワイルドカード</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>記号</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>*</code></td><td>名前の中の任意の文字列。<strong>階層は跨ぎません</strong></td></tr>
+    <tr><td><code>**</code></td><td>階層を何段でも跨ぎます</td></tr>
+    <tr><td><code>?</code></td><td>任意の1文字</td></tr>
+    <tr><td><code>[...]</code></td><td>カッコの中のどれか1文字。<code>Leg[1234]</code> のように使います</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>*</code> と <code>**</code> の違いだけ押さえておけば十分です。
+「直下だけ」なら <code>*</code>、「以下ぜんぶ」なら <code>**</code>。</p>
+
+<h3>3段目 — 種類で選ぶ</h3>
+
+<p><code>%</code> で始まるのがオートコレクションです。パスを知らなくても、性質で選べます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>書き方</th><th>選ぶもの</th></tr></thead>
+  <tbody>
+    <tr><td><code>%type:Mesh</code></td><td>USD の型で選ぶ</td></tr>
+    <tr><td><code>%kind:component</code></td><td>Kind（アセットとしての単位）で選ぶ</td></tr>
+    <tr><td><code>%descendants(/imported)</code></td><td>あるプリムの子孫ぜんぶ</td></tr>
+    <tr><td><code>%ancestors(%type:Mesh)</code></td><td>あるプリムの親をたどる</td></tr>
+    <tr><td><code>%active(false)</code></td><td>止められているプリム</td></tr>
+    <tr><td><code>%bound(/cameras/camera1)</code></td><td>そのカメラの画角に入っているもの</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">書き方は2通りあって、<code>%kind:component</code> と <code>%kind(component)</code> は同じ意味です。
+引数が増えるものは関数の形のほうが読みやすいと思います。</p>
+
+<h3>4段目 — 組み合わせる</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>記号</th><th>意味</th><th>例</th></tr></thead>
+  <tbody>
+    <tr><td>スペース</td><td>足す（または）</td><td><code>%type:Mesh %type:Camera</code></td></tr>
+    <tr><td><code>&amp;</code></td><td>両方に当たるものだけ（かつ）</td><td><code>%type:Mesh &amp; %descendants(/imported)</code></td></tr>
+    <tr><td><code>^</code></td><td>引く</td><td><code>%type:Mesh ^ /imported/**</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>区切りがスペースで「または」</strong>というのが最初つまずくところです。
+複数のパスを並べて書くと、それは全部が対象になります。</p>
+
+<h2>実機で13種類、全部評価しました</h2>
+
+<p>言葉だけだと不安なので、Houdini 22.0.368 に第1回で組んだステージを読ませて、
+パターンを1つずつ評価させました。ステージの中身はこうです。</p>
+
+<svg viewBox="0 0 820 430" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="テストしたシーングラフの階層と、3つのプリムパターンがどの行に一致したかの対応表">
+  <rect x="8" y="8" width="804" height="414" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="28" y="34" font-size="14" font-weight="bold" fill="#203744">テストに使ったシーングラフ</text>
+
+  <text x="566" y="72" font-size="13" font-weight="bold" fill="#2CA9E1">A</text>
+  <text x="656" y="72" font-size="13" font-weight="bold" fill="#3fae6a">B</text>
+  <text x="746" y="72" font-size="13" font-weight="bold" fill="#e05252">C</text>
+  <path d="M28 80 H784" stroke="#dde3e8"/>
+
+  <text x="40" y="104" font-size="13" fill="#2b3a44">Render</text>
+  <text x="40" y="130" font-size="13" fill="#2b3a44">    rendersettings</text>
+  <text x="40" y="156" font-size="13" fill="#2b3a44">cameras</text>
+  <text x="40" y="182" font-size="13" fill="#2b3a44">    camera1</text>
+  <text x="330" y="182" font-size="12" fill="#7a868e">Camera</text>
+  <text x="40" y="208" font-size="13" fill="#2b3a44">imported</text>
+  <text x="330" y="208" font-size="12" fill="#7a868e">Xform / kind = component</text>
+  <text x="40" y="234" font-size="13" fill="#2b3a44">    box_geo</text>
+  <text x="330" y="234" font-size="12" fill="#7a868e">Mesh</text>
+  <text x="40" y="260" font-size="13" fill="#2b3a44">    sphere_geo</text>
+  <text x="330" y="260" font-size="12" fill="#7a868e">Mesh</text>
+  <text x="40" y="286" font-size="13" fill="#2b3a44">lights</text>
+  <text x="40" y="312" font-size="13" fill="#2b3a44">    domelight1</text>
+  <text x="330" y="312" font-size="12" fill="#7a868e">DomeLight_1</text>
+  <text x="40" y="338" font-size="13" fill="#2b3a44">sopcreate_direct</text>
+  <text x="330" y="338" font-size="12" fill="#7a868e">Xform / kind = component</text>
+  <text x="40" y="364" font-size="13" fill="#2b3a44">    torus_geo</text>
+  <text x="330" y="364" font-size="12" fill="#7a868e">Mesh</text>
+
+  <circle cx="570" cy="230" r="6" fill="#2CA9E1"/>
+  <circle cx="570" cy="256" r="6" fill="#2CA9E1"/>
+  <circle cx="570" cy="360" r="6" fill="#2CA9E1"/>
+
+  <circle cx="660" cy="204" r="6" fill="#3fae6a"/>
+  <circle cx="660" cy="334" r="6" fill="#3fae6a"/>
+
+  <circle cx="750" cy="230" r="6" fill="#e05252"/>
+  <circle cx="750" cy="256" r="6" fill="#e05252"/>
+
+  <path d="M28 384 H784" stroke="#dde3e8"/>
+  <text x="40" y="406" font-size="12" fill="#2CA9E1">A = %type:Mesh</text>
+  <text x="260" y="406" font-size="12" fill="#3fae6a">B = %kind:component</text>
+  <text x="530" y="406" font-size="12" fill="#e05252">C = /imported/*</text>
+</svg>
+
+<p>評価した結果がこちらです。数字は一致したプリムの個数です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パターン</th><th>数</th><th>一致したもの</th></tr></thead>
+  <tbody>
+    <tr><td><code>/**</code></td><td>17</td><td>ステージ全部</td></tr>
+    <tr><td><code>/imported/*</code></td><td>2</td><td><code>box_geo</code> <code>sphere_geo</code></td></tr>
+    <tr><td><code>/**/*_geo</code></td><td>3</td><td>3つの Mesh すべて（階層を跨ぎました）</td></tr>
+    <tr><td><code>%type:Mesh</code></td><td>3</td><td>3つの Mesh</td></tr>
+    <tr><td><code>%kind:component</code></td><td>2</td><td><code>/imported</code> <code>/sopcreate_direct</code></td></tr>
+    <tr><td><code>%type:Camera</code></td><td>1</td><td><code>/cameras/camera1</code></td></tr>
+    <tr><td><code>%descendants(/imported)</code></td><td>2</td><td><code>box_geo</code> <code>sphere_geo</code>（自分は入りません）</td></tr>
+    <tr><td><code>%ancestors(%type:Mesh)</code></td><td>2</td><td><code>/imported</code> <code>/sopcreate_direct</code></td></tr>
+    <tr><td><code>%type:Mesh %type:Camera</code></td><td>4</td><td>スペースは<strong>足し算</strong>でした</td></tr>
+    <tr><td><code>%type:Mesh &amp; %descendants(/imported)</code></td><td>2</td><td><code>&amp;</code> は<strong>かつ</strong></td></tr>
+    <tr><td><code>%type:Mesh ^ /imported/**</code></td><td>1</td><td><code>torus_geo</code> だけ。<code>^</code> は<strong>引き算</strong></td></tr>
+    <tr><td><code>%defined</code></td><td>17</td><td>全部（<code>over</code> だけのプリムは無い状態でした）</td></tr>
+    <tr><td><code>%active(false)</code></td><td>0</td><td>止めているものが無いので0</td></tr>
+  </tbody>
+</table></div>
+
+<p>「スペースは足し算」「<code>&amp;</code> はかつ」「<code>^</code> は引き算」の3つが確認できれば、
+4段目まではもう使えます。</p>
+
+<h2>実機で気づいたこと</h2>
+
+<h3>型の名前は「新しいほう」で書いても当たらないことがある</h3>
+
+<p>ドームライトを型で選ぼうとして、こうなりました。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パターン</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td><code>%type:DomeLight_1</code></td><td><span class="tx-green">1個</span></td></tr>
+    <tr><td><code>%type:DomeLight</code></td><td><span class="tx-red">0個</span></td></tr>
+    <tr><td><code>%type:Light</code></td><td><span class="tx-green">1個</span></td></tr>
+  </tbody>
+</table></div>
+
+<p>Houdini 22 の Dome Light LOP は、新しい <code>DomeLight_1</code> というスキーマでプリムを作ります。
+古い <code>DomeLight</code> という名前では当たりません。</p>
+
+<p>一方で、<strong>基底の型 <code>Light</code> で書けば当たりました</strong>。
+つまり <code>%type:</code> は継承をたどってくれます。
+バージョンによって型名が変わりうるところは、<strong>基底の型で書いておくほうが安全</strong>そうです。</p>
+
+<p class="tx-muted">型の正確な名前は Scene Graph Tree の Type 列に出ています。
+迷ったらそこをコピーするのがいちばん確実です。</p>
+
+<h3><code>/Render/**</code> に <code>/Render</code> 自身は入らない</h3>
+
+<p><code>/** ^ /Render/**</code> を評価したら 10 個返ってきて、その中に <code>/Render</code> が残っていました。
+<code>**</code> は<strong>子孫だけ</strong>で、自分自身は含みません。</p>
+
+<p>自分も含めたいときは <code>/Render /Render/**</code> のように並べて書くか、
+<code>%descendants(/Render, strict=false)</code> を使います。</p>
+
+<h3>無いオートコレクションは、エラーにならず0個になる</h3>
+
+<p>試しに <code>%light</code> や <code>%isa:Light</code> と書いてみたところ、
+<strong>エラーは出ず、静かに0個</strong>が返ってきました。</p>
+
+<p>これは地味に怖いところです。綴りを間違えても「何も当たらなかった」としか見えません。
+思った数が返ってこないときは、<strong>まず綴りを疑う</strong>のが早いです。</p>
+
+<h2>ノードごとの解説</h2>
+
+<h3>Collection <span class="tx-muted">collection</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>プリムパターンで選んだ集合に<strong>名前を付けて保存する</strong></td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td>Collection Name、Primitive Path（既定 <code>/collections</code>）、含める／除外するパターン</td></tr>
+    <tr><td>呼び出し方</td><td><code>%KeyLights</code>（<code>/collections</code> 上なら名前だけ）</td></tr>
+    <tr><td>向いている場面</td><td>同じ選択を何度も使うとき。他部署に渡す「窓口」を作りたいとき</td></tr>
+  </tbody>
+</table></div>
+
+<p>覚えておきたいのが <strong>Expansion Rule</strong> です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>No Expansion</td><td>書いたパスそのものだけ</td></tr>
+    <tr><td>Expand Primitives</td><td>その下の子孫も全部入る</td></tr>
+  </tbody>
+</table></div>
+
+<p>「入れたはずなのに子供が入っていない」はここが原因になりがちです。</p>
+
+<p class="tx-muted">コレクションは USD の標準機能なので、<strong>書き出したファイルにも残ります</strong>。
+「このアセットのライトはこれ」を <code>.usd</code> に埋めて渡せる、というのがコレクションの本当の価値だと思います。</p>
+
+<h3>Configure Primitive <span class="tx-muted">configureprimitive</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>プリムのメタデータをまとめて設定する</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>主な設定</td><td>Kind / Purpose / Visibility / Activation / Instanceable / Draw Mode</td></tr>
+    <tr><td>チェックボックス</td><td>第1回と同じで、<strong>オンにしたものだけが書き込まれます</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>ここで押さえておきたいのが <strong>Kind</strong> と <strong>Purpose</strong> の2つです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Kind</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>component</code></td><td>1個のアセット。それ以上分解しない単位</td></tr>
+    <tr><td><code>group</code></td><td>アセットをまとめたもの</td></tr>
+    <tr><td><code>assembly</code></td><td>いちばん外側のまとまり</td></tr>
+    <tr><td><code>subcomponent</code></td><td>component の中の部品</td></tr>
+  </tbody>
+</table></div>
+
+<p>第1回で <code>sopimport</code> の <code>kindschema</code> の既定が <code>component</code> だったのは、これです。
+Kind を付けておくと <code>%kind:component</code> で選べるようになるので、
+<strong>後の自分のために付けておく</strong>もの、と考えると納得しやすいと思います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Purpose</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>default</code></td><td>指定なし。普通に描かれます</td></tr>
+    <tr><td><code>render</code></td><td>本番用の高解像度ジオメトリ</td></tr>
+    <tr><td><code>proxy</code></td><td>軽い代役。テストレンダリング用</td></tr>
+    <tr><td><code>guide</code></td><td>ビューポートには出るが、レンダリングには出ない</td></tr>
+  </tbody>
+</table></div>
+
+<p>Purpose を使うと、レンダリング設定側で「render だけ描く」といった切り替えができます。
+重いシーンを回すときに効いてくる仕組みです。</p>
+
+<h3>Prune <span class="tx-muted">prune</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>選んだプリムを隠す、または止める</td></tr>
+    <tr><td>要のパラメータ</td><td>Target Rules（複数書けます）、<code>method</code></td></tr>
+    <tr><td><code>method</code> の既定</td><td><span class="tx-red"><code>makeinvisible</code></span>（Make Invisible）</td></tr>
+    <tr><td>便利な使い方</td><td>Prune Unselected をオンにすると<strong>「これ以外を消す」</strong>になります</td></tr>
+  </tbody>
+</table></div>
+
+<p>第2回で踏んだとおり、既定は「隠す」であって「止める」ではありません。
+ツリーからも消したいときは <code>deactivate</code> に変えます。</p>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>パターンを書いたのに0個</strong> → 綴り間違いでもエラーにならず0個になります。
+      まず <code>%</code> の後ろを疑ってください。</li>
+  <li><strong><code>%type:</code> が当たらない</strong> → 型名がバージョンで変わっている可能性があります。
+      Scene Graph Tree の Type 列をコピーするか、基底の型（<code>Light</code> など）で書きます。</li>
+  <li><strong><code>**</code> に自分自身が入っていない</strong> → 仕様です。
+      自分も含めるなら並べて書くか <code>%descendants(..., strict=false)</code>。</li>
+  <li><strong>コレクションに子供が入らない</strong> → Expansion Rule が No Expansion のままです。</li>
+  <li><strong>複数パスを書いたら全部に効いた</strong> → スペースは「または」です。絞りたいときは <code>&amp;</code>。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>「どのプリムか」を書けるようになったので、次は<strong>プリムを外から持ってくる</strong>回です。
+リファレンスとサブレイヤーの違い、そしてバリアント（同じアセットの色違い・LOD 違いを1つに束ねる仕組み）を扱います。
+アセットを組み合わせて1つのシーンにする、という Solaris の本領のところです。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/pattern.html">Primitive matching patterns — オートコレクションの全一覧</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/ref/panes/scenegraphtree.html">Scene Graph Tree pane</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/ref/panes/scenegraphdetails.html">Scene Graph Details pane</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/collection.html">Collection LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/configureprimitive.html">Configure Primitive LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/glossary.html">LOPs and USD glossary — Kind の説明</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

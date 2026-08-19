@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>書き出しとワークフローへの組み込み | 技術メモ | makeinufilm</title>
+  <meta name="description" content="USD ROP の Save Style 4種類で出力ファイルがどう変わるかを整理し、husk でのバッチレンダリングまで。既存のワークフローにどこから Solaris を差し込むかを3段階で提案します。シリーズ最終回。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>書き出しとワークフローへの組み込み</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/solaris/output.html">Writing out USD</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/out/usd.html">USD ROP</a> /
+<a href="https://www.sidefx.com/docs/houdini/ref/utils/husk.html">husk</a>。
+このページは上記を日本語で要約・再構成した学習メモです。
+パラメータ名と挙動は Houdini 22.0.368 の実機で確認しています。シリーズ最終回です。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li><strong>Save Style</strong> の4つ — 同じシーンでも、出てくるファイルの数と形が変わります</li>
+  <li>どのレイヤーがどのファイルになるか</li>
+  <li>アニメーションの書き出しと、メモリが足りなくなったときの逃げ道</li>
+  <li>husk でのバッチレンダリング</li>
+  <li><strong>既存のワークフローに、どこから Solaris を差し込むか</strong></li>
+</ul>
+
+<h2>出口は2つある</h2>
+
+<p>第0回に書いたことをもう一度。Solaris の出口は2つです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>出口</th><th>使うノード</th><th>出るもの</th></tr></thead>
+  <tbody>
+    <tr><td>USD を書き出す</td><td><code>usd_rop</code>（USD ROP）</td><td><code>.usd</code> ファイル群</td></tr>
+    <tr><td>画像を出す</td><td><code>usdrender_rop</code> / <code>karma</code></td><td><code>.exr</code> など</td></tr>
+  </tbody>
+</table></div>
+
+<p>名前が似ていて紛らわしいので、もう一度書いておきます。
+<strong><code>usd_rop</code> はファイル、<code>usdrender_rop</code> は絵</strong>です。</p>
+
+<h2>Save Style — 同じシーンでも出方が変わる</h2>
+
+<p>USD ROP でいちばん重要なパラメータがこれです。
+<strong>合成された結果は変わりません。変わるのは、ファイルが何個できるかだけ</strong>です。</p>
+
+<svg viewBox="0 0 820 420" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="USD ROP の Save Style 4種類で出力ファイルがどう変わるかの比較図">
+  <rect x="8" y="8" width="804" height="404" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="28" y="38" font-size="14" font-weight="bold" fill="#203744">Save Style ごとの出力ファイル</text>
+
+  <rect x="28" y="56" width="376" height="164" rx="6" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="48" y="82" font-size="13" font-weight="bold" fill="#203744">Flatten Implicit Layers</text>
+  <text x="248" y="82" font-size="11" fill="#2CA9E1">既定</text>
+  <text x="48" y="110" font-size="12" fill="#2b3a44">out.usd</text>
+  <text x="48" y="132" font-size="12" fill="#2b3a44">landscape.usd（参照のまま）</text>
+  <text x="48" y="164" font-size="11" fill="#7a868e">名前のないレイヤーだけを、いちばん近い</text>
+  <text x="48" y="180" font-size="11" fill="#7a868e">ファイル付きレイヤーに畳みます。</text>
+  <text x="48" y="200" font-size="11" fill="#3fae6a">参照・バリアントは残ります。</text>
+
+  <rect x="416" y="56" width="376" height="164" rx="6" fill="#ffffff" stroke="#7a868e"/>
+  <text x="436" y="82" font-size="13" font-weight="bold" fill="#203744">Flatten All Layers</text>
+  <text x="436" y="110" font-size="12" fill="#2b3a44">out.usd</text>
+  <text x="436" y="132" font-size="12" fill="#7a868e">（外部から参照したファイルは別のまま）</text>
+  <text x="436" y="164" font-size="11" fill="#7a868e">ファイル付きレイヤーも含めて、</text>
+  <text x="436" y="180" font-size="11" fill="#7a868e">サブレイヤーを1枚に畳みます。</text>
+  <text x="436" y="200" font-size="11" fill="#3fae6a">参照・バリアントは残ります。</text>
+
+  <rect x="28" y="236" width="376" height="164" rx="6" fill="#ffffff" stroke="#7a868e"/>
+  <text x="48" y="262" font-size="13" font-weight="bold" fill="#203744">Separate Layers</text>
+  <text x="48" y="290" font-size="12" fill="#2b3a44">out.usd</text>
+  <text x="48" y="312" font-size="12" fill="#2b3a44">layer_a.usd / layer_b.usd / …</text>
+  <text x="48" y="344" font-size="11" fill="#7a868e">何も畳まず、匿名レイヤーまで全部</text>
+  <text x="48" y="360" font-size="11" fill="#7a868e">別ファイルにします。</text>
+  <text x="48" y="380" font-size="11" fill="#e05252">デバッグ用。実運用には向きません。</text>
+
+  <rect x="416" y="236" width="376" height="164" rx="6" fill="#ffffff" stroke="#7a868e"/>
+  <text x="436" y="262" font-size="13" font-weight="bold" fill="#203744">Flatten Stage</text>
+  <text x="436" y="290" font-size="12" fill="#2b3a44">out.usd  ← これ1つだけ</text>
+  <text x="436" y="322" font-size="11" fill="#7a868e">参照もバリアントも全部焼き込みます。</text>
+  <text x="436" y="338" font-size="11" fill="#7a868e">どのレイヤー由来かの情報は消えます。</text>
+  <text x="436" y="358" font-size="11" fill="#e05252">選ばれなかったバリアントも消えます。</text>
+  <text x="436" y="380" font-size="11" fill="#7a868e">「履歴を消して1枚に固めたい」とき。</text>
+</svg>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Save Style</th><th>ひとことで</th><th>使いどころ</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Flatten Implicit Layers</strong>（既定）</td><td>名前のないレイヤーだけ畳む</td><td>ふだんはこれ</td></tr>
+    <tr><td>Flatten All Layers</td><td>サブレイヤーを全部畳む</td><td>持ち出し用に枚数を減らしたいとき</td></tr>
+    <tr><td>Separate Layers</td><td>全部バラバラ</td><td>「どのノードが何を書いたか」を見たいとき</td></tr>
+    <tr><td>Flatten Stage</td><td>合成を焼き込んで1枚</td><td>履歴を消して渡したいとき</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Flatten Stage だけは性質が違います</strong>。他の3つは合成の構造（参照・バリアント）を保ちますが、
+Flatten Stage は焼き込みます。<strong>選ばれなかったバリアントは消えます</strong>。
+第4回で作った「色違いを持ったアセット」も、1つの姿に固定されてしまいます。</p>
+
+<p class="tx-muted">「1ファイルにまとめたいけれど、履歴は残したい」という場合は、
+Flatten Stage ではなく <code>usdzip</code> で <code>.usdz</code> にする、という手があります。
+中身は複数ファイルのままで、外側が1つのアーカイブになります。</p>
+
+<h2>どのファイルがどこに出るか</h2>
+
+<p>ルールは2つだけです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>対象</th><th>出力先の決まり方</th></tr></thead>
+  <tbody>
+    <tr><td>ルートレイヤー</td><td>USD ROP の <strong>Output File</strong>（<code>lopoutput</code>）</td></tr>
+    <tr><td>保存パスを持つレイヤー</td><td><strong>そのレイヤーの Save Path</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>Save Path を付けるのが、第2回で出てきた <code>configurelayer</code> です。
+<code>sopimport</code> と <code>sopcreate</code> にも Save Path のパラメータがあります。</p>
+
+<p>パスは <code>$HIP/props/lamp.usd</code> のように<strong>絶対パスで書くのが推奨</strong>されています。
+書き出すときに Use Relative Paths という出力プロセッサが既定で動いていて、
+ファイル間の参照を<strong>相対パスに書き換えてくれる</strong>からです。
+そのおかげで、あとからフォルダごと移動しても壊れません。</p>
+
+<h3>Strip Layers Above Layer Breaks</h3>
+
+<p>第2回の Layer Break が実際に効くのは、このチェックボックスがあるからでした。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td>オン（既定）</td><td>Layer Break より前は書き出されません</td></tr>
+    <tr><td>オフ</td><td>Layer Break を無視して、全部書き出します</td></tr>
+  </tbody>
+</table></div>
+
+<p>オフにできるのが親切なところです。
+ふだんは差分だけ納品して、たまに「確認用にシーン全部が入ったファイルが欲しい」というとき、
+<strong>ネットワークを組み替えずにチェック1つで切り替えられます</strong>。</p>
+
+<h2>アニメーションを書き出す</h2>
+
+<p>フレーム範囲を書き出すときに知っておきたいのが <strong>Flush Data After Each Frame</strong> です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>動き</th><th>向いている場面</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>オフ（既定）</td>
+      <td>全フレームをメモリに溜めて、最後に一気に書く</td>
+      <td>ふつうのカット</td>
+    </tr>
+    <tr>
+      <td>オン</td>
+      <td>1フレームごとにディスクへ書く</td>
+      <td><strong>メモリが足りないとき</strong>。大量のデータ</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<p>書き出し中にメモリを使い切ってしまう、というのはよくある詰まり方です。
+そのときはこれをオンにすると、<strong>常に1フレーム分しかメモリに載らなくなります</strong>。
+そのぶん遅くなり、ファイルも少し大きくなりますが、書けなかったものが書けるようになります。</p>
+
+<p>オンにしたうえで出力パスに <code>$F4</code> を入れると、<strong>フレームごとに別ファイル</strong>になります。</p>
+
+<pre><code>$HIP/usd/scene_$F4.usd</code></pre>
+
+<p>この形で出したあと、<code>usdstitchclips</code> でまとめる、というのが大きなシーンの定番のようです。</p>
+
+<p class="tx-muted"><strong>Track Primitive Existence to Set Visibility</strong> も覚えておくと役に立ちます。
+フレームによってプリムが出たり消えたりするシーンを1つのファイルにまとめると、
+全フレームのプリムが合体してしまいます。これをオンにすると、
+出入りを<strong>可視性のアニメーション</strong>として書いてくれます。</p>
+
+<h2>画像を出す — husk</h2>
+
+<p>画像側の出口は <code>usdrender_rop</code> で、その裏で動いているのが <strong>husk</strong> です。
+<code>.usd</code> を受け取って絵にする、コマンドラインのプログラムです。</p>
+
+<p>ここがワークフロー的にいちばん効いてくるところだと思います。
+<strong>husk は Houdini の GUI を必要としません</strong>。つまり、</p>
+
+<ol>
+  <li>Houdini で <code>.usd</code> を書き出す</li>
+  <li>その <code>.usd</code> をレンダーファームに配る</li>
+  <li>各マシンで husk が絵にする</li>
+</ol>
+
+<p>という分業ができます。シーンの組み立てとレンダリングが、
+<code>.usd</code> というファイル1つで完全に切り離せる。
+これは <code>.hip</code> を配る運用とはかなり性格が違います。</p>
+
+<h2>どこから Solaris を差し込むか</h2>
+
+<p>ここまで書いてきて、最後に「で、明日から何をすればいいのか」という話をしておきます。
+いきなり全部を Solaris に移すのは大変なので、3段階に分けるのがよいかなと思っています。</p>
+
+<h3>第1段階 — レンダリングだけ置き換える</h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td><code>sceneimport</code> か <code>sopimport</code> で既存の <code>/obj</code> を持ち込み、Karma で出す</td></tr>
+    <tr><td>覚えるもの</td><td>第0回・第1回・第6回・第7回</td></tr>
+    <tr><td>得られるもの</td><td>ビューポートと最終レンダリングが同じになる</td></tr>
+  </tbody>
+</table></div>
+
+<p>USD のことはほとんど知らなくても済みます。
+まずここまでで一度回してみるのが、いちばん挫折しにくいと思います。</p>
+
+<h3>第2段階 — アセットを USD で持つ</h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>よく使うモデルを <code>.usd</code> で書き出し、<code>reference</code> で配置する</td></tr>
+    <tr><td>覚えるもの</td><td>第2回・第3回・第4回</td></tr>
+    <tr><td>得られるもの</td><td>同じものを何度置いても重くならない。直せば全部直る</td></tr>
+  </tbody>
+</table></div>
+
+<p>ここで初めてレイヤーとリファレンスが必要になります。逆に言うと、
+第1段階では要りません。<strong>必要になってから覚えれば十分</strong>です。</p>
+
+<h3>第3段階 — 分業する</h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>Layer Break で担当範囲を切り、差分だけを <code>.usd</code> で納品する</td></tr>
+    <tr><td>覚えるもの</td><td>第2回・第9回（この記事）</td></tr>
+    <tr><td>得られるもの</td><td>他の人の作業を壊さずに、自分の変更だけを渡せる</td></tr>
+  </tbody>
+</table></div>
+
+<p>1人で作業しているうちは要りません。
+人が増えたとき、あるいは<strong>過去の自分と分業したくなったとき</strong>に効いてきます。</p>
+
+<h2>検証機についての注意</h2>
+
+<p>このシリーズは Apprentice ライセンスの Houdini 22.0.368 で検証しました。
+書き出しまわりには、そこから来る制約が2つあります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>Apprentice（検証機）</th></tr></thead>
+  <tbody>
+    <tr><td>USD の書き出し</td><td><code>.usdnc</code> になる。テキストとして読めない</td></tr>
+    <tr><td>画像の解像度</td><td>上限あり。ウォーターマークが入る</td></tr>
+  </tbody>
+</table></div>
+
+<p>ノード名・パラメータ名・既定値・レイヤーの構造といった、このシリーズで扱ったことには影響しません。
+ただ、<strong>他の DCC やレンダーファームに <code>.usd</code> を渡す運用を組むなら、
+そこは本番ライセンスで一度確認してください</strong>。ここだけは検証機では確かめられませんでした。</p>
+
+<h2>シリーズのまとめ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>いちばん言いたかったこと</th></tr></thead>
+  <tbody>
+    <tr><td>00</td><td>ステージは空っぽ。ジオメトリ・ライト・カメラ・karma の4つで絵は出る</td></tr>
+    <tr><td>01</td><td>USD の階層は SOP 側のアトリビュートで決まる。LOP では直せない</td></tr>
+    <tr><td>02</td><td>Layer Break は見た目を変えない。変わるのは書き出したときだけ</td></tr>
+    <tr><td>03</td><td>プリムパターンを1回覚えると、以降のノードが全部楽になる</td></tr>
+    <tr><td>04</td><td>リファレンスはコピーではなくリンク。1か所直せば全部直る</td></tr>
+    <tr><td>05</td><td>マテリアルは箱、シェーダは中身。迷ったら MaterialX</td></tr>
+    <tr><td>06</td><td>カメラは常に Y up・−Z 向き。パラメータと USD の数字は違う</td></tr>
+    <tr><td>07</td><td>karma LOP は4つの詰め合わせ。Var → Product → Settings の入れ子</td></tr>
+    <tr><td>08</td><td>Quality は本数ではなく倍率。症状を見てから触る場所を決める</td></tr>
+    <tr><td>09</td><td>Save Style で出方が変わる。Flatten Stage だけは履歴が消える</td></tr>
+  </tbody>
+</table></div>
+
+<p>Solaris が複雑に見えるのは、たぶん「難しいものが1つある」のではなく、
+<strong>性質の違うものが同時に見えている</strong>からだと、書き終えてみて改めて思いました。
+1つずつなら、どれもそんなに大きくありません。</p>
+
+<p>長くなりましたが、最後までお読みいただきありがとうございました。
+どこか1つでも、詰まっていたところが解けていたら嬉しいです。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/output.html">Writing out USD</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/out/usd.html">USD ROP — Save Style の全説明</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/ref/utils/husk.html">husk</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/out/usdzip.html">USD Zip ROP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/out/usdstitchclips.html">USD Stitch Clips ROP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/jumpstart.html">Solaris Jumpstart</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/index.html">Solaris and USD</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

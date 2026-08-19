@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>サンプリングとノイズ — どのノイズにどれが効くのか | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Karma のサンプルが Primary と Secondary の2階建てになっていること、Quality が本数ではなく倍率であることを整理し、症状別にどのパラメータを触るかの早見表を作りました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>サンプリングとノイズ — どのノイズにどれが効くのか</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/solaris/kug/sampling.html">Karma User Guide — Sampling</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/karmarendersettings.html">Karma Render Settings</a>。
+このページは上記を日本語で要約・再構成した学習メモです。
+パラメータ名と既定値は Houdini 22.0.368 の実機で照会して確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li>ノイズは1種類ではない、という話</li>
+  <li>サンプルが<strong>2階建て</strong>になっていること（Primary と Secondary）</li>
+  <li>Quality は本数ではなく<strong>倍率</strong>だということ</li>
+  <li><strong>症状別に、どのパラメータを触ればいいか</strong>の早見表</li>
+</ul>
+
+<h2>「全部上げる」から抜け出す</h2>
+
+<p>ノイズが出たとき、とりあえずサンプル数を上げる、というのはよくやります。
+でもそれだと、<strong>効かないところにも計算時間を払う</strong>ことになります。</p>
+
+<p>Karma のサンプリングは、パラメータが多い代わりに<strong>効く場所がはっきり分かれています</strong>。
+「どこがザラついているか」を見てから触る場所を決められれば、時間がかなり変わります。
+この回はそのための地図を作ります。</p>
+
+<h2>サンプルは2階建て</h2>
+
+<p>まずここです。Karma のサンプルには2つの階層があります。</p>
+
+<svg viewBox="0 0 820 380" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="1ピクセルから飛ぶ一次サンプルと、面に当たった先から飛ぶ二次サンプルの2階層を示した図">
+  <rect x="8" y="8" width="804" height="364" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+
+  <rect x="46" y="140" width="66" height="66" fill="#ffffff" stroke="#203744" stroke-width="2"/>
+  <path d="M68 140 V206 M90 140 V206 M46 162 H112 M46 184 H112" stroke="#dde3e8"/>
+  <rect x="68" y="162" width="22" height="22" fill="#2CA9E1" opacity="0.25"/>
+  <text x="40" y="230" font-size="12" fill="#7a868e">1 ピクセル</text>
+
+  <path d="M330 100 L392 310" stroke="#203744" stroke-width="3" fill="none"/>
+  <text x="330" y="336" font-size="12" fill="#7a868e">面</text>
+
+  <path d="M80 173 L336 121" stroke="#2CA9E1" fill="none"/>
+  <path d="M80 173 L348 163" stroke="#2CA9E1" fill="none"/>
+  <path d="M80 173 L360 205" stroke="#2CA9E1" stroke-width="2" fill="none"/>
+  <path d="M80 173 L372 247" stroke="#2CA9E1" fill="none"/>
+  <path d="M80 173 L384 289" stroke="#2CA9E1" fill="none"/>
+
+  <text x="140" y="112" font-size="13" fill="#2CA9E1">Primary Samples</text>
+  <text x="140" y="132" font-size="11" fill="#7a868e">1ピクセルから何本飛ばすか。既定 9</text>
+
+  <circle cx="360" cy="205" r="5" fill="#3fae6a"/>
+
+  <path d="M360 205 L700 84" stroke="#3fae6a" stroke-dasharray="4 3" fill="none"/>
+  <path d="M360 205 L700 132" stroke="#3fae6a" stroke-dasharray="4 3" fill="none"/>
+  <path d="M360 205 L700 180" stroke="#3fae6a" stroke-dasharray="4 3" fill="none"/>
+  <path d="M360 205 L700 236" stroke="#3fae6a" stroke-dasharray="4 3" fill="none"/>
+  <path d="M360 205 L700 292" stroke="#3fae6a" stroke-dasharray="4 3" fill="none"/>
+
+  <text x="470" y="62" font-size="13" fill="#3fae6a">Secondary Samples</text>
+  <text x="470" y="82" font-size="11" fill="#7a868e">当たった先から何本飛ばすか。</text>
+  <text x="470" y="98" font-size="11" fill="#7a868e">Min 1 〜 Max 9 のあいだで自動調整</text>
+
+  <path d="M40 344 H780" stroke="#dde3e8"/>
+  <text x="46" y="366" font-size="11" fill="#7a868e">Noise Level（既定 0.01）を下回るまで、Secondary を Min から Max のあいだで自動的に増やします。</text>
+</svg>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Primary（一次）</th><th>Secondary（二次）</th></tr></thead>
+  <tbody>
+    <tr><td>飛ばす場所</td><td>カメラのピクセルから</td><td>面に当たった先から</td></tr>
+    <tr><td>効くノイズ</td><td>エッジ、モーションブラー、被写界深度</td><td>間接光、反射、屈折、ボリューム、SSS</td></tr>
+    <tr><td>パラメータ</td><td>Primary Samples（<code>samplesperpixel</code>）</td><td>Min / Max Secondary Samples ＋ 各 Quality</td></tr>
+    <tr><td>既定</td><td>9</td><td>1 〜 9</td></tr>
+  </tbody>
+</table></div>
+
+<p>これが分かると、切り分けが1段できます。
+<strong>輪郭がガタついている</strong>なら Primary、<strong>面の中がザラついている</strong>なら Secondary です。</p>
+
+<h2>Quality は本数ではなく倍率</h2>
+
+<p>ここが Karma でいちばん誤解しやすいところだと思います。</p>
+
+<p>Diffuse Quality、Reflection Quality といったパラメータは、
+<strong>それ自体がサンプル数ではありません</strong>。
+Min / Max Secondary Samples に<strong>掛ける倍率</strong>です。</p>
+
+<pre><code>実際のサンプル数 = Min〜Max Secondary Samples × その成分の Quality</code></pre>
+
+<p>既定はどれも <code>1.0</code>。だから既定状態では、どの成分も Min 1 〜 Max 9 で回っています。
+反射だけノイズが目立つなら <code>Reflection Quality</code> を 2 にする、
+つまり<strong>反射だけ倍のサンプルを使う</strong>、という指定になります。</p>
+
+<p>全体を上げたいなら Max Secondary Samples を上げる。
+特定の成分だけなら Quality を上げる。この二段構えです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Quality パラメータ</th><th>既定</th><th>効く場所</th></tr></thead>
+  <tbody>
+    <tr><td><code>diffusequality</code></td><td>1.0</td><td>間接光の回り込み</td></tr>
+    <tr><td><code>reflectquality</code></td><td>1.0</td><td>ぼけた反射</td></tr>
+    <tr><td><code>refractquality</code></td><td>1.0</td><td>すりガラスなどの屈折</td></tr>
+    <tr><td><code>volumequality</code></td><td>1.0</td><td>煙、霧、雲</td></tr>
+    <tr><td><code>sssquality</code></td><td>1.0</td><td>肌などの表面下散乱</td></tr>
+    <tr><td><code>light_sampling_quality</code></td><td>1.0</td><td>ライトの影の縁</td></tr>
+    <tr><td><code>offscreenquality</code></td><td><strong>0.1</strong></td><td>画面の外にあるものの寄与</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>offscreenquality</code> だけ既定が <strong>0.1</strong> です。
+画面に映っていないものは1/10の精度でいい、という割り切りですね。
+画面外の大きな反射面が映り込んでノイズになる場合は、ここを上げると効きます。</p>
+
+<h2>Noise Level — いつ止めるかの基準</h2>
+
+<p>Secondary が「Min 〜 Max のあいだで自動調整」なのは、
+<strong>適応サンプリング</strong>という仕組みが動いているからです。</p>
+
+<p>ざらつき具合を測って、まだ荒ければサンプルを足す。
+十分になったら Max に達していなくても止める。その打ち切り基準が <strong>Noise Level</strong>
+（<code>varianceaa_thresh</code>、既定 <strong>0.01</strong>）です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Noise Level</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td>大きくする（例 0.05）</td><td>早く止まる。速いがザラつく</td></tr>
+    <tr><td>小さくする（例 0.005）</td><td>粘る。きれいだが遅い</td></tr>
+  </tbody>
+</table></div>
+
+<p>Max Secondary Samples を上げてもノイズが減らないときは、
+<strong>Noise Level のほうで先に止まっている</strong>可能性があります。
+上限を上げただけでは、そこまで使ってくれないわけですね。この2つはセットで考えます。</p>
+
+<h2>Limit はノイズではなく「暗さ」に効く</h2>
+
+<p>名前が似ていて紛らわしいのですが、<strong>Limit 系はサンプル数ではありません</strong>。
+光が<strong>何回跳ね返るまで追いかけるか</strong>という回数の上限です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>既定</th><th>足りないとどうなるか</th></tr></thead>
+  <tbody>
+    <tr><td><code>diffuselimit</code></td><td><strong>1.0</strong></td><td>間接光が回らず、影が暗くなる</td></tr>
+    <tr><td><code>reflectionlimit</code></td><td>4.0</td><td>鏡どうしの映り込みが途中で黒くなる</td></tr>
+    <tr><td><code>refractionlimit</code></td><td>4.0</td><td>厚いガラスの奥が黒くなる</td></tr>
+    <tr><td><code>volumelimit</code></td><td><strong>0.0</strong></td><td>ボリュームの多重散乱が出ない</td></tr>
+    <tr><td><code>ssslimit</code></td><td>1.0</td><td>表面下散乱が浅くなる</td></tr>
+  </tbody>
+</table></div>
+
+<p>注目したいのが <code>diffuselimit</code> の既定が <strong>1</strong> だということです。
+間接光は<strong>1回しか跳ねません</strong>。室内シーンが思ったより暗いのは、たいていこれです。
+2〜3 に上げると一気に明るくなります（そのぶん重くなります）。</p>
+
+<p><code>volumelimit</code> が <strong>0</strong> なのも同じです。煙が平坦に見えるときは、ここを上げます。</p>
+
+<p class="tx-muted"><code>colorlimit</code>（既定 20）は、明るすぎるサンプルを頭打ちにするものです。
+小さな鏡面ハイライトが「白い点」としてチラチラするノイズ（ファイアフライ）を抑えるのに使います。
+下げるとノイズは減りますが、本来明るいはずのところも暗くなります。</p>
+
+<h2>症状別・触る順番</h2>
+
+<p>ここまでを1枚にまとめました。上から順に疑うと早いと思います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず触る</th><th>次に触る</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>輪郭がガタガタ</td>
+      <td>Primary Samples</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>動いているものがガタつく</td>
+      <td>Primary Samples</td>
+      <td>モーションブラーのサンプル設定</td>
+    </tr>
+    <tr>
+      <td>ボケた背景がザラつく</td>
+      <td>Primary Samples</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>面全体がまだらにザラつく</td>
+      <td>Max Secondary Samples</td>
+      <td>Noise Level を下げる</td>
+    </tr>
+    <tr>
+      <td>ぼけた反射だけザラつく</td>
+      <td>Reflection Quality</td>
+      <td>Max Secondary Samples</td>
+    </tr>
+    <tr>
+      <td>煙・霧がザラつく</td>
+      <td>Volume Quality</td>
+      <td>Volume Limit</td>
+    </tr>
+    <tr>
+      <td>影の縁がザラつく</td>
+      <td>Light Sampling Quality</td>
+      <td>ライト側の Samples</td>
+    </tr>
+    <tr>
+      <td>白い点がチラチラする</td>
+      <td>Color Limit を下げる</td>
+      <td>Reflection Quality</td>
+    </tr>
+    <tr>
+      <td>室内が暗い</td>
+      <td><strong>Diffuse Limit</strong>（既定 1）</td>
+      <td>ライトの Exposure</td>
+    </tr>
+    <tr>
+      <td>ガラスの奥が黒い</td>
+      <td>Refraction Limit</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>画面外の映り込みが荒い</td>
+      <td>Offscreen Quality（既定 0.1）</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<h2>デノイザー</h2>
+
+<p>計算で減らしきれない分は、後処理で消すという手があります。
+<code>denoiser</code> パラメータの既定は <code>off</code> で、選べるのは2つです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>正体</th></tr></thead>
+  <tbody>
+    <tr><td><code>off</code>（既定）</td><td>使わない</td></tr>
+    <tr><td><code>optix</code></td><td>NVIDIA の OptiX デノイザー。GPU が要ります</td></tr>
+    <tr><td><code>oidn</code></td><td>Intel Open Image Denoise。CPU でも動きます</td></tr>
+  </tbody>
+</table></div>
+
+<p>精度を上げたいときは <code>denoise_usealbedo</code> と <code>denoise_useN</code> をオンにします。
+アルベドと法線を手がかりに渡すので、ディテールが残りやすくなります。</p>
+
+<p class="tx-muted">デノイザーは万能ではありません。<strong>サンプルが足りなさすぎる絵</strong>にかけると、
+のっぺりしたり、細かいディテールが溶けたりします。
+まず必要なところにサンプルを配って、最後の仕上げに使うのがよさそうです。</p>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>Quality を上げても変わらない</strong> → Quality は倍率です。
+      Max Secondary Samples が小さいと、倍にしても大した数になりません。</li>
+  <li><strong>Max Secondary を上げても変わらない</strong> → Noise Level で先に止まっています。
+      こちらも下げます。</li>
+  <li><strong>サンプルを上げても輪郭が直らない</strong> → 触っているのが Secondary です。輪郭は Primary。</li>
+  <li><strong>CPU なのに Path Traced Samples を触っている</strong> → 第7回のとおり、エンジンごとに使われる方が違います。</li>
+  <li><strong>室内が暗い</strong> → ノイズではなく Diffuse Limit（既定 1）です。ライトを上げる前に確認します。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>いよいよ最終回です。ここまでで作ったものを<strong>書き出して、ワークフローに組み込む</strong>ところをまとめます。
+<code>.usd</code> の書き出し方、Save Style の使い分け、husk でのバッチレンダリング、
+そして「Solaris をどこから使い始めるか」という話で締めます。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/kug/sampling.html">Karma User Guide — Sampling</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/karmarendersettings.html">Karma Render Settings LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/karma_xpu.html">Karma XPU</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/kug/index.html">Karma User Guide</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

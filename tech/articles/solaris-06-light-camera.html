@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ライトとカメラ — 型の対応と、数字が変わる話 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="ライトのノードが USD 側でどの型になるかを実測し、Intensity と Exposure の関係を整理します。カメラの Focal Length が 50 と 0.5 で食い違う理由も確認しました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>ライトとカメラ — 型の対応と、数字が変わる話</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/light.html">Light</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/domelight.html">Dome Light</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/camera.html">Camera</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/lightmixer.html">Light Mixer</a>。
+このページは上記を日本語で要約・再構成した学習メモです。
+ノードのメニューと USD の型の対応、パラメータの値は Houdini 22.0.368 の実機で確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li>ライトのノードが、USD 側で<strong>どの型になるのか</strong>（実測しました）</li>
+  <li>明るさの決まり方 — Intensity と Exposure の関係</li>
+  <li>カメラの3つの約束と、<strong>パラメータの数字が USD に入る数字と違う</strong>という話</li>
+  <li><code>light</code> / <code>domelight</code> / <code>lightmixer</code> / <code>lightlinker</code> / <code>camera</code> のノード解説</li>
+</ul>
+
+<h2>ライトのノードは3種類に分かれる</h2>
+
+<p>LOP のライトは、見た目より整理されています。3つのグループに分けて考えると迷いません。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>グループ</th><th>ノード</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>形のあるライト</td>
+      <td><code>light</code></td>
+      <td>1ノードでメニュー切り替え。長方形・球・円盤・円柱・点・平行光</td>
+    </tr>
+    <tr>
+      <td>環境光</td>
+      <td><code>domelight</code> / <code>karmaskydomelight</code></td>
+      <td>周囲ぜんぶから当てる。HDRI を貼るのはこれ</td>
+    </tr>
+    <tr>
+      <td>特殊</td>
+      <td><code>distantlight</code> / <code>geometrylight</code> / <code>portallight</code></td>
+      <td>太陽光、ジオメトリ自体を光らせる、窓からの光を効率化する</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<h3>メニューと USD の型の対応（実測）</h3>
+
+<p><code>light</code> LOP のメニューを切り替えて、実際にどの型のプリムができるか確かめました。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノードのメニュー</th><th>できる USD の型</th></tr></thead>
+  <tbody>
+    <tr><td>UsdLuxRectLight</td><td><code>RectLight</code></td></tr>
+    <tr><td>UsdLuxDiskLight</td><td><code>DiskLight</code></td></tr>
+    <tr><td>UsdLuxSphereLight</td><td><code>SphereLight</code></td></tr>
+    <tr><td>UsdLuxCylinderLight</td><td><code>CylinderLight</code></td></tr>
+    <tr><td>UsdLuxDistantLight</td><td><code>DistantLight</code></td></tr>
+    <tr><td><strong>point</strong></td><td><code>SphereLight</code> ＋ <code>treatAsPoint = true</code></td></tr>
+    <tr><td>Dome Light LOP</td><td><code>DomeLight_1</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>面白いのが <strong>point</strong> です。専用の型があるわけではなく、
+<strong>球ライトに「点として扱う」という旗を立てただけ</strong>でした。
+実機で <code>treatAsPoint</code> を読んだら <code>true</code> になっていました。</p>
+
+<p>これは第3回のプリムパターンにも効いてきます。点光源を選びたいと思って
+<code>%type:PointLight</code> と書いても<strong>0個</strong>です。<code>%type:SphereLight</code> が正解になります。</p>
+
+<h2>明るさの決まり方</h2>
+
+<p>ライトのパラメータは多いのですが、明るさに効くのは実質この4つです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>USD の属性</th><th>効き方</th></tr></thead>
+  <tbody>
+    <tr><td>Intensity</td><td><code>inputs:intensity</code></td><td>そのまま倍率。既定 1</td></tr>
+    <tr><td>Exposure</td><td><code>inputs:exposure</code></td><td><strong>2のべき乗</strong>で効きます。既定 0</td></tr>
+    <tr><td>Color</td><td><code>inputs:color</code></td><td>色。既定 (1, 1, 1)</td></tr>
+    <tr><td>Normalize</td><td><code>inputs:normalize</code></td><td>大きさで割るかどうか。既定オフ</td></tr>
+  </tbody>
+</table></div>
+
+<p>Intensity と Exposure が両方あるのは、<strong>掛け算の道具が2つある</strong>ということです。
+最終的な明るさは、ざっくり <code>intensity × 2^exposure</code> になります。</p>
+
+<p>Exposure を 1 増やすと2倍、2 増やすと4倍。カメラの露出と同じ感覚ですね。
+細かく詰めるときは Intensity、大きく振るときは Exposure、という使い分けがしやすいと思います。</p>
+
+<p><strong>Normalize</strong> は引っかかりやすいところです。オフのままだと、
+ライトを大きくすると<strong>その分だけ明るくなります</strong>（面積が増えるので当然といえば当然です）。
+オンにすると、大きさを変えても明るさが変わりません。
+「柔らかくしたいだけなのに明るくなってしまう」ときは、ここをオンにします。</p>
+
+<p class="tx-muted">色温度で指定したい場合は Enable Color Temperature をオンにします。
+既定はオフで、そのときは Color がそのまま使われます。</p>
+
+<h2>カメラの3つの約束</h2>
+
+<p>USD のカメラには、覚えておかないと混乱する決まりが3つあります。</p>
+
+<svg viewBox="0 0 820 360" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="USD カメラは常にY軸が上でマイナスZ方向を向くという図と、パラメータの値とUSDに入る値が異なることを示す図">
+  <rect x="8" y="8" width="462" height="344" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="28" y="34" font-size="14" font-weight="bold" fill="#203744">カメラの向き</text>
+
+  <path d="M250 200 V80" stroke="#203744" stroke-width="2" fill="none" marker-end="url(#ar6)"/>
+  <text x="258" y="80" font-size="13" fill="#203744">+Y</text>
+  <text x="258" y="98" font-size="11" fill="#7a868e">上（常に）</text>
+
+  <path d="M250 200 H420" stroke="#7a868e" stroke-width="2" fill="none" marker-end="url(#ar6b)"/>
+  <text x="424" y="204" font-size="13" fill="#7a868e">+X</text>
+
+  <path d="M250 200 L120 284" stroke="#2CA9E1" stroke-width="2" fill="none" marker-end="url(#ar6c)"/>
+  <text x="96" y="306" font-size="13" fill="#2CA9E1">−Z</text>
+  <text x="130" y="322" font-size="11" fill="#2CA9E1">この向きを見ています</text>
+
+  <path d="M240 190 L118 240 L152 310 L262 218 Z" fill="#ffffff" stroke="#2CA9E1" stroke-dasharray="4 3"/>
+  <rect x="232" y="182" width="38" height="34" rx="4" fill="#203744"/>
+
+  <text x="28" y="342" font-size="11" fill="#7a868e">ステージの up axis が Z でも、カメラだけは Y up のままです。</text>
+
+  <rect x="482" y="8" width="330" height="344" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="502" y="34" font-size="14" font-weight="bold" fill="#203744">見る場所で数字が違う</text>
+
+  <rect x="512" y="70" width="270" height="70" rx="5" fill="#ffffff" stroke="#7a868e"/>
+  <text x="530" y="96" font-size="12" fill="#7a868e">Camera LOP のパラメータ</text>
+  <text x="530" y="124" font-size="18" fill="#2b3a44">Focal Length = 50</text>
+
+  <path d="M647 140 V186" stroke="#203744" stroke-width="2" fill="none" marker-end="url(#ar6)"/>
+  <text x="660" y="168" font-size="11" fill="#7a868e">USD に書かれるとき</text>
+
+  <rect x="512" y="190" width="270" height="70" rx="5" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="530" y="216" font-size="12" fill="#7a868e">USD の属性</text>
+  <text x="530" y="244" font-size="18" fill="#2CA9E1">focalLength = 0.5</text>
+
+  <text x="512" y="296" font-size="11" fill="#7a868e">パラメータはミリメートル。USD は「ワールド単位の 1/10」。</text>
+  <text x="512" y="314" font-size="11" fill="#7a868e">metersPerUnit = 1 のとき、ちょうど 1/100 になります。</text>
+  <text x="512" y="336" font-size="11" fill="#e05252">他のソフトで開いて数字が違っても、壊れてはいません。</text>
+
+  <defs>
+    <marker id="ar6" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#203744"/>
+    </marker>
+    <marker id="ar6b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#7a868e"/>
+    </marker>
+    <marker id="ar6c" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#2CA9E1"/>
+    </marker>
+  </defs>
+</svg>
+
+<h3>約束1 — 常に Y が上</h3>
+
+<p>USD のカメラは、<strong>ステージの up axis が何であっても Y up</strong> です。
+Houdini のシーンを Z up で作っていても、カメラだけは Y up。ここは例外です。</p>
+
+<h3>約束2 — 常に −Z を向く</h3>
+
+<p>カメラが見ているのは常に <strong>−Z 方向</strong>です。
+カメラの向きを式で作るときは、これを前提にします。</p>
+
+<h3>約束3 — パラメータの数字と USD の数字は違う</h3>
+
+<p>これが実機でいちばん驚いたところです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>見る場所</th><th>Focal Length の値</th></tr></thead>
+  <tbody>
+    <tr><td>Camera LOP のパラメータ</td><td><code>50</code></td></tr>
+    <tr><td>USD の <code>focalLength</code> 属性</td><td><code>0.5</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>パラメータは<strong>ミリメートル</strong>で入力しますが、USD は
+<strong>「ワールド単位の 1/10」</strong>で保存するという決まりになっています。
+ステージの <code>metersPerUnit</code> が 1 なら、50mm = 0.05m = 0.5、というわけですね。</p>
+
+<p>Scene Graph Details で数字を見て「あれ？」となっても、壊れてはいません。
+Aperture 系のパラメータも同じ扱いです。</p>
+
+<h2>ノードごとの解説</h2>
+
+<h3>Light <span class="tx-muted">light</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>形のあるライトを1つ作る（または既存を編集する）</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>lighttype</code>、<code>primpath</code>（既定 <code>/lights/$OS</code>）、Intensity、Exposure</td></tr>
+    <tr><td>ビューポート操作</td><td>Enter でハンドル。Shift+D で「面に対して垂直に置く」、Shift+S で「ここにハイライトが出るように置く」</td></tr>
+  </tbody>
+</table></div>
+
+<p>ビューポートでの置き方が便利なので、少し書いておきます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>キー</th><th>モード</th></tr></thead>
+  <tbody>
+    <tr><td>Shift + D</td><td>クリックした面に対して垂直にライトを置く</td></tr>
+    <tr><td>Shift + S</td><td>クリックした場所に<strong>ハイライトが出るように</strong>置く</td></tr>
+    <tr><td>Shift + F</td><td>影の落ち方を見ながら置く</td></tr>
+    <tr><td>Shift + T</td><td>Look At を有効にして、狙いを付ける</td></tr>
+    <tr><td>Ctrl + Shift ドラッグ</td><td>明るさを変える</td></tr>
+  </tbody>
+</table></div>
+
+<p>Shift+S は、ハイライトの位置からライトの位置を逆算してくれるものです。
+「そこが光ってほしい」から入れるので、考え方として素直だと思います。</p>
+
+<h3>Dome Light <span class="tx-muted">domelight</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>周囲ぜんぶから当てる環境光を作る</td></tr>
+    <tr><td>要のパラメータ</td><td>Texture（HDRI のパス）、Format、Pole Axis、Intensity / Exposure</td></tr>
+    <tr><td>Format</td><td>既定は Automatic。緯度経度マップかキューブマップかを推測します</td></tr>
+    <tr><td>Pole Axis</td><td>ドームの上をどこに向けるか。既定は Scene（ステージの up axis に合わせる）</td></tr>
+    <tr><td>Portals</td><td>窓がある室内で、サンプリングを効率化するための誘導口</td></tr>
+  </tbody>
+</table></div>
+
+<p>第0回の最小構成でこれを1つ置いただけで絵が出たのは、
+テクスチャが無くても<strong>白い環境光として機能する</strong>からです。</p>
+
+<p class="tx-muted">Houdini 22 の Dome Light は <code>DomeLight_1</code> という新しいスキーマでプリムを作ります。
+古い <code>DomeLight</code> ではないので、パターンで拾うときは注意です（第3回参照）。</p>
+
+<h3>Light Mixer <span class="tx-muted">lightmixer</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>シーン中のライトを<strong>1枚のパネルにまとめて</strong>、スライダーで調整する</td></tr>
+    <tr><td>向いている場面</td><td>ライトが増えてきて、ノードを行き来するのがつらくなったとき</td></tr>
+  </tbody>
+</table></div>
+
+<p>照明の調整は「全体のバランス」を見る作業なので、
+ノードを1つずつ開くより、こういうパネルのほうが速いです。</p>
+
+<h3>Light Linker <span class="tx-muted">lightlinker</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>「このライトは、このオブジェクトだけを照らす」という関係を作る</td></tr>
+    <tr><td>向いている場面</td><td>物理的には正しくないけれど、絵として必要な調整</td></tr>
+  </tbody>
+</table></div>
+
+<p>指定にはプリムパターンが使えます。第3回のコレクションと組み合わせると管理しやすくなります。</p>
+
+<h3>Camera <span class="tx-muted">camera</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>USD のカメラを作る</td></tr>
+    <tr><td>要のパラメータ</td><td><code>primpath</code>（既定 <code>/cameras/$OS</code>）、Projection、Focal Length（既定 50）、
+        Horizontal Aperture、Clipping Range</td></tr>
+    <tr><td>被写界深度</td><td>F-Stop と Focus Distance。Shift+F で焦点面を可視化できます</td></tr>
+    <tr><td>Look At</td><td>他のプリムを狙わせる。Constraints セクション</td></tr>
+  </tbody>
+</table></div>
+
+<p>Aperture の指定方法が2通りある点だけ補足しておきます。
+Control Aperture を <strong>Set Horizontal Aperture and Aspect Ratio</strong> にすると、
+横幅とアスペクト比で指定できます。この形にしておくと、
+Render Settings 側が<strong>解像度を自動で合わせられる</strong>ようになります。</p>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>ライトを大きくしたら明るくなりすぎた</strong> → Normalize をオンにします。</li>
+  <li><strong><code>%type:PointLight</code> で選べない</strong> → 点光源は <code>SphereLight</code> です。
+      <code>treatAsPoint</code> が立っているだけの球ライトでした。</li>
+  <li><strong>Scene Graph Details の数字がパラメータと違う</strong> → 仕様です。
+      mm と「ワールド単位の 1/10」の違いで、だいたい 1/100 になります。</li>
+  <li><strong>Z up のシーンなのにカメラが変な向き</strong> → USD のカメラは常に Y up・−Z 向きです。</li>
+  <li><strong>ドームライトの回転が思ったのと違う</strong> → Pole Axis を確認します。既定は Scene です。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>ジオメトリ、マテリアル、ライト、カメラ。絵にするための材料はこれで全部そろいました。
+次回はいよいよ Karma を回します。<code>karma</code> LOP の中身を分解して、
+Render Settings / Render Product / Render Var が<strong>それぞれ何を決めているのか</strong>を見ていきます。
+AOV の出し方もここで扱います。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/light.html">Light LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/domelight.html">Dome Light LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/camera.html">Camera LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/lightmixer.html">Light Mixer LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/lightlinker.html">Light Linker LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/lighting.html">Lighting in Solaris</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karma を回す — 4つの詰め合わせを分解する | 技術メモ | makeinufilm</title>
+  <meta name="description" content="karma LOP に入っている Render Var / Render Product / Render Settings / USD Render ROP の役割を分けて整理します。標準 AOV セットの中身も実機で確認しました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Karma を回す — 4つの詰め合わせを分解する</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/karma.html">Karma LOP</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/rendervar.html">Render Var</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/renderproduct.html">Render Product</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/kug/index.html">Karma User Guide</a>。
+このページは上記を日本語で要約・再構成した学習メモです。
+できるプリムの構造と AOV の一覧は Houdini 22.0.368 の実機で確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li><code>karma</code> LOP が<strong>4つのノードの詰め合わせ</strong>であること、その内訳</li>
+  <li>Render Settings / Render Product / Render Var が<strong>それぞれ何を決めているか</strong></li>
+  <li>CPU と XPU の切り替え</li>
+  <li>AOV の出し方（実機で標準セットを作って中身を確認しました）</li>
+</ul>
+
+<h2>karma LOP を開けると4つ入っている</h2>
+
+<p>第0回で少しだけ触れたところを、ここできちんと分解します。
+公式ドキュメントの説明はこうです。</p>
+
+<blockquote>
+  <p>Karma LOP は Render Vars / Render Product / Karma Render Settings / USD Render ROP の機能を
+  1つにまとめたもので、Karma 固有の設定も含めて1か所で構成できるようにしたノードです。</p>
+</blockquote>
+
+<p>つまり <code>karma</code> LOP を1個置くというのは、<strong>4つのノードをまとめて置いている</strong>のと同じです。
+そして置いた瞬間に、ステージに <code>/Render</code> という枝ができます。</p>
+
+<svg viewBox="0 0 820 400" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="karma LOP に含まれる4つの機能と、それぞれが作る USD プリムの対応図">
+  <rect x="8" y="8" width="382" height="384" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="28" y="34" font-size="14" font-weight="bold" fill="#203744">karma LOP の中身</text>
+
+  <rect x="28" y="48" width="342" height="330" rx="6" fill="#ffffff" stroke="#203744" stroke-width="2"/>
+
+  <rect x="48" y="70" width="302" height="66" rx="4" fill="#f4f7f9" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="66" y="94" font-size="13" fill="#2b3a44">Render Var</text>
+  <text x="66" y="118" font-size="11" fill="#7a868e">何を出すか（ビューティ、深度、法線…）</text>
+
+  <rect x="48" y="150" width="302" height="66" rx="4" fill="#f4f7f9" stroke="#3fae6a" stroke-width="2"/>
+  <text x="66" y="174" font-size="13" fill="#2b3a44">Render Product</text>
+  <text x="66" y="198" font-size="11" fill="#7a868e">どのファイルにまとめるか</text>
+
+  <rect x="48" y="230" width="302" height="66" rx="4" fill="#f4f7f9" stroke="#e05252" stroke-width="2"/>
+  <text x="66" y="254" font-size="13" fill="#2b3a44">Karma Render Settings</text>
+  <text x="66" y="278" font-size="11" fill="#7a868e">どう計算するか（解像度、サンプル、CPU/XPU）</text>
+
+  <rect x="48" y="310" width="302" height="52" rx="4" fill="#f4f7f9" stroke="#7a868e"/>
+  <text x="66" y="334" font-size="13" fill="#2b3a44">USD Render ROP</text>
+  <text x="66" y="352" font-size="11" fill="#7a868e">実行する</text>
+
+  <rect x="402" y="8" width="410" height="384" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="422" y="34" font-size="14" font-weight="bold" fill="#203744">できるプリム（実測）</text>
+
+  <text x="430" y="76" font-size="13" fill="#2b3a44">/Render</text>
+  <text x="600" y="76" font-size="11" fill="#7a868e">Scope</text>
+
+  <text x="450" y="106" font-size="13" fill="#e05252">rendersettings</text>
+  <text x="600" y="106" font-size="11" fill="#7a868e">RenderSettings</text>
+
+  <text x="450" y="136" font-size="13" fill="#2b3a44">Products</text>
+  <text x="600" y="136" font-size="11" fill="#7a868e">Scope</text>
+
+  <text x="470" y="166" font-size="13" fill="#3fae6a">renderproduct</text>
+  <text x="600" y="166" font-size="11" fill="#7a868e">RenderProduct</text>
+
+  <text x="470" y="196" font-size="13" fill="#3fae6a">checkpoint</text>
+  <text x="600" y="196" font-size="11" fill="#7a868e">RenderProduct</text>
+
+  <text x="470" y="226" font-size="13" fill="#2b3a44">Vars</text>
+  <text x="600" y="226" font-size="11" fill="#7a868e">Scope</text>
+
+  <text x="490" y="256" font-size="13" fill="#2CA9E1">Beauty</text>
+  <text x="600" y="256" font-size="11" fill="#7a868e">RenderVar</text>
+
+  <text x="490" y="286" font-size="13" fill="#2CA9E1">ignored_checkpoint_rendervar</text>
+
+  <path d="M422 310 H792" stroke="#dde3e8"/>
+  <text x="422" y="336" font-size="11" fill="#7a868e">色は左の箱と対応しています。</text>
+  <text x="422" y="356" font-size="11" fill="#7a868e">karma LOP を1個置くだけで、この7個のプリムができました。</text>
+  <text x="422" y="376" font-size="11" fill="#7a868e">パラメータは何も触っていません。</text>
+
+  <defs></defs>
+</svg>
+
+<h2>3つのプリムの役割</h2>
+
+<p>名前が似ていて混乱しやすいので、一言ずつで区別しておきます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>プリム</th><th>ひとことで</th><th>決めること</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>RenderVar</td>
+      <td><strong>何を</strong></td>
+      <td>1枚の画像に入る1種類のデータ。ビューティ、深度、法線、Cryptomatte など</td>
+    </tr>
+    <tr>
+      <td>RenderProduct</td>
+      <td><strong>どこへ</strong></td>
+      <td>RenderVar を集めて1つのファイルにする。パスと形式</td>
+    </tr>
+    <tr>
+      <td>RenderSettings</td>
+      <td><strong>どう計算するか</strong></td>
+      <td>カメラ、解像度、サンプル数、エンジン。Product をどれ使うかも</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<p>入れ子で覚えると簡単です。<strong>Var が集まって Product になり、Product を Settings が束ねる</strong>。
+料理でいうと、Var が材料、Product が皿、Settings がレシピですね。</p>
+
+<p class="tx-muted">Pixar の仕様では、これら3種類のプリムは <code>/Render</code> の下に置くことになっています。
+レンダリング側がツリー全体を探し回らなくて済むようにするためです。
+Houdini の既定値がそうなっているのは、この決まりに従っているからでした。</p>
+
+<h2>CPU と XPU</h2>
+
+<p>切り替えは <code>Engine Settings</code>（内部名 <code>engine</code>）ひとつです。実機で確認した既定は <code>cpu</code> でした。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Karma CPU</th><th>Karma XPU</th></tr></thead>
+  <tbody>
+    <tr><td>速度</td><td>遅い</td><td>速い</td></tr>
+    <tr><td>機能</td><td>多い。挙動もより正確</td><td>CPU を追いかける形で、いくらか少ない</td></tr>
+    <tr><td>サンプル数のパラメータ</td><td><code>samplesperpixel</code>（既定 9）</td><td><code>pathtracedsamples</code>（既定 128）</td></tr>
+    <tr><td>マテリアル</td><td>MaterialX / Principled / USD Preview</td><td>MaterialX / USD Preview のみ</td></tr>
+    <tr><td>GPU の条件</td><td>—</td><td>現状 NVIDIA のみ</td></tr>
+  </tbody>
+</table></div>
+
+<p>サンプル数のパラメータが<strong>2つ並んでいて、エンジンによって使われる方が変わる</strong>のが罠です。
+CPU なのに <code>Path Traced Samples</code> をいくら上げても何も変わりません。
+逆もまた然りです。ここは第8回でもう一度扱います。</p>
+
+<h2>AOV を出す</h2>
+
+<p>AOV（追加の画像プレーン）を足す方法は3通りあります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>やり方</th><th>手間</th><th>向いている場面</th></tr></thead>
+  <tbody>
+    <tr><td><code>karmastandardrendervars</code> を置く</td><td>1ノード</td><td>まず定番を全部出したいとき</td></tr>
+    <tr><td><code>additionalrendervars</code> を置く</td><td>チェックを入れる</td><td>定番から少し足したいとき</td></tr>
+    <tr><td><code>rendervar</code> を1つずつ置く</td><td>細かい</td><td>LPE で自分で定義したいとき</td></tr>
+  </tbody>
+</table></div>
+
+<h3>標準セットの中身（実測）</h3>
+
+<p><code>karmastandardrendervars</code> を1つ置いたら、これだけできました。</p>
+
+<pre><code>/Render/Products/Vars/
+├─ beauty                     ビューティ
+├─ combineddiffuse            ディフューズ
+├─ combinedglossyreflection   反射
+├─ combinedvolume             ボリューム
+├─ hitPz                      深度
+├─ hituv                      UV
+└─ hitN                       法線</code></pre>
+
+<p>コンポジットでよく使うものが一通りそろっています。
+まずこれを置いて、足りないものだけ足す、という順番が楽だと思います。</p>
+
+<h3>自分で作るとき</h3>
+
+<p><code>rendervar</code> を使うときに決めるのは、基本この3つです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>Data Type（既定 <code>color3f</code>）</td><td>データの型。EXR のチャンネル名がこれで決まります</td></tr>
+    <tr><td>Source Name</td><td>何を取ってくるか</td></tr>
+    <tr><td>Source Type</td><td>Source Name の読み方。Raw / Primvar / <strong>LPE</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>Data Type が地味に効きます。<code>color3f</code> なら EXR のチャンネル名は <code>R</code>/<code>G</code>/<code>B</code>、
+<code>normal3f</code> なら <code>x</code>/<code>y</code>/<code>z</code> になります。
+コンポジット側でチャンネルが見つからないときは、まずここを疑うとよさそうです。</p>
+
+<p><strong>LPE</strong>（Light Path Expression）を選ぶと、光の経路を式で指定できます。
+「このライトからの直接光だけ」「2回反射した成分だけ」といった切り出し方ができるもので、
+Karma の AOV の本領はここにあります。</p>
+
+<h2>ノードごとの解説</h2>
+
+<h3>Karma <span class="tx-muted">karma</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レンダリングの設定と実行を1か所でまとめる</td></tr>
+    <tr><td>入力</td><td>1〜2（最低1つ必要。generator ではありません）</td></tr>
+    <tr><td>パラメータ数</td><td>80（Houdini 22.0.368 実測）</td></tr>
+    <tr><td>出力</td><td><strong>設定済みの USD ステージ</strong>。下流にもう1つ LOP を繋げます</td></tr>
+  </tbody>
+</table></div>
+
+<p>ここは見落としやすいところですが、<code>karma</code> LOP は<strong>行き止まりではありません</strong>。
+出力はステージなので、下流でさらに編集したり、そのまま <code>.usd</code> に書き出したりできます。
+「レンダリング設定を含んだシーン」を納品する、という使い方ができるわけです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>既定値</th></tr></thead>
+  <tbody>
+    <tr><td>Camera（<code>camera</code>）</td><td><code>/cameras/camera1</code></td></tr>
+    <tr><td>Resolution（<code>resolution</code>）</td><td>1280 × 720</td></tr>
+    <tr><td>Output Picture（<code>picture</code>）</td><td><code>$HIP/render/$HIPNAME.$OS.$F4.exr</code></td></tr>
+    <tr><td>RenderSettings Primitive Path（<code>primpath</code>）</td><td><code>/Render/rendersettings</code></td></tr>
+    <tr><td>Engine Settings（<code>engine</code>）</td><td><code>cpu</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>$F4</code> は4桁ゼロ埋めのフレーム番号です。連番で出すなら<strong>必ずこれを含めます</strong>。
+忘れると、全フレームが同じファイルに上書きされていきます。</p>
+
+<h3>Karma Render Settings <span class="tx-muted">karmarendersettings</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レンダリング設定のプリムだけを作る</td></tr>
+    <tr><td>既定の書き込み先</td><td><code>/Render/$OS</code>（<code>karma</code> LOP は <code>/Render/rendersettings</code>）</td></tr>
+    <tr><td>向いている場面</td><td>設定だけを別レイヤーで管理したいとき。分業するとき</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Render Product <span class="tx-muted">renderproduct</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数の RenderVar を1つのファイルにまとめる</td></tr>
+    <tr><td>決めること</td><td>出力パス、形式、どの RenderVar を含めるか</td></tr>
+    <tr><td>向いている場面</td><td>ビューティとデータ系を<strong>別ファイルに分けたい</strong>とき</td></tr>
+  </tbody>
+</table></div>
+
+<h3>USD Render ROP <span class="tx-muted">usdrender_rop</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ステージを実際にレンダリングする（画像を出す）</td></tr>
+    <tr><td>裏で動くもの</td><td><strong>husk</strong>。USD を絵にするコマンドラインツール</td></tr>
+    <tr><td>向いている場面</td><td>ファーム投げ、バックグラウンドレンダリング</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">名前が似ている <code>usd_rop</code>（USD ROP）とは役割が違います。
+<code>usd_rop</code> は <strong><code>.usd</code> ファイル</strong>を書き出すもの、
+<code>usdrender_rop</code> は <strong>画像</strong>を出すものです。第2回で使ったのは前者でした。</p>
+
+<h2>実機で気づいたこと</h2>
+
+<h3>checkpoint という Product が最初から付いてくる</h3>
+
+<p><code>karma</code> LOP が作るプリムを数えたら、RenderProduct が<strong>2つ</strong>ありました。
+<code>renderproduct</code> と <code>checkpoint</code> です。</p>
+
+<p>チェックポイントは、長いレンダリングの途中経過を保存して、
+中断しても続きから再開できるようにする仕組みです。
+使わないつもりでも最初から用意されている、ということですね。</p>
+
+<h3>Apprentice には解像度の上限がある</h3>
+
+<p>検証機は Apprentice なので、出力解像度は 1280×720 が上限で、
+書き出した画像にはウォーターマークが入ります。
+既定の解像度がちょうど 1280×720 なのは、そのままでは引っかからないようにするためかもしれません。</p>
+
+<p class="tx-muted">Indie ではこの上限が上がります（本番の数字はライセンス側で確認してください）。
+<strong>4K で出す前提のワークフローを組むなら、ここは検証機では確かめられません。</strong></p>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>全フレームが同じファイルに上書きされる</strong> → 出力パスに <code>$F4</code> が入っていません。</li>
+  <li><strong>サンプルを上げても変わらない</strong> → エンジンと対応していないほうを触っています。
+      CPU は <code>samplesperpixel</code>、XPU は <code>pathtracedsamples</code>。</li>
+  <li><strong>AOV が EXR に入っていない</strong> → RenderProduct に含める設定になっているか確認します。
+      RenderVar を作っただけでは出ません。</li>
+  <li><strong>チャンネル名が想定と違う</strong> → RenderVar の Data Type で決まります。</li>
+  <li><strong>karma LOP の下流に何も繋げないと思っていた</strong> → 出力はステージです。繋げます。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>回るようになったので、次は<strong>ノイズを減らす</strong>回です。
+サンプリングのパラメータがたくさんあって、どれがどのノイズに効くのか分かりにくいところを、
+種類ごとに整理します。「とりあえず全部上げる」から抜け出すのが目標です。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/karma.html">Karma LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/kug/index.html">Karma User Guide</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/rendervar.html">Render Var LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/renderproduct.html">Render Product LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/support/lpe.html">Light Path Expressions</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/support/aovs.html">Cryptomatte and Material AOVs in Karma</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/ref/utils/husk.html">husk</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

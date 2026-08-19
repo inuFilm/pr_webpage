@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>マテリアル — MaterialX と Material Library | 技術メモ | makeinufilm</title>
+  <meta name="description" content="USD のマテリアルが Material プリムと Shader プリムの2階建てになっている話から、MaterialX / Principled / USD Preview Surface の使い分けまで。実機で1つ作り、プリムパターンで3つに割り当てました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>マテリアル — MaterialX と Material Library</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/materiallibrary.html">Material Library</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/assignmaterial.html">Assign Material</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/materialx.html">MaterialX</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/karma.html">Karma</a>。
+このページは上記を日本語で要約・再構成した学習メモです。
+マテリアルの構造と割り当ての結果は Houdini 22.0.368 の実機で確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li>USD のマテリアルが<strong>どういう形をしているのか</strong></li>
+  <li>MaterialX / Principled Shader / USD Preview Surface の使い分け</li>
+  <li><code>materiallibrary</code> と <code>assignmaterial</code> のノード解説</li>
+  <li>実機でマテリアルを1つ作って、プリムパターンで3つに割り当てます</li>
+</ul>
+
+<h2>マテリアルは「箱」で、シェーダは「中身」</h2>
+
+<p>ここだけ最初に押さえておくと、あとが楽です。</p>
+
+<p>USD のマテリアルは<strong>2階建て</strong>になっています。
+<code>Material</code> という箱があって、その中に <code>Shader</code> が入っています。</p>
+
+<pre><code>/materials/brick          Material   ← 箱。ジオメトリはこれを指します
+└─ brick                  Shader     ← 中身。実際の計算をするもの</code></pre>
+
+<p>ジオメトリが結びつくのは<strong>箱のほう</strong>です。中身が何であっても、外から見れば同じ「brick というマテリアル」。
+だからレンダラごとに中身を差し替えても、割り当てはそのまま使えます。</p>
+
+<p>この作りが分かっていると、シーングラフでマテリアルを開いたときに
+「なんで2段になっているんだろう」と迷わなくなります。</p>
+
+<h2>シェーダは3系統ある</h2>
+
+<p>Houdini で作れるシェーダは大きく3つで、それぞれ守備範囲が違います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>MaterialX</th><th>Principled Shader</th><th>USD Preview Surface</th></tr></thead>
+  <tbody>
+    <tr><td>正体</td><td>業界標準の規格</td><td>Houdini 独自</td><td>USD 標準の最小セット</td></tr>
+    <tr><td>Karma CPU</td><td><span class="tx-green">○</span></td><td><span class="tx-green">○</span></td><td><span class="tx-green">○</span></td></tr>
+    <tr><td>Karma XPU</td><td><span class="tx-green">○</span></td><td><span class="tx-red">×</span></td><td><span class="tx-green">○</span></td></tr>
+    <tr><td>他のレンダラ</td><td>対応が広い</td><td><span class="tx-red">×</span></td><td>ほぼどこでも</td></tr>
+    <tr><td>表現力</td><td>高い</td><td>高い</td><td>低い（簡易表示向け）</td></tr>
+  </tbody>
+</table></div>
+
+<p>迷ったら <strong>MaterialX</strong> です。XPU でも他のレンダラでも通りますし、
+第0回で書いたとおり Karma XPU は Principled Shader を扱えません。
+最初から MaterialX で組んでおくと、あとで engine を切り替えたくなったときに困りません。</p>
+
+<p class="tx-muted">Houdini 20 から、Material Library の中にシェーダを置く方法が変わりました。
+いきなりシェーダを置くのではなく、<strong>ビルダー（Karma Material Builder / USD MaterialX Builder など）の
+subnet を作って、その中に置く</strong>のが正しい形になっています。
+こうすることで、混ぜてはいけないノードがタブメニューに出てこなくなります。</p>
+
+<h2>実機で組んでみました</h2>
+
+<p>MaterialX の Standard Surface を1つ作って、前回のシーンに割り当ててみます。</p>
+
+<svg viewBox="0 0 820 380" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="Material プリムの中に2つの Shader が入り、3つのジオメトリからバインドされている構造の図">
+  <rect x="8" y="8" width="804" height="364" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+
+  <rect x="40" y="40" width="330" height="176" rx="6" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="58" y="66" font-size="13" font-weight="bold" fill="#203744">/materials/brick</text>
+  <text x="240" y="66" font-size="11" fill="#7a868e">Material</text>
+
+  <rect x="60" y="84" width="290" height="52" rx="4" fill="#f4f7f9" stroke="#7a868e"/>
+  <text x="76" y="106" font-size="12" fill="#2b3a44">brick</text>
+  <text x="76" y="124" font-size="11" fill="#7a868e">MtlX Standard Surface</text>
+  <text x="300" y="106" font-size="11" fill="#7a868e">Shader</text>
+
+  <rect x="60" y="146" width="290" height="52" rx="4" fill="#f4f7f9" stroke="#3fae6a" stroke-dasharray="4 3"/>
+  <text x="76" y="168" font-size="12" fill="#2b3a44">brick_preview</text>
+  <text x="76" y="186" font-size="11" fill="#3fae6a">USD Preview Surface（自動生成）</text>
+  <text x="300" y="168" font-size="11" fill="#7a868e">Shader</text>
+
+  <rect x="520" y="52" width="250" height="40" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="538" y="77" font-size="12" fill="#2b3a44">/asset/geo</text>
+  <rect x="520" y="106" width="250" height="40" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="538" y="131" font-size="12" fill="#2b3a44">/shelf/copy1/geo</text>
+  <rect x="520" y="160" width="250" height="40" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="538" y="185" font-size="12" fill="#2b3a44">/shelf/copy2/geo</text>
+
+  <path d="M520 72 H450 Q438 72 438 84 V116 Q438 128 426 128 H370" stroke="#2CA9E1" stroke-width="2" fill="none" marker-end="url(#ar5)"/>
+  <path d="M520 126 H460 Q448 126 448 128 H370" stroke="#2CA9E1" stroke-width="2" fill="none" marker-end="url(#ar5)"/>
+  <path d="M520 180 H450 Q438 180 438 168 V140 Q438 128 426 128 H370" stroke="#2CA9E1" stroke-width="2" fill="none" marker-end="url(#ar5)"/>
+
+  <text x="440" y="228" font-size="11" fill="#2CA9E1">material:binding</text>
+
+  <rect x="40" y="252" width="730" height="100" rx="6" fill="#ffffff" stroke="#dde3e8"/>
+  <text x="60" y="278" font-size="12" font-weight="bold" fill="#203744">割り当てに書いたのは、この一行だけです</text>
+  <text x="60" y="304" font-size="13" fill="#2b3a44">Primitives:  %type:Cube</text>
+  <text x="60" y="328" font-size="11" fill="#7a868e">3つのパスを手で並べる必要はありません。前回のプリムパターンがそのまま使えます。</text>
+
+  <defs>
+    <marker id="ar5" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#2CA9E1"/>
+    </marker>
+  </defs>
+</svg>
+
+<h3>1. シェーダを1つ置いたら、プリムが4つできた</h3>
+
+<p><code>materiallibrary</code> の中に <code>mtlxstandard_surface</code> を1つ置いただけで、
+ステージにはこれだけできていました。</p>
+
+<pre><code>/materials                 Scope
+└─ brick                   Material
+   ├─ brick                Shader   ← 置いた MaterialX
+   └─ brick_preview        Shader   ← 勝手に増えた</code></pre>
+
+<p><code>brick_preview</code> は<strong>自動で作られた USD Preview Surface</strong> です。
+Material Library の <strong>Auto-generate Preview Surface Shaders</strong> が既定でオンなので、
+MaterialX を1つ書くたびに、その簡易版が一緒に作られます。</p>
+
+<p>これは親切な仕様です。USD Preview Surface は USD の標準なので、
+<strong>Karma を知らないソフトに渡しても、とりあえず色は出ます</strong>。
+本命のシェーダと、どこでも通る保険。その2枚組が1つの箱に入っている、という形ですね。</p>
+
+<h3>2. パターンで割り当てたら、3つに刺さった</h3>
+
+<p><code>assignmaterial</code> の Primitives に <code>%type:Cube</code> と書いて、
+Material Path に <code>/materials/brick</code> を入れました。結果です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>マテリアル</th><th>結びついたプリム</th></tr></thead>
+  <tbody>
+    <tr><td rowspan="3"><code>/materials/brick</code></td><td><code>/asset/geo</code></td></tr>
+    <tr><td><code>/shelf/copy1/geo</code></td></tr>
+    <tr><td><code>/shelf/copy2/geo</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>パスを3つ書いたわけではありません。<strong>「立方体ぜんぶ」と書いただけ</strong>です。
+第3回のプリムパターンが、そのまま効いています。</p>
+
+<p>面白いのは、<code>/shelf/copy1/geo</code> と <code>/shelf/copy2/geo</code> は
+<strong>前回リファレンスで持ってきたプリム</strong>だということです。
+参照先のファイルには一切触らずに、こちら側のレイヤーに
+「このプリムはこのマテリアル」という一行を足しただけで結びつきました。
+第2回のルール3（ディスクのファイルは書き換えない）が、ちゃんとここでも効いています。</p>
+
+<h2>ノードごとの解説</h2>
+
+<h3>Material Library <span class="tx-muted">materiallibrary</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>シェーダの VOP ネットワークを、USD の Material プリムに変換する</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td><code>matpathprefix</code>（既定 <code>/materials/</code>）、Material VOP（既定 <code>*</code>）</td></tr>
+    <tr><td>中身の作り方</td><td>ノードに潜って、ビルダー subnet を作り、その中にシェーダを組みます</td></tr>
+    <tr><td>Auto-generate Preview Surface</td><td>既定<strong>オン</strong>。USD Preview Surface が自動で付きます</td></tr>
+  </tbody>
+</table></div>
+
+<p>公式ドキュメントに1つ推奨が書かれています。
+<strong>このノードでも割り当てはできるけれど、割り当ては別ノードに分けたほうがよい</strong>、と。
+作るのと配るのを分けておくと、あとから見た人が読みやすいからですね。</p>
+
+<h3>Assign Material <span class="tx-muted">assignmaterial</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>マテリアルをプリムに結びつける</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>要のパラメータ</td><td>Primitives（プリムパターン）、Material Path</td></tr>
+    <tr><td>指定方法</td><td>Explicit Path ／ CVEX Script ／ VEXpression</td></tr>
+    <tr><td>複数まとめて</td><td>行を増やせば、1ノードで何組でも割り当てられます</td></tr>
+  </tbody>
+</table></div>
+
+<p>VEXpression が使えるのが Houdini らしいところです。
+プリムごとに違うマテリアルを計算して返せます。</p>
+
+<pre><code>return (@elemnum % 2) ? "/materials/rough_red" : "/materials/rough_blue";</code></pre>
+
+<p>これで奇数番目と偶数番目に別のマテリアルが入ります。
+<code>@primpath</code>（プリムのパス）や、そのプリムの属性も変数として使えます。</p>
+
+<p><strong>Material Binding の Method</strong> も覚えておくと効きます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>Direct（既定）</td><td>該当するプリム1つずつに書き込む</td></tr>
+    <tr><td>Collection Based</td><td><strong>コレクションそのもの</strong>に書き込む</td></tr>
+  </tbody>
+</table></div>
+
+<p>コレクションに割り当てるなら Collection Based にします。
+そうすると、あとからコレクションにプリムを足したときに、割り当てが自動で追随します。
+第3回のコレクションが効いてくる場面です。</p>
+
+<h3>Component Material <span class="tx-muted">componentmaterial</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>アセット単位でマテリアルをまとめて管理する</td></tr>
+    <tr><td>向いている場面</td><td>Component Builder で作ったアセットに、マテリアルのバリエーションを持たせたいとき</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Material Linker <span class="tx-muted">materiallinker</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>マテリアルとプリムの結びつきを、専用の UI でまとめて編集する</td></tr>
+    <tr><td>向いている場面</td><td>割り当てが増えてきて、ノードを並べるのがつらくなったとき</td></tr>
+  </tbody>
+</table></div>
+
+<h2>実機で気づいたこと</h2>
+
+<h3>Preview Surface が「勝手に増える」のは正常</h3>
+
+<p>シェーダを1つ置いたのに <code>Shader</code> プリムが2つできて、最初は何かを間違えたのかと思いました。
+これは Auto-generate Preview Surface Shaders の仕業で、正常な動作です。</p>
+
+<p>切りたい場合はチェックを外せます。ドキュメントには、
+テクスチャの不透明度の扱いで Storm が意図しない表示になることがあり、
+そのときは自動生成を切って手で組む、という回避策が載っていました。</p>
+
+<h3>マテリアルの「箱」の名前は、シェーダのノード名から来る</h3>
+
+<p>ノード名を <code>brick</code> にしたので、できたのは <code>/materials/brick</code> でした。
+<code>matpathprefix</code>（既定 <code>/materials/</code>）＋ノード名、という組み立てです。</p>
+
+<p>第4回のバリアント名と同じで、<strong>ノード名がそのまま USD に残ります</strong>。
+Solaris はこのパターンが多いので、ノード名は最初からきちんと付けておくのがよさそうです。</p>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>Material Library の中にシェーダが置けない</strong> → Houdini 20 以降はビルダー subnet の中に置きます。
+      いきなり置く形は非推奨になりました。</li>
+  <li><strong>XPU に切り替えたら真っ黒</strong> → Principled Shader は XPU では動きません。MaterialX に置き換えます。</li>
+  <li><strong>割り当てたのに色が出ない</strong> → Material Path の綴りを確認します。
+      <code>/materials/</code> の prefix を忘れがちです。</li>
+  <li><strong>コレクションに足したプリムに色が付かない</strong> → Method が Direct のままです。
+      Collection Based にすると追随します。</li>
+  <li><strong>Shader プリムが2つある</strong> → 正常です。片方は自動生成された Preview Surface。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>マテリアルが付いたので、次はライトとカメラです。
+第0回で「ライトが無いと真っ黒、カメラが無いと何も映らない」と書いたところを、
+1つずつノード単位で見ていきます。
+ライトの種類、明るさの単位、Light Mixer、そしてカメラの各パラメータが
+USD 側でどう保存されるかを扱います。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/materiallibrary.html">Material Library LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/assignmaterial.html">Assign Material LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/materialx.html">MaterialX in Houdini</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/vop/mtlxstandard_surface.html">MtlX Standard Surface VOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/materiallinker.html">Material Linker LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/quick_materials.html">Quick Materials</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

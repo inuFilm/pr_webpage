@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ステージに載せる — SOP から LOP への4つの入口 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SOP Import / SOP Create / SOP Modify / Scene Import をノード単位で解説します。USD の階層が SOP 側のアトリビュートで決まること、効きそうで効かないパラメータを実機で検証しました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>ステージに載せる — SOP から LOP への4つの入口</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/solaris/about_lops.html">How LOPs work</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/sopimport.html">SOP Import</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/sop_import.html">SOP Geometry I/O</a>。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名・パラメータ名・挙動は
+Houdini 22.0.368 で実際にネットワークを組んで確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li>SOP で作ったジオメトリを Solaris のステージに載せる<strong>4つの入口</strong>と、その使い分け</li>
+  <li><code>sopimport</code> / <code>sopcreate</code> / <code>sopmodify</code> / <code>sceneimport</code> のノード単位の解説</li>
+  <li>USD 側の階層が<strong>何によって決まるのか</strong>（ここが最初の関門です）</li>
+  <li>効きそうで効かないパラメータの話</li>
+</ul>
+
+<h2>まず、線を流れているものが違う</h2>
+
+<p>前回も書きましたが、ここが分からないと全部あやふやになるのでもう一度だけ。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>SOP</th><th>LOP</th></tr></thead>
+  <tbody>
+    <tr><td>線を流れるもの</td><td>ジオメトリ</td><td><strong>合成済みのステージ全体</strong></td></tr>
+    <tr><td>Merge の意味</td><td>点と面を足し合わせる</td><td>別々のシーンを合流させる</td></tr>
+    <tr><td>ノードを足すと</td><td>形が変わる</td><td>シーンへの<strong>編集が1つ追記される</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>なので「SOP のジオメトリを LOP に持っていく」のは、ただのコピーではありません。
+<strong>形の集まりを、名前の付いた入れ子構造に置き換える</strong>作業になります。</p>
+
+<p>USD ではこの入れ子のひとつひとつを「プリム」と呼びます。
+フォルダとファイルの関係に近いと思ってください。<code>/imported/box_geo</code> のように、
+スラッシュ区切りのパスで場所が決まります。</p>
+
+<p>入口が4つあるのは、この置き換えをどこまで面倒みてくれるかが違うからです。</p>
+
+<h2>4つの入口</h2>
+
+<svg viewBox="0 0 820 400" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="SOP から LOP への4つの入口を示した図">
+  <rect x="8" y="8" width="240" height="384" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="20" y="32" font-size="15" font-weight="bold" fill="#203744">/obj — SOP</text>
+
+  <rect x="28" y="52" width="120" height="30" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="40" y="72" font-size="13" fill="#2b3a44">box1</text>
+  <rect x="28" y="94" width="120" height="30" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="40" y="114" font-size="13" fill="#2b3a44">sphere1</text>
+  <path d="M88 82 V94" stroke="#7a868e" fill="none"/>
+  <rect x="28" y="136" width="120" height="30" rx="4" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="40" y="156" font-size="13" fill="#2b3a44">name</text>
+  <path d="M88 124 V136" stroke="#7a868e" fill="none"/>
+  <rect x="28" y="178" width="120" height="30" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="40" y="198" font-size="13" fill="#2b3a44">OUT</text>
+  <path d="M88 166 V178" stroke="#7a868e" fill="none"/>
+  <text x="28" y="232" font-size="11" fill="#7a868e">name が USD のプリム名になる</text>
+
+  <rect x="288" y="8" width="524" height="384" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="302" y="32" font-size="15" font-weight="bold" fill="#203744">/stage — LOP</text>
+
+  <rect x="316" y="56" width="180" height="34" rx="4" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="330" y="78" font-size="13" fill="#2b3a44">sopimport</text>
+  <text x="510" y="70" font-size="11" fill="#7a868e">既存の SOP を参照して</text>
+  <text x="510" y="84" font-size="11" fill="#7a868e">ステージに載せる</text>
+  <path d="M148 193 H240 Q252 193 252 181 V73 Q252 61 264 61 H316" stroke="#2CA9E1" stroke-width="2" fill="none" marker-end="url(#ar)"/>
+
+  <rect x="316" y="112" width="180" height="34" rx="4" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="330" y="134" font-size="13" fill="#2b3a44">sopcreate</text>
+  <text x="510" y="126" font-size="11" fill="#7a868e">SOP ネットワークを内蔵。</text>
+  <text x="510" y="140" font-size="11" fill="#7a868e">/obj を経由しない</text>
+
+  <rect x="316" y="168" width="180" height="34" rx="4" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="330" y="190" font-size="13" fill="#2b3a44">sopmodify</text>
+  <text x="510" y="182" font-size="11" fill="#7a868e">ステージ上のプリムを</text>
+  <text x="510" y="196" font-size="11" fill="#7a868e">SOP で編集して戻す</text>
+
+  <rect x="316" y="224" width="180" height="34" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="330" y="246" font-size="13" fill="#2b3a44">sceneimport</text>
+  <text x="510" y="238" font-size="11" fill="#7a868e">/obj をまるごと。</text>
+  <text x="510" y="252" font-size="11" fill="#7a868e">手軽だが制御は粗い</text>
+
+  <rect x="316" y="296" width="180" height="34" rx="4" fill="#ffffff" stroke="#203744" stroke-width="2"/>
+  <text x="330" y="318" font-size="13" fill="#2b3a44">merge</text>
+  <path d="M406 90 V296" stroke="#7a868e" fill="none" stroke-dasharray="4 3"/>
+  <path d="M406 146 V296" stroke="#7a868e" fill="none" stroke-dasharray="4 3"/>
+  <path d="M406 202 V296" stroke="#7a868e" fill="none" stroke-dasharray="4 3"/>
+  <path d="M406 258 V296" stroke="#7a868e" fill="none" stroke-dasharray="4 3"/>
+  <text x="510" y="316" font-size="11" fill="#7a868e">ステージ同士を合流させる</text>
+
+  <text x="316" y="360" font-size="12" fill="#203744">どれを選んでも、出てくるのは「USD のプリム階層」です。</text>
+  <text x="316" y="378" font-size="12" fill="#203744">違うのは、その階層をどこで・どう決めるか。</text>
+
+  <defs>
+    <marker id="ar" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#2CA9E1"/>
+    </marker>
+  </defs>
+</svg>
+
+<h2>ノードごとの解説</h2>
+
+<h3>SOP Import <span class="tx-muted">sopimport</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>別の場所にある SOP ネットワークの出力を、USD のプリムに変換してステージに載せる</td></tr>
+    <tr><td>入力</td><td>0〜1（省略可。省略するとステージを新規に作る generator になります）</td></tr>
+    <tr><td>要のパラメータ</td><td><code>soppath</code>（読みにいく SOP ノードのパス）</td></tr>
+    <tr><td>階層の指定</td><td><code>pathprefix</code>（既定 <code>/$OS</code>）— <strong>ただしチェックボックスを入れないと効きません</strong></td></tr>
+    <tr><td>Kind</td><td><code>kindschema</code> の既定は <code>component</code></td></tr>
+    <tr><td>向いている場面</td><td>すでに /obj に作ってある SOP をそのまま使いたいとき</td></tr>
+  </tbody>
+</table></div>
+
+<p>このノードは、2つの仕事を続けてやっています。</p>
+
+<ol>
+  <li>SOP のジオメトリを、USD のプリム階層に<strong>変換する</strong></li>
+  <li>変換したものを、シーンに<strong>取り込む</strong></li>
+</ol>
+
+<p>パラメータがやたら多く見えるのは、1 のための設定と 2 のための設定が同じ画面に並んでいるからです。
+今どちらの話をしているのかを意識して眺めると、だいぶ読みやすくなります。</p>
+
+<h3>SOP Create <span class="tx-muted">sopcreate</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ノードの中に SOP ネットワークを持ち、そこで作ったジオメトリを直接ステージに載せる</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>特徴</td><td>/obj を経由しない。マテリアルの割り当てまで内側で完結する</td></tr>
+    <tr><td>向いている場面</td><td>その LOP ネットワークでしか使わない小さなジオメトリ</td></tr>
+  </tbody>
+</table></div>
+
+<p>このノードの正体が気になったので、実機で中身を展開してみました。
+<code>sopcreate</code> は <strong>subnet</strong> で、中には次のノードが入っています。</p>
+
+<pre><code>/stage/sopcreate_direct/
+├─ input              (null, LOP)     … 上流のステージ
+├─ sopnet             (sopnet)        … 中に SOP ネットワーク
+│   ├─ create         (subnet, SOP)   … ここに自分のジオメトリを作る
+│   └─ OUT            (null, SOP)
+├─ sopimport          (sopimport)     … ← 中身は結局これ
+├─ materiallibrary    (materiallibrary)
+├─ assignmaterial     (assignmaterial)
+├─ loftpayloadinfo1   (loftpayloadinfo)
+├─ xform              (xform)
+└─ output             (output)</code></pre>
+
+<p>つまり <strong>SOP Create は「SOP ネットワーク＋ SOP Import ＋ Material Library ＋ Assign Material」の詰め合わせ</strong>でした。
+中核は <code>sopimport</code> なので、SOP Import の挙動を理解しておけば SOP Create もそのまま分かります。</p>
+
+<p class="tx-muted">Solaris にはこの「便利ノードの中身は既存ノードの組み合わせ」というパターンが何度も出てきます。
+のちに出てくる <code>karma</code> LOP も同じ作りです。詰まったら中に入って見てみると、たいてい腑に落ちます。</p>
+
+<h3>SOP Modify <span class="tx-muted">sopmodify</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ステージ上のプリムを SOP に取り出し、SOP で編集して、またステージに書き戻す</td></tr>
+    <tr><td>入力</td><td>1（必須。編集対象のステージ）</td></tr>
+    <tr><td>向いている場面</td><td>USD で読み込んだジオメトリに Houdini の SOP 処理をかけたいとき</td></tr>
+  </tbody>
+</table></div>
+
+<p>「載せる」というより「往復する」ノードです。他所から来た USD アセットに
+デフォームやスキャッタをかけたい、といったときの逃げ道になります。</p>
+
+<h3>Scene Import <span class="tx-muted">sceneimport</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>/obj のオブジェクト・カメラ・ライト・マテリアルをまとめてステージに持ち込む</td></tr>
+    <tr><td>向いている場面</td><td>既存の /obj シーンをとりあえず Solaris に持っていきたいとき</td></tr>
+    <tr><td>注意</td><td>手軽な代わりに、取り込みの細かい制御はできません</td></tr>
+  </tbody>
+</table></div>
+
+<p>公式ドキュメントも「1ノードでジオメトリとマテリアルを取り込めるが、
+取り込み過程の制御は SOP Import ほど効かない」という趣旨の書き方をしています。
+移行の第一歩には便利ですが、本番の組み方としては SOP Import 系に寄せるのが素直かなと思います。</p>
+
+<h3>Merge <span class="tx-muted">merge</span></h3>
+
+<p>SOP の Merge と名前は同じですが、<strong>合流するのはジオメトリではなくステージ</strong>です。
+別々に組んだブランチのレイヤーをまとめる役で、Solaris ではほぼ必ず使います。
+レイヤーの話は次回に回します。</p>
+
+<h2>実機で確かめたこと1 — 階層は SOP 側のアトリビュートで決まる</h2>
+
+<p>ここが個人的にいちばん引っかかったところです。</p>
+
+<p>まず、box と sphere を Merge しただけの SOP を <code>sopimport</code> で取り込んでみました。
+結果がこちらです。</p>
+
+<pre><code>/imported            (Xform, kind = component)
+└─ mesh_0            (Mesh)   ← box と sphere が1つに潰れている</code></pre>
+
+<p>2つ入れたのに、出てきたプリムは1つ。名前も <code>mesh_0</code> という機械的なものです。</p>
+
+<p>理由は単純でした。<strong>ジオメトリのどこにも「名前」が書いてなかった</strong>からです。
+名前が無いので分けようがなく、まとめて1つにされた、というわけですね。</p>
+
+<p>そこで SOP 側に <code>name</code> SOP を2つ足して、それぞれ <code>box_geo</code> / <code>sphere_geo</code> を
+付けてから、同じように取り込み直しました。</p>
+
+<pre><code>/imported            (Xform, kind = component)
+├─ box_geo           (Mesh)
+└─ sphere_geo        (Mesh)</code></pre>
+
+<p>きれいに分かれました。ルールは単純で、<strong><code>name</code> の文字列が、そのまま USD のプリム名になる</strong>だけです。</p>
+
+<p>もっと深い階層が欲しいときは、<code>name</code> の代わりに <code>path</code> アトリビュートを使います。
+<code>建物/1階/柱</code> のようにスラッシュ区切りで書けば、そのとおりの入れ子ができます。
+公式ドキュメントでは、Connectivity SOP でパーツ番号を振ってから
+Attribute Create SOP で文字列を組み立てる例が紹介されています。</p>
+
+<p>逆に言うと、<strong>Solaris で思った階層にならないときは、まず SOP 側を疑うのが早い</strong>です。
+LOP 側のパラメータをいくら探しても出てきません。</p>
+
+<h2>実機で確かめたこと2 — 効きそうで効かないパラメータ</h2>
+
+<p>最初、取り込み先を変えようとして <code>primpath</code> に <code>/imported</code> と入れました。
+ところが結果は <code>/sopimport_from_obj</code> のまま。ノード名から作られた既定値が使われていて、
+入力した値は<strong>まったく反映されていません</strong>でした。</p>
+
+<p>正解は <code>pathprefix</code> の方で、しかも<strong>左側のチェックボックスを入れないと効きません</strong>。
+チェックを入れて <code>/imported</code> にしたところ、期待通りプリムが移動しました。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td><code>primpath</code> に <code>/imported</code></td><td><span class="tx-red">効かない</span>（Load As Reference が off のとき）</td></tr>
+    <tr><td><code>enable_pathprefix</code> ＋ <code>pathprefix</code> に <code>/imported</code></td><td><span class="tx-green">効く</span></td></tr>
+  </tbody>
+</table></div>
+
+<p>このチェックボックスには意味がありました。<strong>値をどこから取ってくるかの切り替えスイッチ</strong>です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>チェック</th><th>使われる値</th></tr></thead>
+  <tbody>
+    <tr><td>外れている</td><td>まずジオメトリ側に埋め込まれた値を探す。無ければ既定値</td></tr>
+    <tr><td>入っている</td><td>ジオメトリ側を無視して、ここに入力した値を使う</td></tr>
+  </tbody>
+</table></div>
+
+<p>ジオメトリ側に値を埋めるには <code>USD Configure</code> SOP を使います。
+つまり設定を書ける場所が SOP 側と LOP 側の2か所あって、
+チェックボックスは<strong>どちらを優先するか</strong>を決めていた、ということですね。
+アセットごとに設定を持たせたいときは SOP 側、その場で変えたいときは LOP 側、と使い分けられます。</p>
+
+<p class="tx-muted"><code>sopimport</code> にはこの <code>enable_〜</code> 付きのパラメータが数十個あります。
+「値を入れたのに効かない」と思ったら、まずチェックボックスを見る、と覚えておくと早いです。</p>
+
+<h2>組んだ結果</h2>
+
+<p>SOP Create（トーラス）と SOP Import（箱と球）を Merge して、SOP Modify を通した状態です。</p>
+
+<img src="img/solaris-01-viewport.png" alt="Solaris のビューポート。SOP Create で作ったトーラスと、SOP Import で /obj から取り込んだ箱と球が同じステージ上に並んでいる">
+
+<p>ステージ上のプリムはこうなりました。出所の違う2系統が、1つのシーングラフに同居しています。</p>
+
+<pre><code>/sopcreate_direct        (Xform, kind = component)
+└─ torus_geo             (Mesh)      ← SOP Create 由来
+/imported                (Xform, kind = component)
+├─ box_geo               (Mesh)      ← SOP Import 由来
+└─ sphere_geo            (Mesh)</code></pre>
+
+<p><code>/HoudiniLayerInfo</code> というプリムも一緒に出てきますが、これは Houdini が内部で使う
+メタデータ用のもので、こちらで触るものではありません。</p>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>プリムが1つに潰れる</strong> → SOP 側に <code>name</code> か <code>path</code> のプリミティブアトリビュートを付ける。
+      LOP 側では解決できません。</li>
+  <li><strong>パラメータを変えても効かない</strong> → 左のチェックボックスが外れていないか。
+      <code>sopimport</code> の <code>enable_〜</code> 系はすべてこの挙動です。</li>
+  <li><strong><code>primpath</code> と <code>pathprefix</code> を取り違える</strong> → 参照として読み込む場合とそうでない場合で、
+      効くパラメータが変わります。まず <code>pathprefix</code> を疑うのが確率が高いです。</li>
+  <li><strong>SOP Create の中身が分からなくなる</strong> → subnet なので中に入れます。
+      困ったら <code>sopimport</code> のパラメータを直接見にいくのが確実です。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>ステージには載りました。次は<strong>その編集がどのレイヤーに書き込まれているのか</strong>という話です。
+Solaris でいちばん躓きやすいところで、Layer Break を理解すると
+「書き出したら余計なものまで入っていた」が起きなくなります。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/sop_import.html">SOP Geometry I/O — 変換ルールの詳細</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/sopimport.html">SOP Import LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/sopcreate.html">SOP Create LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/sopmodify.html">SOP Modify LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/about_lops.html">How LOPs work</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

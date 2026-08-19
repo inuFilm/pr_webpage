@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リファレンスとバリアント — アセットを組み合わせる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SubLayer と Reference の違い、そして1つのアセットに複数の姿を持たせるバリアントを扱います。実機で棚に2つ並べ、上流を1か所いじると両方が変わることを確認しました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>リファレンスとバリアント — アセットを組み合わせる</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/reference.html">Reference</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/addvariant.html">Add Variant</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/setvariant.html">Set Variant</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/glossary.html">LOPs and USD glossary</a>。
+このページは上記を日本語で要約・再構成した学習メモです。
+リファレンスとバリアントは Houdini 22.0.368 の実機で組んで、切り替わることを確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li>SubLayer と Reference の違い — <strong>重ねる</strong>のか<strong>ぶら下げる</strong>のか</li>
+  <li>バリアント — 1つのアセットに複数の姿を持たせる仕組み</li>
+  <li>実機で棚に2つ並べて、上流を1か所いじると<strong>両方とも変わる</strong>ことを確認します</li>
+  <li><code>reference</code> / <code>addvariant</code> / <code>setvariant</code> のノード解説</li>
+</ul>
+
+<h2>コピーではなく、リンクです</h2>
+
+<p>シーンに椅子を10脚並べたい、というときの話です。</p>
+
+<p>ふつうの発想だと「椅子のデータを10個複製する」ですが、USD ではそうしません。
+<strong>椅子は1つだけ置いて、10か所から「あれを見て」と指を差す</strong>という作り方をします。</p>
+
+<p>これがリファレンスです。ウェブページのリンクと同じで、実体は1つ。
+だから元の椅子を直せば、10脚ぜんぶが直ります。ファイルも重くなりません。</p>
+
+<h2>SubLayer と Reference の違い</h2>
+
+<p>外から USD を持ち込む方法は2つあって、ここが最初の分かれ道です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>SubLayer</th><th>Reference</th></tr></thead>
+  <tbody>
+    <tr><td>ひとことで</td><td><strong>重ねる</strong></td><td><strong>ぶら下げる</strong></td></tr>
+    <tr><td>出てくる場所</td><td>ファイルに書かれていたパスのまま</td><td>自分で指定したパスの下</td></tr>
+    <tr><td>同じものを複数</td><td>できない</td><td><strong>できる</strong></td></tr>
+    <tr><td>向いている場面</td><td>シーン全体を持ち込む。他部署のレイヤーを載せる</td><td>アセットを配置する。同じものを何度も使う</td></tr>
+  </tbody>
+</table></div>
+
+<p>「シーンを持ち込む」なら SubLayer、「モノを置く」なら Reference、と覚えておけばだいたい合っています。</p>
+
+<p class="tx-muted">Merge LOP は「メモリ上のステージ版の SubLayer」、Graft Stages LOP は「メモリ上のステージ版の Reference」という関係になっています。
+ファイル相手か、ノードチェーン相手かの違いですね。</p>
+
+<h2>バリアント — 1つのアセットに複数の姿</h2>
+
+<p>もう1つが<strong>バリアント</strong>です。同じアセットの色違い、LOD 違い、開いた／閉じた、といった
+複数の姿を1つのプリムに入れておいて、あとから1つだけ選ぶ仕組みです。</p>
+
+<p>用語が2段になっているので、そこだけ先に整理します。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td><strong>バリアントセット</strong></td><td>選択肢のグループ。例: <code>model</code>、<code>color</code></td></tr>
+    <tr><td><strong>バリアント</strong></td><td>その中の1つ。例: <code>var_hi</code>、<code>var_lo</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>1つのプリムにバリアントセットを複数持たせられるので、
+「形は <code>hi</code>、色は <code>red</code>」のような組み合わせもできます。</p>
+
+<h2>実機で組んでみました</h2>
+
+<p>球と立方体を2つのバリアントにして <code>/asset</code> にまとめ、それを2か所からリファレンスしました。</p>
+
+<svg viewBox="0 0 820 400" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="バリアントを持つアセットを2か所からリファレンスした構造の図">
+  <rect x="8" y="8" width="804" height="384" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+
+  <rect x="270" y="34" width="280" height="150" rx="6" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="288" y="58" font-size="13" font-weight="bold" fill="#203744">/asset  (Xform)</text>
+  <text x="288" y="84" font-size="12" fill="#7a868e">variantSet "model"</text>
+  <text x="300" y="108" font-size="12" fill="#7a868e">var_hi  →  Sphere</text>
+  <rect x="292" y="118" width="216" height="24" rx="3" fill="#f4f7f9" stroke="#3fae6a"/>
+  <text x="300" y="135" font-size="12" fill="#2b3a44">var_lo  →  Cube</text>
+  <text x="288" y="164" font-size="11" fill="#3fae6a">↑ いま選ばれているのはこちら</text>
+
+  <rect x="60" y="266" width="240" height="76" rx="6" fill="#ffffff" stroke="#7a868e"/>
+  <text x="78" y="290" font-size="13" fill="#2b3a44">/shelf/copy1</text>
+  <text x="78" y="312" font-size="12" fill="#7a868e">geo  (Cube)</text>
+  <text x="78" y="332" font-size="11" fill="#7a868e">実体は持っていません</text>
+
+  <rect x="520" y="266" width="240" height="76" rx="6" fill="#ffffff" stroke="#7a868e"/>
+  <text x="538" y="290" font-size="13" fill="#2b3a44">/shelf/copy2</text>
+  <text x="538" y="312" font-size="12" fill="#7a868e">geo  (Cube)</text>
+  <text x="538" y="332" font-size="11" fill="#7a868e">実体は持っていません</text>
+
+  <path d="M180 266 V220 Q180 208 192 208 H270" stroke="#2CA9E1" stroke-width="2" fill="none" marker-end="url(#ar4)"/>
+  <path d="M640 266 V220 Q640 208 628 208 H550" stroke="#2CA9E1" stroke-width="2" fill="none" marker-end="url(#ar4)"/>
+  <text x="196" y="238" font-size="11" fill="#2CA9E1">reference</text>
+  <text x="540" y="238" font-size="11" fill="#2CA9E1">reference</text>
+
+  <text x="270" y="212" font-size="11" fill="#7a868e">/asset の選択を1か所変えるだけで、</text>
+  <text x="270" y="228" font-size="11" fill="#7a868e">両方の copy が同時に変わります。</text>
+
+  <text x="60" y="374" font-size="11" fill="#7a868e">実測: var_hi → var_lo に切り替えたら、3つの geo すべてが Sphere から Cube になりました。</text>
+
+  <defs>
+    <marker id="ar4" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#2CA9E1"/>
+    </marker>
+  </defs>
+</svg>
+
+<h3>結果</h3>
+
+<p>バリアントの選択を <code>var_hi</code> から <code>var_lo</code> に変えたときの、ステージの変化です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>プリム</th><th>var_hi のとき</th><th>var_lo のとき</th></tr></thead>
+  <tbody>
+    <tr><td><code>/asset/geo</code></td><td>Sphere</td><td>Cube</td></tr>
+    <tr><td><code>/shelf/copy1/geo</code></td><td>Sphere</td><td>Cube</td></tr>
+    <tr><td><code>/shelf/copy2/geo</code></td><td>Sphere</td><td>Cube</td></tr>
+  </tbody>
+</table></div>
+
+<p>触ったのは <code>setvariant</code> のパラメータ1つだけです。
+コピーを配ったのではなく<strong>リンクを張った</strong>ので、こうなります。</p>
+
+<h3>合成アークが見えます</h3>
+
+<p><code>/shelf/copy1</code> が何でできているかを問い合わせたら、こう返ってきました。</p>
+
+<pre><code>Root       →  /shelf/copy1
+Reference  →  /asset
+Variant    →  /asset{model=var_lo}</code></pre>
+
+<p>USD の「合成」というのは、この3行が積み上がることでした。
+自分の場所があって、そこにリファレンスが刺さっていて、その先でバリアントが1つ選ばれている。
+言葉で読むと難しいのですが、並べて見ると仕組みは素直です。</p>
+
+<h2>実機で気づいたこと — バリアントの中身は「何を入れるか」で決まる</h2>
+
+<p>最初、思ったとおりに動きませんでした。<code>setvariant</code> で <code>var_lo</code>（立方体）を選んでいるのに、
+<code>/asset</code> はずっと <code>Sphere</code> のままだったんです。</p>
+
+<p>原因は <code>addvariant</code> の <strong>Variant Source Primitive</strong>（<code>variantprimpath</code>）でした。
+ここを <code>/geo</code> にしていたので、<strong>プリムの中身だけ</strong>がバリアントに入り、
+<strong>型そのものはバリアントの外に書かれて</strong>いました。</p>
+
+<p>書き出されたレイヤーを読んだら一目瞭然でした。</p>
+
+<pre><code>def Sphere "asset" (                 ← 型は外側。最初の入力のものに固定
+    variants = { string model = "var_lo" }
+    prepend variantSets = "model"
+)
+{
+    variantSet "model" = {
+        "var_hi" { double radius = 1  ... }   ← 球の属性だけ
+        "var_lo" { double size   = 2  ... }   ← 立方体の属性だけ
+    }
+}</code></pre>
+
+<p><code>Variant Source Primitive</code> を既定の <code>/</code> に戻したら、期待どおりになりました。</p>
+
+<pre><code>/asset          (Xform)      ← 器
+└─ geo          (Sphere / Cube)  ← ここが丸ごと入れ替わる</code></pre>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Variant Source Primitive</th><th>バリアントに入るもの</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td><code>/geo</code></td><td>属性だけ</td><td><span class="tx-red">型が切り替わらない</span></td></tr>
+    <tr><td><code>/</code>（既定）</td><td>プリムごと</td><td><span class="tx-green">丸ごと切り替わる</span></td></tr>
+  </tbody>
+</table></div>
+
+<p>コツは<strong>「バリアントの中身は、どれを選んでも同じ形をしているほうがよい」</strong>ということだと思います。
+公式ドキュメントも「後から上書きする予定があるなら、各バリアントの構造をそろえておくとよい」と書いています。
+入れ替わるのは中の子プリム、器は共通、という作りにしておくと事故が減ります。</p>
+
+<h2>ノードごとの解説</h2>
+
+<h3>Reference <span class="tx-muted">reference</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>別の場所のプリムツリーを、指定したパスの下にぶら下げる</td></tr>
+    <tr><td>入力</td><td>0〜多数。1つ目＝置き先のステージ、2つ目以降＝参照元</td></tr>
+    <tr><td>参照元</td><td>ファイル／別のノードチェーン／<strong>同じツリーの中の別のプリム</strong></td></tr>
+    <tr><td>Reference Type</td><td><code>file</code> / <code>payload</code> / <code>prim</code> / <code>inherit</code> / <code>specialize</code></td></tr>
+    <tr><td>Action</td><td>Create New Primitives（新規）／ Edit Existing Primitives（既存に足す）</td></tr>
+    <tr><td>Primitive Count</td><td>1つの設定から複数個作れます。名前に連番が付きます</td></tr>
+  </tbody>
+</table></div>
+
+<p>今回は <code>Primitive Count = 2</code> にして、<code>/shelf/copy1</code> と <code>/shelf/copy2</code> を一度に作りました。</p>
+
+<p class="tx-muted">パラメータの上部にタブが2つあります（マルチ入力用と、ファイル／内部参照用）。
+どちらのタブがアクティブかで使われる設定が変わるので、
+「値を入れたのに何も出てこない」ときはタブを確認してみてください。実際に一度これで詰まりました。</p>
+
+<h3>Payload — 読み込みを後回しにする</h3>
+
+<p>Reference Type に <code>payload</code> があります。リファレンスとほぼ同じですが、
+<strong>中身の読み込みを遅らせられる</strong>のが違いです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Reference</th><th>Payload</th></tr></thead>
+  <tbody>
+    <tr><td>読み込み</td><td>常に</td><td>オン／オフできる</td></tr>
+    <tr><td>既定</td><td>—</td><td>Houdini では<strong>全部読み込む</strong></td></tr>
+    <tr><td>使いどころ</td><td>普通のアセット配置</td><td>巨大なシーン。街1つ、森1つ</td></tr>
+  </tbody>
+</table></div>
+
+<p>読み込まないようにすると軽くなりますが、そのぶん
+<strong>中のプリムがシーングラフに出てこなくなり、プリムパターンにも当たらなくなります</strong>。
+前回のパターンの話と直結するので、切るときは意識しておくとよさそうです。</p>
+
+<h3>Add Variant <span class="tx-muted">addvariant</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>バリアントセットを作り、そこにバリアントを追加する</td></tr>
+    <tr><td>入力</td><td>1つ目＝本流のステージ、2つ目以降＝各バリアントの中身</td></tr>
+    <tr><td>要のパラメータ</td><td><code>primpath</code>（既定 <code>/$OS</code>）、<code>variantset</code>（既定 <code>model</code>）、
+        <code>variantprimpath</code>（既定 <code>/</code>）</td></tr>
+    <tr><td>バリアント名</td><td>指定しなければ<strong>入力ノードの名前</strong>が使われます</td></tr>
+    <tr><td>プリムが無ければ</td><td>作ります（型は <code>parentprimtype</code>、既定 <code>UsdGeomXform</code>）</td></tr>
+  </tbody>
+</table></div>
+
+<p>今回、バリアント名を何も指定しなかったので <code>var_hi</code> / <code>var_lo</code>（＝ノード名）になりました。
+ノード名がそのまま USD に残るので、<strong>入力ノードの名前は意味のあるものにしておく</strong>と後で楽です。</p>
+
+<h3>Set Variant <span class="tx-muted">setvariant</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>バリアントセットの中から1つ選ぶ</td></tr>
+    <tr><td>入力</td><td>1（必須）</td></tr>
+    <tr><td>要のパラメータ</td><td>プリムパターン、<code>variantset</code>、<code>variantname</code></td></tr>
+    <tr><td>複数まとめて</td><td>Number of Variants を増やすと、1ノードで何組でも選べます</td></tr>
+    <tr><td>ランダムに選ぶ</td><td>Choose Variant Name by Index ＋ <code>rand()</code> の式</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">気をつけたいのが、<strong>存在しないバリアント名を書いても警告もエラーも出ない</strong>ことです。
+選択が黙って解除されるだけになります。前回の「綴りを間違えても0個」と同じ手触りですね。</p>
+
+<h3>Explore Variants <span class="tx-muted">explorevariants</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>バリアントの組み合わせを並べて一覧表示する</td></tr>
+    <tr><td>向いている場面</td><td>作ったバリアントの確認。カタログ画像を作りたいとき</td></tr>
+  </tbody>
+</table></div>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>バリアントを切り替えても形が変わらない</strong> → <code>addvariant</code> の Variant Source Primitive を確認します。
+      既定の <code>/</code> のままにしておくのが基本です。</li>
+  <li><strong>Set Variant が効かない</strong> → バリアント名の綴りです。エラーは出ません。</li>
+  <li><strong>Reference で何も出てこない</strong> → パラメータ上部のタブが、使いたい入力方法と合っているか。</li>
+  <li><strong>Payload を切ったら選べなくなった</strong> → 仕様です。読み込んでいないプリムはパターンに当たりません。</li>
+  <li><strong>バリアント名が <code>sphere1</code> のような機械的な名前になる</strong> → 入力ノードの名前がそのまま入ります。
+      先にリネームしてから繋ぐと綺麗です。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>シーンの組み立てはここまでで一通りそろいました。次はマテリアルです。
+<code>materiallibrary</code> と <code>assignmaterial</code>、そして MaterialX を扱います。
+Karma で絵にするために避けて通れないところで、
+<strong>「どのレンダラで何が使えるか」</strong>が効いてくる場面でもあります。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/glossary.html">LOPs and USD glossary — sublayer と reference の違い</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/reference.html">Reference LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/addvariant.html">Add Variant LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/setvariant.html">Set Variant LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/graftstages.html">Graft Stages LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/stagemanager.html">Stage Manager LOP</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

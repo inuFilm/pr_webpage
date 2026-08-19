@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>レイヤーと Layer Break — 編集はどこに書かれるのか | 技術メモ | makeinufilm</title>
+  <meta name="description" content="USD には「消す」が無いという話から、LOP の編集がどのレイヤーに書かれるのかを整理します。Layer Break の前後でレイヤーの中身がどう変わるかを実機で書き出して確認しました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>レイヤーと Layer Break — 編集はどこに書かれるのか</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/solaris/about_lops.html">How LOPs work</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/layerbreak.html">Layer Break</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/lop/merge.html">Merge LOP</a> /
+<a href="https://www.sidefx.com/docs/houdini/nodes/out/usd.html">USD ROP</a>。
+このページは上記を日本語で要約・再構成した学習メモです。挙動は Houdini 22.0.368 で実際にネットワークを組み、
+書き出したファイルとレイヤーの中身を確認しています。</p>
+
+<h2>この記事で扱うこと</h2>
+
+<ul>
+  <li>LOP の編集が<strong>どこに書き込まれるのか</strong>（＝レイヤー）</li>
+  <li><code>layerbreak</code> が何をしているのか。パラメータが1つも無いのに、いちばん効くノードです</li>
+  <li><code>sublayer</code> / <code>merge</code> / <code>configurelayer</code> / <code>edittargetlayer</code> のノード解説</li>
+  <li>実際に書き出して、ファイルの中身が本当に変わることを確認します</li>
+</ul>
+
+<h2>まず、USD には「消す」が無い</h2>
+
+<p>ここから話が始まります。USD では、いちど書かれたものを<strong>消すことができません</strong>。
+できるのは「上から別のことを書く」だけです。</p>
+
+<p>だから「このライトを消したい」は、USD では
+「このライトを<span class="tx-blue">オフにする、という一文を上に足す</span>」になります。
+元のライトはそのまま残ります。</p>
+
+<p>この「上に足していく紙」がレイヤーです。前回の Photoshop の喩えがそのまま使えます。
+下の絵は消せないけれど、上に不透明な四角を1枚置けば隠せますよね。それと同じことをしています。</p>
+
+<h2>ルールは3つだけ</h2>
+
+<p>公式ドキュメントの説明を、実際に手を動かすときに必要な形に絞ると、覚えることは3つでした。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>ルール</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>ノードから出てくるのは<strong>重ねた結果</strong></td>
+      <td>どのノードを見ても、そこまでを全部重ねた「完成形のシーン」が見えます</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>書き込み先は<strong>いちばん上の1枚</strong></td>
+      <td>ノードが編集を書くのは、常にいちばん強いレイヤーです。だから書いたことが必ず見えます</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>ディスクのファイルは<strong>絶対に書き換えない</strong></td>
+      <td>読み込んだ <code>.usd</code> の上に新しい1枚が作られ、そこに書かれます</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<p>ルール2の「いちばん上の1枚」を、Houdini は<strong>アクティブレイヤー</strong>と呼びます。
+パラメータ名やパネルにこの言葉が出てきたら、「いま書き込まれている紙」のことだと思ってください。</p>
+
+<p>ルール3が地味に大事です。他所からもらった <code>.usd</code> をいくらいじっても、<strong>元ファイルは無傷</strong>です。
+変更はぜんぶ、その上の新しい紙に載ります。</p>
+
+<h2>Layer Break — 保存されるのはここから下だけ</h2>
+
+<p>やっと本題です。<code>layerbreak</code> がやることは2つだけです。</p>
+
+<ol>
+  <li>ここから新しい紙を1枚おろす（以降のノードはその紙に書く）</li>
+  <li>それより前の紙に「これは保存しない」と印をつける</li>
+</ol>
+
+<p>そして<strong>いちばん大事なのは、見た目が何も変わらないこと</strong>です。
+ビューポートの絵は Layer Break の前後で完全に同じままです。変わるのは
+<strong><code>.usd</code> に書き出したときに、何がファイルに入るか</strong>だけ。</p>
+
+<blockquote>
+  <p>USD ROP がレイヤーをファイルに書き出すとき、<strong>Layer Break より前のものはすべて捨てられます</strong>。</p>
+</blockquote>
+
+<p>実機で <code>get_node_card</code> を引いたところ、<code>layerbreak</code> の<strong>パラメータは実質ゼロ</strong>でした
+（セパレータとラベルだけで、設定する値がありません）。置くか置かないか、位置をどこにするか。それが全部です。</p>
+
+<h3>何が嬉しいのか</h3>
+
+<p>公式ドキュメントが挙げている例が分かりやすいので、そのまま借ります。</p>
+
+<p>あなたは照明担当です。レイアウト部から <code>landscape.usd</code> が届きました。
+中には地形と、レイアウト担当が仮で置いた <code>/lights/scratch_sun1</code> という<strong>仮ライト</strong>が入っています。</p>
+
+<p>あなたの仕事は「仮ライトを消して、本番のライトを組む」こと。
+そして納品するのは <code>lighting.usd</code>、つまり<strong>照明の変更だけが入ったファイル</strong>です。
+地形をもう一度書き出したら、二重に持つことになってしまいます。</p>
+
+<p>ここで Layer Break を1個置くだけで、それが実現します。</p>
+
+<svg viewBox="0 0 820 440" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="Layer Break を挟んだノードチェーンと、その結果できるレイヤースタックの対応図">
+  <rect x="8" y="8" width="300" height="424" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="26" y="34" font-size="14" font-weight="bold" fill="#203744">ノードの並び</text>
+
+  <rect x="36" y="52" width="240" height="38" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="50" y="70" font-size="13" fill="#2b3a44">from_layout</text>
+  <text x="50" y="84" font-size="10" fill="#7a868e">もらった地形</text>
+  <path d="M156 90 V106" stroke="#7a868e" stroke-width="2" fill="none"/>
+
+  <rect x="36" y="106" width="240" height="38" rx="4" fill="#ffffff" stroke="#7a868e"/>
+  <text x="50" y="124" font-size="13" fill="#2b3a44">scratch_sun1</text>
+  <text x="50" y="138" font-size="10" fill="#7a868e">レイアウト担当が置いた仮ライト</text>
+  <path d="M156 144 V162" stroke="#7a868e" stroke-width="2" fill="none"/>
+
+  <rect x="36" y="162" width="240" height="38" rx="4" fill="#ffffff" stroke="#e05252" stroke-width="2"/>
+  <text x="50" y="180" font-size="13" font-weight="bold" fill="#2b3a44">layerbreak1</text>
+  <text x="50" y="194" font-size="10" fill="#e05252">ここから下だけが保存される</text>
+  <path d="M156 200 V218" stroke="#203744" stroke-width="2" fill="none"/>
+
+  <rect x="36" y="218" width="240" height="38" rx="4" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="50" y="236" font-size="13" fill="#2b3a44">kill_scratch</text>
+  <text x="50" y="250" font-size="10" fill="#7a868e">仮ライトを止める</text>
+  <path d="M156 256 V274" stroke="#203744" stroke-width="2" fill="none"/>
+
+  <rect x="36" y="274" width="240" height="38" rx="4" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="50" y="292" font-size="13" fill="#2b3a44">key_dome</text>
+  <text x="50" y="306" font-size="10" fill="#7a868e">本番のライト</text>
+  <path d="M156 312 V330" stroke="#203744" stroke-width="2" fill="none"/>
+
+  <rect x="36" y="330" width="240" height="38" rx="4" fill="#ffffff" stroke="#203744" stroke-width="2"/>
+  <text x="50" y="354" font-size="13" fill="#2b3a44">usd_rop</text>
+
+  <text x="36" y="394" font-size="11" fill="#7a868e">ビューポートの絵は</text>
+  <text x="36" y="410" font-size="11" fill="#7a868e">layerbreak の有無で変わりません。</text>
+
+  <rect x="328" y="8" width="484" height="424" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="348" y="34" font-size="14" font-weight="bold" fill="#203744">できるレイヤー</text>
+  <text x="700" y="34" font-size="11" fill="#7a868e">↑ 強い</text>
+
+  <rect x="376" y="56" width="380" height="150" rx="5" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="394" y="80" font-size="13" font-weight="bold" fill="#2b3a44">Layer Break より後の紙</text>
+  <text x="394" y="104" font-size="12" fill="#2b3a44">over  scratch_sun1  ( active = false )</text>
+  <text x="394" y="126" font-size="12" fill="#2b3a44">def   DomeLight_1 "key_dome"</text>
+  <text x="394" y="156" font-size="11" fill="#3fae6a">↑ 書き出されるのはこの紙だけ</text>
+  <text x="394" y="178" font-size="11" fill="#7a868e">仮ライトは「止める」という一文だけ。</text>
+  <text x="394" y="194" font-size="11" fill="#7a868e">ライト本体は入っていません。</text>
+
+  <rect x="376" y="236" width="380" height="130" rx="5" fill="#ffffff" stroke="#dde3e8" stroke-dasharray="5 4"/>
+  <text x="394" y="260" font-size="13" font-weight="bold" fill="#7a868e">Layer Break より前の紙</text>
+  <text x="394" y="284" font-size="12" fill="#7a868e">def   Sphere "from_layout"</text>
+  <text x="394" y="306" font-size="12" fill="#7a868e">def   DistantLight "scratch_sun1"</text>
+  <text x="394" y="336" font-size="11" fill="#e05252">↑ 捨てられる（画面には出ています）</text>
+
+  <path d="M276 181 H340 Q352 181 352 193 V221" stroke="#e05252" stroke-width="2" stroke-dasharray="5 4" fill="none"/>
+  <text x="348" y="400" font-size="11" fill="#7a868e">下から順に重ねた結果が、画面に出ている絵です。</text>
+
+  <text x="700" y="418" font-size="11" fill="#7a868e">↓ 弱い</text>
+</svg>
+
+<h2>実機で確かめました</h2>
+
+<p>図のとおりのネットワークを Houdini 22.0.368 で組んで、レイヤーの中身を直接読みました。</p>
+
+<h3>1. レイヤースタックの中身</h3>
+
+<p>いちばん下流のノードでレイヤーを並べたところ、こうなっていました。上が強い順です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>順</th><th>そのレイヤーに書かれているもの</th><th>正体</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>（ほぼ空）</td><td>Houdini の内部用</td></tr>
+    <tr><td>1</td><td>（ほぼ空）</td><td>Houdini の内部用</td></tr>
+    <tr><td>2</td><td><code>/lights/scratch_sun1</code>、<code>/lights/key_dome</code></td>
+        <td><span class="tx-blue">Layer Break より後</span></td></tr>
+    <tr><td>3</td><td><code>/from_layout</code>、<code>/lights/scratch_sun1</code></td>
+        <td><span class="tx-muted">Layer Break より前</span></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>scratch_sun1</code> が<strong>2枚に出てくる</strong>のが分かりますでしょうか。下の紙にライト本体があって、
+上の紙に「止める」という指示だけが載っています。これがルール1〜3の合わせ技です。</p>
+
+<p class="tx-muted">ノードは5個なのにレイヤーは4枚で、しかも2枚が空でした。
+「1ノード＝1レイヤー」ではないので、数が合わなくても気にしなくて大丈夫です。</p>
+
+<h3>2. 中身の書かれ方が違う</h3>
+
+<p>同じ <code>scratch_sun1</code> なのに、2枚での書かれ方がはっきり違いました。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Layer Break より前（下）</th><th>Layer Break より後（上）</th></tr></thead>
+  <tbody>
+    <tr><td>書き出しの種類</td><td><code>def</code>（定義）</td><td><code>over</code>（上書き）</td></tr>
+    <tr><td>持っている情報</td><td>型、スキーマ、各種設定</td><td><code>active</code> の1つだけ</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>def</code> は「これを作ります」、<code>over</code> は「すでにあるものに、これだけ足します」です。
+Layer Break より後で触ったものは、こうやって<strong>差分だけ</strong>になります。</p>
+
+<p>上の紙を実際にテキストで書き出すと、こうなっていました（長いので抜粋です）。</p>
+
+<pre><code>#usda 1.0
+
+over "lights"
+{
+    over "scratch_sun1" (
+        active = false
+    )
+    {
+    }
+
+    def DomeLight_1 "key_dome"
+    {
+        color3f inputs:color = (1, 1, 1)
+        float inputs:intensity = 1
+        ...
+    }
+}</code></pre>
+
+<p>地形（<code>from_layout</code>）は影も形もありません。仮ライトも <code>active = false</code> の一行だけ。
+まさに「照明の変更だけが入ったファイル」になっています。</p>
+
+<h3>3. 書き出したファイルも変わる</h3>
+
+<p>最後に、USD ROP から実際にファイルへ書き出して、<code>layerbreak1</code> をバイパスした場合と比べました。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Layer Break</th><th>書き出されたファイル</th></tr></thead>
+  <tbody>
+    <tr><td>有効</td><td>1,691 バイト</td></tr>
+    <tr><td>バイパス</td><td>2,162 バイト</td></tr>
+  </tbody>
+</table></div>
+
+<p>差の 471 バイトが、地形と仮ライトの本体です。ノードを1つバイパスしただけで、
+<strong>画面の絵は一切変わらないまま</strong>、ファイルの中身が増えました。</p>
+
+<h2>ノードごとの解説</h2>
+
+<h3>Layer Break <span class="tx-muted">layerbreak</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>新しい紙をおろし、それより前を「保存しない」と印をつける</td></tr>
+    <tr><td>入力</td><td>0〜1</td></tr>
+    <tr><td>パラメータ</td><td><strong>実質ゼロ</strong>（ラベルとセパレータのみ）</td></tr>
+    <tr><td>見た目への影響</td><td><strong>なし</strong>。ビューポートは変わりません</td></tr>
+    <tr><td>置く場所</td><td>「ここから自分の仕事」という境目。他所から読み込んだ直後が定番です</td></tr>
+  </tbody>
+</table></div>
+
+<h3>SubLayer <span class="tx-muted">sublayer</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td><code>.usd</code> ファイルをレイヤーとして重ねる。既存レイヤーの削除・入れ替え・並べ替えもできます</td></tr>
+    <tr><td>入力</td><td>1つ目＝重ねる先のステージ、2つ目＝マルチ入力（他のノードチェーンのレイヤー）</td></tr>
+    <tr><td>入力の順番</td><td><strong>左が弱く、右が強い</strong></td></tr>
+    <tr><td>要のパラメータ</td><td>ファイルパス、<code>handlemissingfiles</code>（既定は <code>error</code>）</td></tr>
+    <tr><td>向いている場面</td><td>他部署の <code>.usd</code> を持ち込む。シーンの入口</td></tr>
+  </tbody>
+</table></div>
+
+<p>「重ねる」だけなので、読み込んだものは<strong>その場所にそのまま</strong>出てきます。
+「別の場所にぶら下げたい」ときは Reference のほうで、これは第4回で扱います。</p>
+
+<h3>Merge <span class="tx-muted">merge</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>複数のノードチェーンのレイヤーを、1つのレイヤースタックにまとめる</td></tr>
+    <tr><td>入力</td><td>いくつでも。<strong>後ろの入力ほど強い</strong></td></tr>
+    <tr><td>要のパラメータ</td><td><code>mergestyle</code>（既定 <code>flattenloplayers</code>）、<code>striplayerbreaks</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>mergestyle</code> は7種類ありますが、最初に知っておきたいのは<strong>2系統ある</strong>ということだけです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>系統</th><th>やること</th><th>速さ</th></tr></thead>
+  <tbody>
+    <tr><td>Separate 系</td><td>レイヤーを重ねるだけ。枚数はそのまま</td><td>速い</td></tr>
+    <tr><td>Flatten 系</td><td>レイヤーを1枚に潰す</td><td>遅い</td></tr>
+  </tbody>
+</table></div>
+
+<p>ドキュメントには「潰すのはディスクに書き出すときでよく、その処理は USD ROP 側でもできる」という趣旨の
+注意が書かれています。ネットワークの途中で潰すと、そのぶん毎回コストを払うことになるからですね。</p>
+
+<p><code>striplayerbreaks</code>（Strip Layers Above Layer Breaks）も覚えておくと効きます。
+1か所から枝分かれして、また Merge で合流する形（ダイヤ型）を組むと、同じレイヤーが両方の枝から来て重複します。
+枝の先頭に Layer Break を置いてこれをオンにすると、その重複を落とせます。</p>
+
+<h3>Configure Layer <span class="tx-muted">configurelayer</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>レイヤーのメタデータを設定する。<strong>保存先ファイルパスを決めるのがここ</strong></td></tr>
+    <tr><td>要のパラメータ</td><td><code>setsavepath</code> ＋ <code>savepath</code>（既定 <code>$HIP/usd/$OS.usd</code>）</td></tr>
+    <tr><td>その他</td><td>デフォルトプリム、単位（<code>metersperunit</code> 既定 0.01）、上方向軸（既定 <code>z</code>）、コメント</td></tr>
+    <tr><td>チェックボックス</td><td>第1回と同じで、<strong>オンにしたものだけが書き込まれます</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>メモリ上のレイヤーに保存先を与えると、書き出しのときに<strong>そのレイヤーが別ファイルになります</strong>。
+「地形は <code>landscape.usd</code>、照明は <code>lighting.usd</code>」といった分け方は、ここで決めます。</p>
+
+<p class="tx-muted">ディスクから読み込んだレイヤーには、読み込み元のパスが最初から入っています。
+自分で決める必要があるのは、LOP の中で新しく作ったレイヤーだけです。</p>
+
+<h3>Edit Target Layer <span class="tx-muted">edittargetlayer</span></h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>やること</td><td>ルール2の例外。<strong>下のレイヤーを直接いじったことにする</strong></td></tr>
+    <tr><td>入力</td><td>1（必須）</td></tr>
+    <tr><td>使い方</td><td>ノードの中に潜って、そこで編集を組みます</td></tr>
+    <tr><td>向いている場面</td><td>「上に重ねる」ではどうにもならないとき。最後の手段です</td></tr>
+  </tbody>
+</table></div>
+
+<p>Solaris は USD の Edit Target という仕組みを使いません。かわりにこのノードが、
+対象レイヤーを取り出して編集し、元の位置に差し替える、ということをやっています。
+仲間に <code>loadlayer</code>（Load Layer For Editing）と <code>layerreplace</code>（Layer Replace）があります。</p>
+
+<h2>実機で気づいたこと</h2>
+
+<h3>Prune の既定は「消す」ではなく「隠す」</h3>
+
+<p><code>prune</code> でライトを止めようとして、最初うまくいきませんでした。
+パターンは合っているのに、シーングラフにライトが残ったままだったんです。</p>
+
+<p>原因は <code>method</code> パラメータで、<strong>既定値は <code>makeinvisible</code>（Make Invisible）</strong>でした。
+<code>deactivate</code>（Deactivate）に変えたら、ライトはツリーからも消えました。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Method</th><th>何が起きるか</th></tr></thead>
+  <tbody>
+    <tr><td>Make Invisible <span class="tx-muted">（既定）</span></td>
+        <td>ツリーには残る。ビューポートとレンダリングには出ない</td></tr>
+    <tr><td>Deactivate</td>
+        <td>ツリーからも消える。以降のノードからも触れなくなる</td></tr>
+  </tbody>
+</table></div>
+
+<p>下流でそのプリムを名前で指定したい場合は Make Invisible、完全に無かったことにしたい場合は
+Deactivate、という使い分けになりそうです。</p>
+
+<h3>Apprentice が書き出す USD は <code>.usdnc</code> になる</h3>
+
+<p><code>.usda</code>（テキスト形式）で書き出そうとしたのですが、できたファイルは <code>lighting.usdnc</code> でした。
+拡張子が勝手に変わります。中身を覗くと、こう書いてありました。</p>
+
+<pre><code>Houdini Non-Commercial USD File. Tampering with this text consti...</code></pre>
+
+<p>Apprentice で書き出した USD は<strong>非商用形式で包まれ、テキストとして読めなくなります</strong>。
+この記事の <code>.usda</code> の中身は、ファイルからではなく<strong>メモリ上のレイヤーから直接読み出したもの</strong>です。
+ファイルサイズの比較だけは、書き出した <code>.usdnc</code> の実測値です。</p>
+
+<p class="tx-muted">Indie や Commercial では普通の <code>.usd</code> / <code>.usda</code> / <code>.usdc</code> が出ます。
+検証機が Apprentice なので出た制約で、Solaris の仕様ではありません。
+ただ、他の DCC に渡す前提でワークフローを組むなら、<strong>ここは必ず本番ライセンスで確認したほうがよい</strong>ところです。</p>
+
+<h3>レイヤー一覧には Houdini の UI 用レイヤーが混ざる</h3>
+
+<p>レイヤーを一覧すると 14 枚も出てきて驚きましたが、大半は
+<code>Solo Lights</code> / <code>Purpose</code> / <code>Viewport State</code> / <code>Selectability</code> /
+<code>Visibility and Activation</code> といった<strong>ビューポート操作用のレイヤー</strong>でした。</p>
+
+<p>シーンの中身が入っているのは名前が単に <code>LOP</code> になっているものだけです。
+初めてレイヤーのパネルを開くと面食らいますが、名前が付いているものは読み飛ばして大丈夫です。</p>
+
+<h2>詰まりやすいポイント</h2>
+
+<ul>
+  <li><strong>Layer Break を置いても何も変わらない</strong> → それが正しい挙動です。
+      違いが出るのは書き出したときだけ。慌てて位置を変えないでください。</li>
+  <li><strong>書き出したファイルに余計なものが入る</strong> → Layer Break が無いか、位置が上流すぎます。
+      「ここから自分の仕事」の直前に置きます。</li>
+  <li><strong>読み込んだ USD を直接書き換えたい</strong> → できません。上に重なる新しいレイヤーに書かれます。
+      どうしても、というときだけ <code>edittargetlayer</code> です。</li>
+  <li><strong>Merge したら重い</strong> → <code>mergestyle</code> が Flatten 系になっていないか確認します。
+      潰すのは書き出しのときで足ります。</li>
+  <li><strong>Prune したのに残っている</strong> → <code>method</code> が既定の Make Invisible のままです。</li>
+</ul>
+
+<h2>次回</h2>
+
+<p>レイヤーの話が片付いたので、次はシーングラフそのものを読む回です。
+Scene Graph Tree と Details パネルの見方と、Solaris 全体で使い回せる
+<strong>プリムパターン</strong>（<code>%kind:component</code> のような書き方）を扱います。
+「どのプリムを選ぶか」を書けるようになると、以降のノードがまとめて楽になります。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/about_lops.html">How LOPs work — レイヤーと Layer Break の原典</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/layerbreak.html">Layer Break LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/sublayer.html">SubLayer LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/merge.html">Merge LOP — Merge Style の全種類</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/lop/configurelayer.html">Configure Layer LOP</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/nodes/out/usd.html">USD ROP — Save Style</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/output.html">USD output</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

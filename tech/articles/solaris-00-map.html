@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solaris と Karma の地図 — 何が複雑なのかを先に整理する | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Solaris が難しく感じる理由を USD / LOPs / Karma の3層に切り分けて、まず1枚レンダリングするまでの最小構成をまとめます。ノード名と既定値は Houdini 22.0.368 の実機で確認しました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Solaris と Karma の地図 — 何が複雑なのかを先に整理する</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-19</p>
+<p class="tx-muted">出典: SideFX 公式ドキュメント
+<a href="https://www.sidefx.com/docs/houdini/solaris/index.html">Solaris and USD</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/about_lops.html">How LOPs work</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/karma.html">Karma</a> /
+<a href="https://www.sidefx.com/docs/houdini/solaris/kug/index.html">Karma User Guide</a>、
+および <a href="https://www.sidefx.com/ja/tutorials/usd-basics-with-solaris/">USD Basics with Solaris</a>（英語）。
+このページは上記を日本語で要約・再構成した学習メモです。ノード名とパラメータの既定値は
+Houdini 22.0.368 の実機で照会して確認しています。</p>
+
+<h2>このシリーズについて</h2>
+
+<p>Solaris と Karma は、触りはじめたときの「覚えることの多さ」がなかなか手強いところだと思います。
+私自身、ワークフローに組み込みたいと思いながら何度か引き返しました。そこで、公式ドキュメントを
+読み直しながら、<strong>実際に使う順番で並べ直したマニュアル</strong>を作ることにしました。</p>
+
+<p>方針は3つです。</p>
+
+<ul>
+  <li><strong>USD の理論は最小限にします。</strong> USD の仕様そのものより、Solaris で作業するときに
+      知らないと詰まることを優先します。</li>
+  <li><strong>ノード名とパラメータ名は正確に書きます。</strong> 記憶で書かず、Houdini 22.0.368 に
+      問い合わせて確認したものだけを載せています。</li>
+  <li><strong>絵を出すところまでを1周させます。</strong> 概念の説明で終わらず、Karma で
+      レンダリングして書き出すところまで通します。</li>
+</ul>
+
+<h2>なぜ複雑に感じるのか</h2>
+
+<p>Solaris が難しく感じる理由は、たぶん「難しいものが1つある」のではなく、
+<strong>性質の違う3つを同時に覚えさせられる</strong>ことにあります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>層</th><th>正体</th><th>つまずきやすいところ</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>USD</td>
+      <td>シーンを記述するファイル形式とデータモデル。Houdini とは別に存在する規格</td>
+      <td>レイヤー、リファレンス、オピニオンといった聞き慣れない語がまとめて出てくる</td>
+    </tr>
+    <tr>
+      <td>Solaris / LOPs</td>
+      <td>その USD をノードグラフで手続き的に組み立てる Houdini 側の仕組み</td>
+      <td>SOP と見た目が同じなのに、線を流れているものの正体が違う</td>
+    </tr>
+    <tr>
+      <td>Karma</td>
+      <td>その USD を絵にするレンダラ</td>
+      <td>サンプリング系のパラメータが多く、どれがどのノイズに効くのか分かりにくい</td>
+    </tr>
+  </tbody>
+</table></div>
+
+<p>逆に言うと、この3つを切り分けてしまえば、それぞれはそこまで大きくありません。
+このシリーズもその順で進みます。</p>
+
+<h2>いちばん大事な一行</h2>
+
+<p>細かい話に入る前に、これだけ先に書いておきます。</p>
+
+<blockquote>
+  <p>SOP の線を流れているのは<strong>モノ</strong>。LOP の線を流れているのは<strong>シーン</strong>。</p>
+</blockquote>
+
+<p>SOP のノードは、渡されたジオメトリを加工して次に渡します。箱を Subdivide に通せば、
+分割された箱が出てきます。流れているのは「モノ」です。</p>
+
+<p>LOP のノードは違います。入ってくるのはシーン全体で、出ていくのもシーン全体です。
+ノードがやるのは、そこに<strong>変更をひとつ書き足すこと</strong>だけ。
+「ライトを1つ足す」「このプリムを隠す」といったメモを1枚重ねて、シーンごと次に渡します。</p>
+
+<p>Photoshop のレイヤーが近いと思います。レイヤーを1枚足しても、画面に出るのはそのレイヤー単体ではなく、
+全部を重ねた1枚の絵ですよね。LOP も同じで、どのノードを見ても
+<strong>その時点でのシーンの完成形</strong>が表示されます。</p>
+
+<p>この「書き足したメモがどこに置かれるか」がレイヤーの話です。第2回で扱います。</p>
+
+<h2>まず1枚出すまで — これが基本形です</h2>
+
+<p>Blender の Cycles なら、オブジェクトを置いて F12 を押せば絵が出ます。
+Solaris は同じ感覚でいくと出ません。ここが最初の壁だと思います。</p>
+
+<p>理由ははっきりしていて、<strong>Solaris のステージは最初、本当に空っぽ</strong>だからです。
+既定のライトも、既定のカメラもありません。全部ノードで載せます。
+裏を返すと、載せるものさえ決まっていれば毎回同じ形で組めます。</p>
+
+<p>最小構成はこの4つです。上から順に1本の線でつなぐだけで、分岐もありません。</p>
+
+<svg viewBox="0 0 820 370" style="width:100%;height:auto;display:block;margin:20px 0;font-family:sans-serif" role="img" aria-label="Solaris で最短にレンダリングするための4ノードの並び">
+  <rect x="8" y="8" width="804" height="354" rx="8" fill="#f4f7f9" stroke="#dde3e8"/>
+  <text x="28" y="34" font-size="14" font-weight="bold" fill="#203744">/stage — 最小構成</text>
+
+  <rect x="40" y="52" width="230" height="46" rx="5" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="58" y="74" font-size="14" fill="#2b3a44">1. sopcreate</text>
+  <text x="58" y="90" font-size="11" fill="#7a868e">ジオメトリを載せる</text>
+  <text x="300" y="82" font-size="12" fill="#203744">形が無ければ何も映りません</text>
+  <path d="M155 98 V126" stroke="#203744" stroke-width="2" fill="none" marker-end="url(#ar2)"/>
+
+  <rect x="40" y="130" width="230" height="46" rx="5" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="58" y="152" font-size="14" fill="#2b3a44">2. domelight</text>
+  <text x="58" y="168" font-size="11" fill="#7a868e">→ /lights/domelight1</text>
+  <text x="300" y="160" font-size="12" fill="#203744">これが無いと真っ黒です</text>
+  <path d="M155 176 V204" stroke="#203744" stroke-width="2" fill="none" marker-end="url(#ar2)"/>
+
+  <rect x="40" y="208" width="230" height="46" rx="5" fill="#ffffff" stroke="#2CA9E1" stroke-width="2"/>
+  <text x="58" y="230" font-size="14" fill="#2b3a44">3. camera</text>
+  <text x="58" y="246" font-size="11" fill="#7a868e">→ /cameras/camera1</text>
+  <text x="300" y="238" font-size="12" fill="#203744">撮る場所。名前は既定のままが楽です</text>
+  <path d="M155 254 V282" stroke="#203744" stroke-width="2" fill="none" marker-end="url(#ar2)"/>
+
+  <rect x="40" y="286" width="230" height="46" rx="5" fill="#ffffff" stroke="#203744" stroke-width="2"/>
+  <text x="58" y="308" font-size="14" fill="#2b3a44">4. karma</text>
+  <text x="58" y="324" font-size="11" fill="#7a868e">Camera の既定 = /cameras/camera1</text>
+  <text x="300" y="306" font-size="12" fill="#203744">3 が作るパスと 4 が探すパスは、</text>
+  <text x="300" y="324" font-size="12" fill="#2CA9E1">最初から一致しています</text>
+
+  <defs>
+    <marker id="ar2" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0 0 L8 4 L0 8 z" fill="#203744"/>
+    </marker>
+  </defs>
+</svg>
+
+<p>この図でいちばん言いたいのは、いちばん下の一致です。実機で確認しました。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td><code>camera</code> LOP の Primitive Path 既定値</td><td><code>/cameras/$OS</code></td></tr>
+    <tr><td><code>$OS</code> はノード名なので、<code>camera1</code> が作るプリムは</td><td><code>/cameras/camera1</code></td></tr>
+    <tr><td><code>karma</code> LOP の Camera 既定値</td><td><code>/cameras/camera1</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>つまり<strong>カメラノードを1つ置くだけなら、Karma 側は何も触らなくていい</strong>ということです。
+既定値どうしが噛み合うように作られています。2つ目のカメラを足したときや、
+ノード名を変えたときだけ、<code>karma</code> の Camera を合わせにいきます。</p>
+
+<p class="tx-muted">この4つを実際に Houdini 22.0.368 で組んで確認しました。<code>karma</code> のパラメータは
+何ひとつ触っていませんが、ステージには <code>/lights/domelight1</code> と <code>/cameras/camera1</code> が並び、
+レンダー設定の <code>/Render/rendersettings</code> まで自動で作られていました。
+ビューポートの表示方法を Karma CPU に切り替えると、そのまま絵が出ます。</p>
+
+<p>絵が出ないときに疑う順番も、この4つで決まります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>たいていの原因</th></tr></thead>
+  <tbody>
+    <tr><td>真っ黒</td><td>ライトが無い</td></tr>
+    <tr><td>何も映らない／変なところを映している</td><td>カメラが無い。または <code>karma</code> の Camera が別のパスを指している</td></tr>
+    <tr><td>ジオメトリだけ出ない</td><td>そもそもステージに載っていない（第1回の話です）</td></tr>
+  </tbody>
+</table></div>
+
+<p>あとは全部、この4つの<strong>すき間に挟まるもの</strong>です。マテリアルは 1 と 2 のあいだ、
+レイヤーの整理も同じあたり、レンダー設定は 4 の手前。
+シリーズの残りは「この骨格のどこに何を足すか」という話になります。</p>
+
+<h2>全体の流れ</h2>
+
+<p>ざっくりした流れはこうなります。左から右に一方通行です。</p>
+
+<pre><code>SOP（ジオメトリを作る）
+   │  SOP Import / SOP Create / SOP Modify
+   ▼
+LOP = /stage（シーンを組む）
+   ├─ ステージに載せる ……… ジオメトリ・カメラ・ライト
+   ├─ レイヤーを整理する …… SubLayer / Layer Break / Configure Layer
+   ├─ マテリアルを割り当てる  Material Library / Assign Material
+   └─ レンダー設定を作る …… Karma Render Settings
+   ▼
+Karma（絵にする）
+   ├─ ビューポートで確認 …… Hydra デリゲートとして
+   └─ karma LOP から書き出し  MPlay / ディスク
+   ▼
+出力
+   ├─ .exr（画像・AOV）
+   └─ .usd（シーンそのもの。他の DCC やレンダラに渡せる）</code></pre>
+
+<p>注目していただきたいのは、いちばん下の出口が<strong>2つある</strong>ことです。
+Solaris は「Houdini でレンダリングするための場所」であると同時に、
+「USD としてシーンを書き出すための場所」でもあります。
+チームで使うときや、あとから別のレンダラに差し替えたくなったときに効いてくるのはこちらです。</p>
+
+<h2>Karma は何なのか</h2>
+
+<p>Karma は Houdini に入っているレンダラです。光を追いかけて絵を作る、いわゆるパストレーサですね。</p>
+
+<p>ありがたいのは、<strong>ビューポートの表示と最終レンダリングが同じ Karma</strong>だという点です。
+ビューポートの表示方法を Karma に切り替えると、そこに出るのは本番と同じ計算による絵になります。
+「プレビューでは良かったのに、書き出したら違った」が起きにくいのはこのためです。</p>
+
+<p class="tx-muted">仕組みとしては、USD 側の描画窓口である Hydra に Karma を差し込む形になっています。
+差し込むものを替えれば表示も替わる、という作りです。この差し込むものを「レンダーデリゲート」と呼びます。</p>
+
+<p>エンジンは2種類あり、パラメータひとつで切り替えます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>Karma CPU</th><th>Karma XPU</th></tr></thead>
+  <tbody>
+    <tr><td>使うハードウェア</td><td>CPU のみ</td><td>CPU ＋ GPU</td></tr>
+    <tr><td>速度</td><td>遅い</td><td>速い</td></tr>
+    <tr><td>機能の多さ</td><td>多い。挙動もより正確</td><td>CPU に追随する形で、いくらか少ない</td></tr>
+    <tr><td>VEX シェーダ</td><td>限定的に使える</td><td>使えない</td></tr>
+    <tr><td>マテリアル</td><td>Principled shader / MaterialX / USD Preview Surface</td><td>MaterialX と USD Preview Surface のみ</td></tr>
+    <tr><td>GPU の条件</td><td>—</td><td>現状 NVIDIA のみ</td></tr>
+  </tbody>
+</table></div>
+
+<p>切り替えは <code>Karma Render Settings</code> LOP または <code>karma</code> LOP の
+<code>Engine Settings</code>（内部名 <code>engine</code>）で行います。実機で確認したところ、
+メニューの値は <code>cpu</code> と <code>xpu</code> の2つで、既定は <code>cpu</code> でした。</p>
+
+<p class="tx-muted">Mac で作業されている場合、XPU は現状 NVIDIA GPU 前提なので、
+実質 CPU 一択になります。このシリーズも CPU を基準に書きます。</p>
+
+<h2>覚えるノードは、思ったより少ない</h2>
+
+<p>LOP のタブメニューにはかなりの数のノードが並んでいますが、最初に覚えるものは
+役割ごとに分けると数えられる程度です。以下は Houdini 22.0.368 に実在することを
+確認したノードタイプ名です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>役割</th><th>ノード（内部名）</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>ジオメトリをステージに載せる</td>
+      <td><code>sopimport</code> / <code>sopcreate</code> / <code>sopmodify</code></td>
+    </tr>
+    <tr>
+      <td>USD ファイルを読み込む・レイヤーを操作する</td>
+      <td><code>sublayer</code> / <code>layerbreak</code> / <code>configurelayer</code> / <code>edittargetlayer</code> / <code>loadlayer</code></td>
+    </tr>
+    <tr>
+      <td>マテリアルを作る・割り当てる</td>
+      <td><code>materiallibrary</code> / <code>assignmaterial</code> / <code>componentmaterial</code> / <code>materiallinker</code></td>
+    </tr>
+    <tr>
+      <td>レンダー設定と出力</td>
+      <td><code>karmarendersettings</code> / <code>karmarenderproducts</code> / <code>karmastandardrendervars</code> / <code>usdrender_rop</code></td>
+    </tr>
+    <tr>
+      <td>レンダリングを実行する</td>
+      <td><code>karma</code></td>
+    </tr>
+  </tbody>
+</table></div>
+
+<h2>先にひとつ、引っかかりどころ</h2>
+
+<p>この表を作るときに実機で気づいたことがあるので、先に共有しておきます。</p>
+
+<p>レンダリングを実行するノードの名前は、そのまま <code>karma</code> です。
+ところがノードタイプの一覧を機械的に引くと、<strong>これだけ出てきません</strong>。
+「karma」で絞り込むと <code>karmarendersettings</code> などはずらりと並ぶのに、肝心の <code>karma</code> が抜けています。</p>
+
+<p>無いわけではありませんでした。名前を指定して直接問い合わせると、ちゃんと返ってきます。
+Houdini 22.0.368 でパラメータ 80 個、<span class="tx-blue">18.0 からあるノード</span>です。
+一覧に出ないだけで、タブメニューからは普通に置けます。</p>
+
+<p>そして、このノードの正体はドキュメントに明記されています。</p>
+
+<blockquote>
+  <p>Karma LOP は <code>rendervar</code> / <code>renderproduct</code> / <code>karmarendersettings</code> /
+  <code>usdrender_rop</code> の機能をひとつにまとめたもので、Karma 固有の設定を含めて
+  1か所で構成できるようにしたノードです。</p>
+</blockquote>
+
+<p>つまり <code>karma</code> LOP は<strong>4つのノードの詰め合わせ</strong>です。
+最初は <code>karma</code> ひとつで通し、パイプラインとして分業したくなったら
+中身の4つに分解する、という順番で覚えるのがよいかなと思っています。</p>
+
+<h2>既定値をいくつか</h2>
+
+<p>手を動かす前に頭に入れておくと迷わない既定値です。いずれも Houdini 22.0.368 の
+<code>karma</code> LOP で確認したものです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ（内部名）</th><th>既定値</th><th>ひとこと</th></tr></thead>
+  <tbody>
+    <tr><td>Camera（<code>camera</code>）</td><td><code>/cameras/camera1</code></td>
+        <td>ステージ上のカメラのシーングラフパス。ここが合っていないと何も映りません</td></tr>
+    <tr><td>Resolution（<code>resolution</code>）</td><td>1280 × 720</td>
+        <td>Render Settings 側の既定も同じです</td></tr>
+    <tr><td>Output Picture（<code>picture</code>）</td><td><code>$HIP/render/$HIPNAME.$OS.$F4.exr</code></td>
+        <td><code>$OS</code> はノード名。連番なら <code>$F</code> 系を必ず含めます</td></tr>
+    <tr><td>Rendersettings Primitive Path（<code>primpath</code>）</td><td><code>/Render/rendersettings</code></td>
+        <td>設定が USD 上のどこに書かれるか。<code>karmarendersettings</code> 単体だと <code>/Render/$OS</code> です</td></tr>
+    <tr><td>Engine Settings（<code>engine</code>）</td><td><code>cpu</code></td><td>CPU / XPU の切り替え</td></tr>
+    <tr><td>Primary Samples（<code>samplesperpixel</code>）</td><td>9</td><td>CPU のときのピクセルあたりのサンプル数</td></tr>
+    <tr><td>Path Traced Samples（<code>pathtracedsamples</code>）</td><td>128</td><td>XPU のときのサンプル数</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>Primary Samples</code> と <code>Path Traced Samples</code> が並んでいて、どちらを触ればいいのか
+迷いやすいところですが、<strong>エンジンによって使われる方が変わります</strong>。
+CPU なら前者、XPU なら後者です。片方をいくら上げても効かない、という事故はここで起きます。
+サンプリングは第8回でまとめて扱います。</p>
+
+<h2>このシリーズの構成</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>00</td><td>Solaris と Karma の地図（この記事）</td></tr>
+    <tr><td>01</td><td><a href="solaris-01-stage.html">ステージに載せる — SOP から LOP への4つの入口</a></td></tr>
+    <tr><td>02</td><td><a href="solaris-02-layer.html">レイヤーと Layer Break — 編集はどこに書かれるのか</a></td></tr>
+    <tr><td>03</td><td><a href="solaris-03-scenegraph.html">シーングラフを読む・選ぶ — プリムパターンの5段階</a></td></tr>
+    <tr><td>04</td><td><a href="solaris-04-reference.html">リファレンスとバリアント — アセットを組み合わせる</a></td></tr>
+    <tr><td>05</td><td><a href="solaris-05-material.html">マテリアル — MaterialX と Material Library</a></td></tr>
+    <tr><td>06</td><td><a href="solaris-06-light-camera.html">ライトとカメラ — 型の対応と、数字が変わる話</a></td></tr>
+    <tr><td>07</td><td><a href="solaris-07-karma.html">Karma を回す — 4つの詰め合わせを分解する</a></td></tr>
+    <tr><td>08</td><td><a href="solaris-08-sampling.html">サンプリングとノイズ — どのノイズにどれが効くのか</a></td></tr>
+    <tr><td>09</td><td><a href="solaris-09-output.html">書き出しとワークフローへの組み込み</a></td></tr>
+  </tbody>
+</table></div>
+
+<h2>環境</h2>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>Houdini</td><td>22.0.368</td></tr>
+    <tr><td>ライセンス</td><td>Apprentice（検証機）</td></tr>
+    <tr><td>ドキュメント</td><td>Houdini 22.0 のオンラインヘルプ</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">Apprentice では出力解像度に上限があり、書き出した画像にウォーターマークが入ります。
+ノード名・パラメータ名・既定値の確認という目的には影響しませんが、
+Indie や Commercial とは出力面の挙動が違う点だけ念のため書いておきます。</p>
+
+<h2>関連リンク</h2>
+
+<ul>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/index.html">Solaris and USD — Houdini 22.0 ドキュメント</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/about_lops.html">How LOPs work</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/karma.html">Karma</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/kug/index.html">Karma User Guide</a></li>
+  <li><a href="https://www.sidefx.com/docs/houdini/solaris/glossary.html">LOPs and USD glossary</a></li>
+  <li><a href="https://www.sidefx.com/ja/tutorials/usd-basics-with-solaris/">USD Basics with Solaris（チュートリアルと PDF リファレンス）</a></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
