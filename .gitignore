@@ -351,6 +351,7 @@ MigrationBackup/
 *.md
 tools/article-editor
 tools/video2article
+tools/workthumb
 tools/.DS_Store
 .DS_Store
 

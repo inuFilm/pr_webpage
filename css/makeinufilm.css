@@ -161,6 +161,17 @@ margin-bottom: 15px;
 	}
   }
 
+/* サムネイル画像はカードの幅を超えない。
+   以前は下の max-width:480px のメディアクエリ内にしか img の指定がなく、
+   PC 表示では原寸で描画されていた（大きい画像を入れると拡大表示になる）。
+   縦は既存の見た目を変えないため素材側の統一（299x168 / -harf は 299x84）に任せる。
+   素材の変換と点検は tools/workthumb/workthumb.py で行う。 */
+.work-thumbnail img,
+.work-thumbnail-harf img {
+	max-width: 100%;
+	height: auto;
+}
+
 .work-thumbnail-harf {
 height: 72px;
 margin-bottom: 10px;
