@@ -11,6 +11,13 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "sidefx-foundations-01-soccerball",
+    "title": "Houdini 22 入門 1 — 上流を差し替えてサッカーボールを作る",
+    "category": "houdini",
+    "date": "2026-08-24",
+    "description": "Set Project から始めて、箱を押し出して細分化し、最後にその箱を Platonic Solids に差し替えます。下流を作り直さずに形だけ入れ替えられるという、Houdini のいちばん基本的な性質を確かめる回です。"
+  },
+  {
     "slug": "nodes-vex",
     "title": "VEX — よく使う関数と、行列まわりの実例",
     "category": "houdini-nodes",
@@ -366,26 +373,5 @@ window.TECH_ARTICLES = [
     "category": "houdini-character",
     "date": "2026-08-18",
     "description": "SideFX 公式チュートリアル Create a Procedural Character 第9回・最終回の日本語メモです。Configure Clip Anim による FBX 出力、name からのマテリアル一括割り当て、groom_group_id での毛束の分離について。"
-  },
-  {
-    "slug": "article-20260708-2345",
-    "title": "HoudiniTEST",
-    "category": "houdini",
-    "date": "2026-07-08",
-    "description": "Houdinimawarinohanashi"
-  },
-  {
-    "slug": "site-structure",
-    "title": "このサイトの構成メモ",
-    "category": "サイト運用",
-    "date": "2026-07-08",
-    "description": "makeinufilm.com の構成と、この技術メモセクションの仕組み。"
-  },
-  {
-    "slug": "how-to-add-article",
-    "title": "記事の追加方法",
-    "category": "サイト運用",
-    "date": "2026-07-08",
-    "description": "この技術メモに新しい記事を追加する手順。"
   }
 ];
