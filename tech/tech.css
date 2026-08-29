@@ -98,6 +98,13 @@ body.tech {
 
 .tech-sidebar-top:hover { color: var(--tech-accent); }
 
+/* ツール一覧(技術メモとは別枠の最上部リンク) */
+.tech-sidebar-tools {
+  color: var(--tech-accent);
+  margin-bottom: 10px;
+}
+.tech-sidebar-tools.is-current { text-decoration: underline; }
+
 .tech-search {
   width: 100%;
   font: inherit;

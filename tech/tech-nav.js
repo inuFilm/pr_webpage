@@ -19,6 +19,10 @@ var CATEGORY_LABELS = {
   'blender': 'Blender'
 };
 
+// このカテゴリの記事は技術メモの一覧に混ぜず、サイドバー最上部の
+// 「ツール一覧」ブロックとして別枠で扱う
+var TOOLS_CATEGORY = 'ツール';
+
 function labelFor(category) {
   return CATEGORY_LABELS[category] || category;
 }
@@ -29,10 +33,12 @@ function anchorFor(category) {
 
 document.addEventListener('DOMContentLoaded', function () {
   if (!Array.isArray(window.TECH_ARTICLES)) return;
-  var grouped = groupByCategory(window.TECH_ARTICLES);
+  var toolsArticles = window.TECH_ARTICLES.filter(function (a) { return a.category === TOOLS_CATEGORY; });
+  var techArticles = window.TECH_ARTICLES.filter(function (a) { return a.category !== TOOLS_CATEGORY; });
+  var grouped = groupByCategory(techArticles);
   var current = findCurrent(window.TECH_ARTICLES);
 
-  renderSidebar(grouped, current);
+  renderSidebar(grouped, current, toolsArticles);
   renderArticleList(grouped);
   enhanceArticleMeta(current);
   renderPager(grouped, current);
@@ -72,9 +78,17 @@ function el(tag, className, text) {
 // ------------------------------------------------------------
 // (a) サイドバー（全ページ共通）
 // ------------------------------------------------------------
-function renderSidebar(grouped, current) {
+function renderSidebar(grouped, current, toolsArticles) {
   var sidebar = document.getElementById('tech-sidebar');
   if (!sidebar) return;
+
+  // ツールは技術メモのカテゴリに混ぜず、最上部の別枠にする
+  if (toolsArticles && toolsArticles.length) {
+    var toolsLink = el('a', 'tech-sidebar-top tech-sidebar-tools', 'ツール一覧 トップ');
+    toolsLink.setAttribute('href', window.TECH_ROOT + 'articles/' + toolsArticles[0].slug + '.html');
+    if (current && current.category === TOOLS_CATEGORY) toolsLink.className += ' is-current';
+    sidebar.appendChild(toolsLink);
+  }
 
   var topLink = el('a', 'tech-sidebar-top', '技術メモ トップ');
   topLink.setAttribute('href', window.TECH_ROOT + 'index.html');
@@ -223,9 +237,14 @@ function enhanceArticleMeta(current) {
 
   meta.textContent = '';
 
-  var catLink = el('a', null, labelFor(current.category));
-  catLink.setAttribute('href', window.TECH_ROOT + 'index.html#' + anchorFor(current.category));
-  meta.appendChild(catLink);
+  if (current.category === TOOLS_CATEGORY) {
+    // ツールは技術メモ一覧にアンカーが無いのでテキスト表示のみ
+    meta.appendChild(el('span', null, labelFor(current.category)));
+  } else {
+    var catLink = el('a', null, labelFor(current.category));
+    catLink.setAttribute('href', window.TECH_ROOT + 'index.html#' + anchorFor(current.category));
+    meta.appendChild(catLink);
+  }
   meta.appendChild(document.createTextNode(' · ' + current.date));
 }
 
