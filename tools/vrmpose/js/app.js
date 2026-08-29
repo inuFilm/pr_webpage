@@ -4,6 +4,7 @@ import { OrbitControls } from '../vendor/controls/OrbitControls.js';
 import { Character, Prop, loadAsset, BONE_PARENT, HAND_POSES } from './character.js';
 import { idb, hashBuffer } from './store.js';
 import { aimBone, solveTwoBoneIK, decomposeRot, composeRot, twistBone } from './ik.js';
+import { buildZip, crc32 } from './zip.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('view');
@@ -15,10 +16,12 @@ const state = {
   activeChar: null,
   pendingChars: null,       // シーン読込時にモデル未所持だったキャラ状態
   pendingProps: null,
+  mode: 'illust',           // 'illust' | 'conte'
+  timeline: { fps: 24, cuts: [] },  // カット = { frames, thumb, state }
   settings: {
     fov: 30, ortho: false, bgColor: '#3a3f47', alphaExport: false,
     aspect: 'free', exportLong: 2048, showHandles: true, showGrid: true, handleScale: 1,
-    panelSide: 'left',
+    panelSide: 'left', showEyeLevel: true,
   },
 };
 
@@ -42,7 +45,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(state.settings.bgColor);
 
-const perspCam = new THREE.PerspectiveCamera(state.settings.fov, 1, 0.01, 100);
+const perspCam = new THREE.PerspectiveCamera(state.settings.fov, 1, 0.01, 3000);
 perspCam.position.set(0, 0.95, 2.8);
 let orthoCam = null;
 let activeCamera = perspCam;
@@ -52,8 +55,49 @@ const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
 dirLight.position.set(1.2, 2.4, 1.8);
 scene.add(dirLight);
 
-const grid = new THREE.GridHelper(4, 8, 0x4a545f, 0x2c343d);
-scene.add(grid);
+// 地平線まで続く床グリッド(1m + 10m の二重グリッド、距離でフェード)
+const grid = (() => {
+  const mat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    uniforms: {
+      uColor: { value: new THREE.Color(0x55606c) },
+      uFadeEnd: { value: 500.0 },
+    },
+    vertexShader: `
+      varying vec3 vWorld;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorld = wp.xyz;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }`,
+    fragmentShader: `
+      varying vec3 vWorld;
+      uniform vec3 uColor;
+      uniform float uFadeEnd;
+      float gridLine(vec2 p, float scale) {
+        vec2 c = p / scale;
+        vec2 g = abs(fract(c - 0.5) - 0.5) / fwidth(c);
+        return 1.0 - min(min(g.x, g.y), 1.0);
+      }
+      void main() {
+        float g1 = gridLine(vWorld.xz, 1.0);
+        float g10 = gridLine(vWorld.xz, 10.0);
+        float dist = distance(cameraPosition.xz, vWorld.xz);
+        float fade = 1.0 - smoothstep(uFadeEnd * 0.25, uFadeEnd, dist);
+        float nearFade = 1.0 - smoothstep(30.0, 120.0, dist);
+        float a = max(g10 * 0.45 * fade, g1 * 0.3 * nearFade);
+        if (a < 0.003) discard;
+        gl_FragColor = vec4(uColor, a);
+      }`,
+  });
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000).rotateX(-Math.PI / 2), mat);
+  mesh.renderOrder = 1;
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  return mesh;
+})();
 
 // 向きコントローラー操作中に出す単位円ガイド
 const headingRing = (() => {
@@ -116,8 +160,8 @@ function aspectValue() {
   return aw / ah;
 }
 
-function exportSize() {
-  const long = Math.max(64, Math.min(8192, state.settings.exportLong || 2048));
+function exportSize(longOverride) {
+  const long = Math.max(64, Math.min(8192, longOverride || state.settings.exportLong || 2048));
   let ar = aspectValue();
   if (ar === null) {
     ar = (canvas.clientWidth || 1) / (canvas.clientHeight || 1);
@@ -162,7 +206,28 @@ renderer.setAnimationLoop(() => {
     if (o.handleGroup.visible) o.updateHandles(state.settings.handleScale);
   }
   renderer.render(scene, activeCamera);
+  updateEyeLine();
 });
+
+/** アイレベル(カメラ高さの地平線)をスクリーン上に重ねる */
+function updateEyeLine() {
+  const el = $('eyeLine');
+  if (state.settings.showEyeLevel === false) { el.classList.add('hidden'); return; }
+  const cam = activeCamera;
+  _v3a.set(0, 0, -1).applyQuaternion(cam.quaternion);
+  _v3a.y = 0;
+  if (_v3a.lengthSq() < 1e-6) { el.classList.add('hidden'); return; } // 真上/真下を見ている
+  _v3a.normalize();
+  _v3b.copy(cam.position).addScaledVector(_v3a, 1000);
+  cam.updateMatrixWorld();
+  cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+  _v3b.project(cam);
+  if (!isFinite(_v3b.y) || _v3b.y < -1.2 || _v3b.y > 1.2) { el.classList.add('hidden'); return; }
+  const rect = canvas.getBoundingClientRect();
+  el.style.top = ((-_v3b.y * 0.5 + 0.5) * rect.height + rect.top) + 'px';
+  $('eyeLineLabel').textContent = `アイレベル ${cam.position.y.toFixed(2)}m`;
+  el.classList.remove('hidden');
+}
 
 // ---------- ハンドルのピックとドラッグ ----------
 
@@ -899,7 +964,7 @@ function setOrtho(on) {
     const dist = pos.distanceTo(target);
     const halfH = Math.tan(THREE.MathUtils.degToRad(state.settings.fov / 2)) * dist;
     const aspect = (canvas.clientWidth || 1) / (canvas.clientHeight || 1);
-    orthoCam = new THREE.OrthographicCamera(-halfH * aspect, halfH * aspect, halfH, -halfH, -100, 200);
+    orthoCam = new THREE.OrthographicCamera(-halfH * aspect, halfH * aspect, halfH, -halfH, -100, 3000);
     orthoCam.position.copy(pos);
     orthoCam.quaternion.copy(quat);
     activeCamera = orthoCam;
@@ -933,19 +998,68 @@ $('orthoToggle').addEventListener('change', (e) => setOrtho(e.target.checked));
 
 // ---------- シーンの直列化 ----------
 
+function captureCameraState() {
+  return {
+    pos: activeCamera.position.toArray(),
+    target: controls.target.toArray(),
+    fov: state.settings.fov,
+    ortho: state.settings.ortho,
+    zoom: activeCamera.zoom || 1,
+  };
+}
+
+function applyCameraState(cam) {
+  if (!cam) return;
+  if (!!cam.ortho !== (activeCamera !== perspCam)) setOrtho(!!cam.ortho);
+  $('orthoToggle').checked = !!cam.ortho;
+  state.settings.fov = cam.fov || 30;
+  perspCam.fov = state.settings.fov;
+  perspCam.updateProjectionMatrix();
+  activeCamera.position.fromArray(cam.pos);
+  controls.target.fromArray(cam.target);
+  if (cam.zoom && activeCamera.isOrthographicCamera) {
+    activeCamera.zoom = cam.zoom;
+    activeCamera.updateProjectionMatrix();
+  }
+  controls.update();
+  syncSettingsUI();
+}
+
+/** ポーズ・小物・カメラのスナップショット(コンテのカットに使う) */
+function captureShot() {
+  return {
+    characters: state.characters.map((c) => c.serialize()),
+    props: state.props.map((p) => p.serialize()),
+    camera: captureCameraState(),
+  };
+}
+
+/** captureShot の状態を現在のシーンへ適用(モデル構成は今あるものを流用) */
+function applyShot(cs) {
+  if (!cs) return;
+  (cs.characters || []).forEach((st, i) => {
+    const c = state.characters[i];
+    if (c) { c.applyState(st); c.applyCurls(); }
+  });
+  (cs.props || []).forEach((st, i) => {
+    const p = state.props[i];
+    if (p) p.applyState(st);
+  });
+  applyCameraState(cs.camera);
+}
+
 function serializeScene() {
   return {
     app: 'vrmpose', version: 1,
     characters: state.characters.map((c) => c.serialize()),
     props: state.props.map((p) => p.serialize()),
-    camera: {
-      pos: activeCamera.position.toArray(),
-      target: controls.target.toArray(),
-      fov: state.settings.fov,
-      ortho: state.settings.ortho,
-      zoom: activeCamera.zoom || 1,
-    },
+    camera: captureCameraState(),
     settings: { ...state.settings },
+    timeline: {
+      fps: state.timeline.fps,
+      exportLong: state.timeline.exportLong || 960,
+      cuts: state.timeline.cuts.map((c) => ({ frames: c.frames, thumb: c.thumb, state: c.state })),
+    },
   };
 }
 
@@ -993,21 +1107,17 @@ async function applyScene(data) {
   }
 
   // カメラ
-  if (data.camera) {
-    if (!!data.camera.ortho !== (activeCamera !== perspCam)) setOrtho(!!data.camera.ortho);
-    $('orthoToggle').checked = !!data.camera.ortho;
-    state.settings.fov = data.camera.fov || 30;
-    perspCam.fov = state.settings.fov;
-    perspCam.updateProjectionMatrix();
-    activeCamera.position.fromArray(data.camera.pos);
-    controls.target.fromArray(data.camera.target);
-    if (data.camera.zoom && activeCamera.isOrthographicCamera) {
-      activeCamera.zoom = data.camera.zoom;
-      activeCamera.updateProjectionMatrix();
-    }
-    controls.update();
-    syncSettingsUI();
-  }
+  applyCameraState(data.camera);
+
+  // タイムライン(コンテ)
+  state.timeline = data.timeline
+    ? JSON.parse(JSON.stringify(data.timeline))
+    : { fps: 24, cuts: [] };
+  if (!state.timeline.fps) state.timeline.fps = 24;
+  if (!Array.isArray(state.timeline.cuts)) state.timeline.cuts = [];
+  selectedCut = state.timeline.cuts.length ? 0 : -1;
+  renderTimeline(false);
+
   renderCharUI();
   markDirty();
 }
@@ -1024,10 +1134,11 @@ function markDirty() {
 
 // ---------- PNG 書き出し ----------
 
-async function exportPNG() {
-  if (!state.characters.length && !state.props.length) { toast('モデルがありません'); return; }
+/** 現在のシーンを W×H で 1 枚レンダリングして PNG blob(または jpeg dataURL)を返す */
+async function renderShot(W, H, asDataURL) {
   const s = state.settings;
-  const [W, H] = exportSize();
+  for (const c of state.characters) { c.updateGaze(activeCamera); c.vrm.update(0.016); }
+  scene.updateMatrixWorld();
   const w = canvas.clientWidth, h = canvas.clientHeight;
   const pr = renderer.getPixelRatio();
   const cam = activeCamera;
@@ -1067,7 +1178,9 @@ async function exportPNG() {
   renderer.setPixelRatio(1);
   renderer.setSize(W, H, false);
   renderer.render(scene, cam);
-  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  let result;
+  if (asDataURL) result = canvas.toDataURL('image/jpeg', 0.7);
+  else result = await new Promise((res) => canvas.toBlob(res, 'image/png'));
 
   renderer.setPixelRatio(pr);
   renderer.setSize(w, h, false);
@@ -1081,16 +1194,27 @@ async function exportPNG() {
   s.showHandles = prevHandles;
   grid.visible = prevGrid;
   if (s.alphaExport) { scene.background = new THREE.Color(s.bgColor); renderer.setClearAlpha(1); }
+  return result;
+}
 
+async function exportPNG() {
+  if (!state.characters.length && !state.props.length) { toast('モデルがありません'); return; }
+  const [W, H] = exportSize();
+  const blob = await renderShot(W, H, false);
   if (!blob) { toast('書き出しに失敗しました'); return; }
   const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
-  const file = new File([blob], `pose_${stamp}.png`, { type: 'image/png' });
+  await deliverFile(blob, `pose_${stamp}.png`, 'image/png');
+}
+
+/** iPad なら共有シート、それ以外はダウンロード */
+async function deliverFile(blob, name, type) {
+  const file = new File([blob], name, { type });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file] }); return; } catch (err) {
       if (err.name === 'AbortError') return;
     }
   }
-  downloadBlob(blob, file.name);
+  downloadBlob(blob, name);
 }
 
 function downloadBlob(blob, name) {
@@ -1191,6 +1315,7 @@ $('exportLong').addEventListener('change', (e) => {
 });
 $('handleToggle').addEventListener('change', (e) => { state.settings.showHandles = e.target.checked; markDirty(); });
 $('gridToggle').addEventListener('change', (e) => { state.settings.showGrid = e.target.checked; grid.visible = e.target.checked; markDirty(); });
+$('eyeLevelToggle').addEventListener('change', (e) => { state.settings.showEyeLevel = e.target.checked; markDirty(); });
 $('handleSize').addEventListener('input', (e) => { state.settings.handleScale = parseFloat(e.target.value); markDirty(); });
 $('panelSideSelect').addEventListener('change', (e) => {
   state.settings.panelSide = e.target.value;
@@ -1216,8 +1341,228 @@ function syncSettingsUI() {
   $('handleToggle').checked = s.showHandles;
   $('gridToggle').checked = s.showGrid;
   grid.visible = s.showGrid;
+  $('eyeLevelToggle').checked = s.showEyeLevel !== false;
   $('handleSize').value = s.handleScale;
 }
+
+// ---------- コンテモード(タイムライン) ----------
+// キーフレーム補間はしない。カット = 状態のスナップショット + ホールドするコマ数。
+// 連番書き出しはホールド分を複製したフレーム番号で zip に入れる(タイミングチェック用)
+
+let selectedCut = -1;
+let playState = null;
+
+function setMode(m) {
+  if (playState) stopContePlay();
+  state.mode = m;
+  document.body.classList.toggle('conte-mode', m === 'conte');
+  $('modeIllust').classList.toggle('active', m === 'illust');
+  $('modeConte').classList.toggle('active', m === 'conte');
+  $('conteBar').classList.toggle('hidden', m !== 'conte');
+  if (m === 'conte') renderTimeline(false);
+}
+$('modeIllust').addEventListener('click', () => setMode('illust'));
+$('modeConte').addEventListener('click', () => setMode('conte'));
+
+async function makeThumb() {
+  const [W, H] = exportSize(160);
+  return await renderShot(W, H, true);
+}
+
+async function addCut() {
+  if (!state.characters.length && !state.props.length) { toast('モデルがありません'); return; }
+  const cut = { frames: 12, state: captureShot(), thumb: await makeThumb() };
+  const at = selectedCut >= 0 ? selectedCut + 1 : state.timeline.cuts.length;
+  state.timeline.cuts.splice(at, 0, cut);
+  selectedCut = at;
+  renderTimeline(false);
+  markDirty();
+}
+
+async function updateCut() {
+  const cut = state.timeline.cuts[selectedCut];
+  if (!cut) { toast('カットが選択されていません'); return; }
+  cut.state = captureShot();
+  cut.thumb = await makeThumb();
+  renderTimeline(false);
+  markDirty();
+  toast(`カット${selectedCut + 1}を上書きしました`);
+}
+
+function deleteCut() {
+  const cut = state.timeline.cuts[selectedCut];
+  if (!cut) return;
+  if (!confirm(`カット${selectedCut + 1}を削除しますか?`)) return;
+  state.timeline.cuts.splice(selectedCut, 1);
+  if (selectedCut >= state.timeline.cuts.length) selectedCut = state.timeline.cuts.length - 1;
+  renderTimeline(false);
+  markDirty();
+}
+
+function moveCut(dir) {
+  const cuts = state.timeline.cuts;
+  const j = selectedCut + dir;
+  if (selectedCut < 0 || j < 0 || j >= cuts.length) return;
+  const tmp = cuts[selectedCut];
+  cuts[selectedCut] = cuts[j];
+  cuts[j] = tmp;
+  selectedCut = j;
+  renderTimeline(false);
+  markDirty();
+}
+
+function selectCut(i, apply) {
+  selectedCut = i;
+  if (apply && state.timeline.cuts[i]) {
+    pushUndo();
+    applyShot(state.timeline.cuts[i].state);
+    syncBoneSliders();
+  }
+  renderTimeline(false);
+}
+
+function updateConteInfo() {
+  const cuts = state.timeline.cuts;
+  const total = cuts.reduce((a, c) => a + (c.frames | 0), 0);
+  $('conteInfo').textContent =
+    `${cuts.length}カット / ${total}コマ / ${(total / state.timeline.fps).toFixed(2)}秒`;
+}
+
+function renderTimeline(highlightOnly) {
+  updateConteInfo();
+  $('conteFps').value = String(state.timeline.fps);
+  if (state.timeline.exportLong) $('conteLong').value = state.timeline.exportLong;
+  const list = $('cutList');
+  if (highlightOnly) {
+    [...list.children].forEach((el2, i) => el2.classList.toggle('selected', i === selectedCut));
+    return;
+  }
+  list.innerHTML = '';
+  state.timeline.cuts.forEach((cut, i) => {
+    const chip = document.createElement('div');
+    chip.className = 'cut-chip' + (i === selectedCut ? ' selected' : '');
+    const img = document.createElement('img');
+    if (cut.thumb) img.src = cut.thumb;
+    chip.appendChild(img);
+    const head = document.createElement('div');
+    head.className = 'cut-head';
+    const idx = document.createElement('span');
+    idx.textContent = String(i + 1);
+    head.appendChild(idx);
+    const fr = document.createElement('input');
+    fr.type = 'number';
+    fr.min = 1; fr.max = 999;
+    fr.value = cut.frames;
+    fr.addEventListener('click', (e) => e.stopPropagation());
+    fr.addEventListener('change', () => {
+      cut.frames = Math.max(1, Math.min(999, parseInt(fr.value, 10) || 1));
+      fr.value = cut.frames;
+      updateConteInfo();
+      markDirty();
+    });
+    head.appendChild(fr);
+    head.appendChild(Object.assign(document.createElement('span'), { textContent: 'k' }));
+    chip.appendChild(head);
+    chip.addEventListener('click', () => selectCut(i, true));
+    list.appendChild(chip);
+  });
+}
+
+function stopContePlay() {
+  if (!playState) return;
+  clearInterval(playState.timer);
+  applyShot(playState.working);
+  playState = null;
+  $('contePlay').textContent = '▶ 再生';
+}
+
+function toggleContePlay() {
+  if (playState) { stopContePlay(); return; }
+  const cuts = state.timeline.cuts;
+  if (!cuts.length) { toast('カットがありません'); return; }
+  const working = captureShot();
+  let cutIdx = 0;
+  let frameInCut = 0;
+  applyShot(cuts[0].state);
+  selectedCut = 0;
+  renderTimeline(true);
+  $('contePlay').textContent = '■ 停止';
+  playState = {
+    working,
+    timer: setInterval(() => {
+      frameInCut++;
+      if (frameInCut >= (cuts[cutIdx].frames | 0)) {
+        cutIdx++;
+        frameInCut = 0;
+        if (cutIdx >= cuts.length) { stopContePlay(); return; }
+        applyShot(cuts[cutIdx].state);
+        selectedCut = cutIdx;
+        renderTimeline(true);
+      }
+    }, 1000 / state.timeline.fps),
+  };
+}
+
+async function exportConte() {
+  const cuts = state.timeline.cuts;
+  if (!cuts.length) { toast('カットがありません'); return; }
+  if (playState) stopContePlay();
+  const fps = state.timeline.fps;
+  const long = Math.max(256, Math.min(4096, parseInt($('conteLong').value, 10) || 960));
+  state.timeline.exportLong = long;
+  const [W, H] = exportSize(long);
+  const working = captureShot();
+  showLoading(true);
+  try {
+    const entries = [];
+    let frame = 1;
+    for (const cut of cuts) {
+      applyShot(cut.state);
+      const blob = await renderShot(W, H, false);
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      const crc = crc32(bytes);
+      for (let k = 0; k < (cut.frames | 0); k++) {
+        entries.push({ name: `conte_${String(frame).padStart(4, '0')}.png`, data: bytes, crc });
+        frame++;
+      }
+    }
+    entries.push({
+      name: 'timeline.json',
+      data: new TextEncoder().encode(JSON.stringify({
+        fps,
+        totalFrames: frame - 1,
+        cuts: cuts.map((c, i) => ({ cut: i + 1, frames: c.frames })),
+      }, null, 1)),
+    });
+    const zip = buildZip(entries);
+    await deliverFile(zip, `conte_${fps}fps.zip`, 'application/zip');
+    toast(`${frame - 1}フレーム(${cuts.length}カット)を書き出しました`);
+  } catch (err) {
+    console.error(err);
+    toast('書き出しに失敗しました: ' + err.message);
+  } finally {
+    applyShot(working);
+    showLoading(false);
+  }
+}
+
+$('cutAdd').addEventListener('click', addCut);
+$('cutUpdate').addEventListener('click', updateCut);
+$('cutDelete').addEventListener('click', deleteCut);
+$('cutLeft').addEventListener('click', () => moveCut(-1));
+$('cutRight').addEventListener('click', () => moveCut(1));
+$('conteFps').addEventListener('change', (e) => {
+  state.timeline.fps = parseInt(e.target.value, 10) || 24;
+  updateConteInfo();
+  markDirty();
+});
+$('conteLong').addEventListener('change', (e) => {
+  state.timeline.exportLong = Math.max(256, Math.min(4096, parseInt(e.target.value, 10) || 960));
+  e.target.value = state.timeline.exportLong;
+  markDirty();
+});
+$('contePlay').addEventListener('click', toggleContePlay);
+$('conteExport').addEventListener('click', exportConte);
 
 // ---------- ツールチップ(ホバー2秒) ----------
 
@@ -1292,7 +1637,7 @@ window.app = {
   THREE, state, scene, renderer,
   get camera() { return activeCamera; },
   get controls() { return controls; },
-  serializeScene, applyScene, exportPNG, pickHandle,
+  serializeScene, applyScene, exportPNG, pickHandle, updateEyeLine,
   async loadVRMFromURL(url) {
     const res = await fetch(url);
     const buf = await res.arrayBuffer();

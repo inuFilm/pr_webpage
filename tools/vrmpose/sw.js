@@ -1,5 +1,5 @@
 // アプリシェルをキャッシュしてオフライン起動を可能にする(モデルは IndexedDB 側)
-const CACHE = 'vrmpose-v1';
+const CACHE = 'vrmpose-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/character.js',
   './js/ik.js',
   './js/store.js',
+  './js/zip.js',
   './vendor/three.module.min.js',
   './vendor/three.core.min.js',
   './vendor/three-vrm.module.min.js',

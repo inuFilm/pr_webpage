@@ -32,6 +32,8 @@
   <button id="btnExport" class="tb" data-tip="静止画(PNG)を書き出します。比率・解像度は「カメラ」、透過背景は⚙で設定">PNG書き出し</button>
   <button id="btnSettings" class="tb icon" data-tip="背景・表示・メニュー位置・キャラクター管理">⚙</button>
   <span class="spacer"></span>
+  <button id="modeIllust" class="tb mode active" data-tip="1枚絵のポーズ資料モード(通常)">イラスト</button>
+  <button id="modeConte" class="tb mode" data-tip="タイムラインでカットを並べ、連番PNGで書き出す絵コンテモード(実験的機能・調整中)">コンテ(実験的機能)</button>
   <button id="btnUndo" class="tb icon" data-tip="元に戻す">↶</button>
   <button id="btnRedo" class="tb icon" data-tip="やり直す">↷</button>
 </header>
@@ -136,6 +138,7 @@
   <h4>表示</h4>
   <label class="check-row"><input id="handleToggle" type="checkbox" checked> 操作ハンドルを表示</label>
   <label class="check-row"><input id="gridToggle" type="checkbox" checked> 床グリッドを表示</label>
+  <label class="check-row"><input id="eyeLevelToggle" type="checkbox" checked> アイレベルを表示</label>
   <label class="slider-row">ハンドルサイズ
     <input id="handleSize" type="range" min="0.5" max="2" step="0.1" value="1">
   </label>
@@ -156,7 +159,29 @@
   <button id="btnDeselect" class="wide small">選択解除</button>
 </div>
 
+<!-- コンテモードのタイムライン -->
+<div id="conteBar" class="hidden">
+  <div class="conte-controls">
+    <button id="cutAdd" data-tip="現在のポーズ・カメラ・小物配置をカットとして追加">＋カット</button>
+    <button id="cutUpdate" data-tip="選択中のカットを現在の状態で上書き">上書き</button>
+    <button id="cutDelete" data-tip="選択中のカットを削除">削除</button>
+    <button id="cutLeft" data-tip="カットを左へ移動">◀</button>
+    <button id="cutRight" data-tip="カットを右へ移動">▶</button>
+    <label>fps
+      <select id="conteFps"><option value="24" selected>24</option><option value="30">30</option></select>
+    </label>
+    <label>長辺
+      <input id="conteLong" type="number" min="256" max="4096" step="32" value="960" inputmode="numeric">
+    </label>
+    <button id="contePlay" data-tip="タイムラインを実時間で再生">▶ 再生</button>
+    <button id="conteExport" data-tip="全フレームを連番PNG(zip)で書き出し。ホールド分も複製されるので編集ソフトでそのままタイミング確認できます">連番書き出し</button>
+    <span id="conteInfo"></span>
+  </div>
+  <div id="cutList"></div>
+</div>
+
 <div id="frameGuide" class="hidden"></div>
+<div id="eyeLine" class="hidden"><span id="eyeLineLabel"></span></div>
 <div id="tooltip" class="hidden"></div>
 <div id="toast" class="hidden"></div>
 <div id="loading" class="hidden"><div class="spin"></div>読み込み中…</div>
