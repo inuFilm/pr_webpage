@@ -11,6 +11,13 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "tools",
+    "title": "ツールまとめ — ブラウザでそのまま使える自作ツール",
+    "category": "ツール",
+    "date": "2026-08-29",
+    "description": "公開している自作 Web ツールの一覧。VRM モデルにポーズを付けて作画資料にする VRM Pose Ref など。すべて端末内で動作し、モデルやデータは外部に送信されません。"
+  },
+  {
     "slug": "sidefx-foundations-01-soccerball",
     "title": "Houdini 22 入門 1 — 上流を差し替えてサッカーボールを作る",
     "category": "houdini",

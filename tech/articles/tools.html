@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ツールまとめ | 技術メモ | makeinufilm</title>
+  <meta name="description" content="ブラウザでそのまま使える自作ツールの一覧。VRM モデルにポーズを付けて作画資料にする VRM Pose Ref など。データはすべて端末内で処理されます。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+  <style>
+    .tool-card {
+      background: var(--tech-panel-alt);
+      border: 1px solid var(--tech-border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      margin: 18px 0;
+    }
+    .tool-card h2 { margin-top: 0; }
+    .tool-tags { margin: 4px 0 10px; }
+    .tool-tags span {
+      display: inline-block;
+      background: #ffffff;
+      border: 1px solid var(--tech-border);
+      color: var(--tech-muted);
+      border-radius: 4px;
+      padding: 1px 8px;
+      font-size: 0.8em;
+      margin-right: 6px;
+    }
+    .tool-launch {
+      display: inline-block;
+      background: var(--tech-accent);
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 10px 28px;
+      border-radius: 6px;
+      font-weight: bold;
+    }
+    .tool-launch:hover { opacity: 0.85; }
+    .tool-note { color: var(--tech-muted); font-size: 0.85em; margin-top: 10px; }
+  </style>
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>ツールまとめ</h1>
+        <p class="tech-meta">ツール / 2026-08-29</p>
+        <p>
+          ブラウザでそのまま使える自作ツールをここにまとめていきます。
+          インストール不要で、読み込んだモデルや作業データはすべて端末内(ブラウザのローカルストレージ)に
+          保存され、外部サーバーには送信されません。
+        </p>
+
+        <div class="tool-card">
+          <h2>VRM Pose Ref</h2>
+          <div class="tool-tags"><span>iPad対応</span><span>VRM</span><span>ポーズ資料</span><span>オフライン可</span></div>
+          <p>
+            VRM モデルを読み込んでポーズを付けられる、作画資料用のポージングツールです。
+            Procreate などと並べて、自分のキャラクターをデッサン人形代わりに使う用途を想定しています。
+          </p>
+          <ul>
+            <li>IK 付きの関節ドラッグ、腰を下げるだけでしゃがめる接地固定、手首・足首の捻りコントローラー</li>
+            <li>立ち・座りポーズ、グー / チョキ / パーなどの手のプリセット、表情・目線の調整</li>
+            <li>glTF / GLB の小物(家具など)の配置、複数キャラクター対応</li>
+            <li>アスペクト比と解像度を指定した PNG 書き出し(透過背景も可)</li>
+            <li>ポーズ・カメラ・シーン構成の保存と .json での受け渡し</li>
+          </ul>
+          <a class="tool-launch" href="../../tools/vrmpose/">起動する</a>
+          <p class="tool-note">
+            iPad では Safari で開いて「共有 → ホーム画面に追加」すると、全画面表示になりオフラインでも起動できます。
+            VRM モデルはアップロードされず、端末内でのみ処理されます。
+          </p>
+        </div>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
