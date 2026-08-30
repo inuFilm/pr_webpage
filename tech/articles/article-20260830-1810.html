@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>始端と終端を繋げる際のsweepのエラー | 技術メモ | makeinufilm</title>
+  <meta name="description" content="sweepと始端終端の繋ぎ方について">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>始端と終端を繋げる際のsweepのエラー</h1>
+        <p class="tech-meta">houdini-tips / 2026-08-30</p>
+読み込んだポリゴンからclipでedgeを作りaddで円を作ろうとすると始端と終端が繋がらない
+この場合下記addprimのVEXで繋げれる
+addprim(0,"poly",@numpt-1,0);
+
+
+但しsweepをこのまま使うとv@tangentuとv@Nの問題で始端と終端に意図しないひねりが入ってしまう
+この場合はPolyFrameノードと
+v@up = set(0,1,0);
+v@N = set(0,0,1);
+
+でアトリビュートをこちら側で設定してからsweepを繋ぐと問題が無くなる
+但し一部ポリゴンの重なりのような挙動が発生するのでpolydoctor又は重複対策用のＶＥＸ等を使用しておくと盤石
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -11,6 +11,13 @@
 // ============================================================
 window.TECH_ARTICLES = [
   {
+    "slug": "article-20260830-1810",
+    "title": "始端と終端を繋げる際のsweepのエラー",
+    "category": "houdini-tips",
+    "date": "2026-08-30",
+    "description": "sweepと始端終端の繋ぎ方について"
+  },
+  {
     "slug": "tools",
     "title": "ツールまとめ — ブラウザでそのまま使える自作ツール",
     "category": "ツール",
