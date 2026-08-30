@@ -136,13 +136,16 @@ for (const [pname, def] of Object.entries(PRESET_LEFT)) {
   POSE_PRESETS[pname] = { bones, rootY: def.rootY };
 }
 
-// 手のプリセット(指ごとの握り 0〜1)
+// 指の開き(扇状)の指ごとの重み。中指を中心に人差し指と小指が大きく開く
+const SPREAD_WEIGHTS = { index: 1, middle: 0.35, ring: -0.35, little: -1 };
+
+// 手のプリセット(指ごとの握り 0〜1。spread は手全体の開き)
 export const HAND_POSES = {
-  'グー': { thumb: 1, index: 1, middle: 1, ring: 1, little: 1 },
-  'パー': { thumb: 0, index: 0, middle: 0, ring: 0, little: 0 },
-  'チョキ': { thumb: 0.9, index: 0, middle: 0, ring: 1, little: 1 },
-  '指差し': { thumb: 0.8, index: 0, middle: 1, ring: 1, little: 1 },
-  'グッジョブ': { thumb: 0, index: 1, middle: 1, ring: 1, little: 1 },
+  'グー': { thumb: 1, index: 1, middle: 1, ring: 1, little: 1, spread: 0 },
+  'パー': { thumb: 0, index: 0, middle: 0, ring: 0, little: 0, spread: 0.6 },
+  'チョキ': { thumb: 0.9, index: 0, middle: 0, ring: 1, little: 1, spread: 0.8 },
+  '指差し': { thumb: 0.8, index: 0, middle: 1, ring: 1, little: 1, spread: 0 },
+  'グッジョブ': { thumb: 0, index: 1, middle: 1, ring: 1, little: 1, spread: 0 },
 };
 
 /** 向き(Y回転)コントローラー用の共通ハンドルを作る */
@@ -191,6 +194,8 @@ export class Character {
       left: { thumb: 0, index: 0, middle: 0, ring: 0, little: 0 },
       right: { thumb: 0, index: 0, middle: 0, ring: 0, little: 0 },
     };
+    // 指の開き(扇状)。-1=閉じる 〜 +1=開く
+    this.spread = { left: 0, right: 0 };
     // 目線: none=モデル任せ / camera=カメラ目線 / manual=yaw,pitch(度)
     this.gaze = { mode: 'none', yaw: 0, pitch: 0 };
     this._gazeTarget = new THREE.Object3D();
@@ -349,6 +354,7 @@ export class Character {
       { bone: 'rightHand', parent: 'rightLowerArm' },
       { bone: 'leftFoot', parent: 'leftLowerLeg' },
       { bone: 'rightFoot', parent: 'rightLowerLeg' },
+      { bone: 'head', parent: 'neck' },
     ];
     for (const s of TWIST_SATS) {
       if (!this.bone(s.bone) || !this.bone(s.parent)) continue;
@@ -365,6 +371,27 @@ export class Character {
       };
       this.handles.push(mesh);
       this.handleGroup.add(mesh);
+    }
+    // 指先IKハンドル(手を選択したときだけ表示)
+    this.fingerHandlesVisible = { left: false, right: false };
+    for (const side of ['left', 'right']) {
+      for (const finger of ['thumb', 'index', 'middle', 'ring', 'little']) {
+        if (!this._fingerSegs(side, finger)) continue;
+        const mat = new THREE.MeshBasicMaterial({
+          color: 0xf0f4ff, depthTest: false, depthWrite: false, transparent: true, opacity: 0.9,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = 1000;
+        mesh.scale.setScalar(r * 0.55);
+        mesh.visible = false;
+        mesh.userData = {
+          charId: this.id,
+          def: { bone: side + 'Hand', mode: 'finger', side, finger },
+          baseScale: r * 0.55, baseColor: 0xf0f4ff,
+        };
+        this.handles.push(mesh);
+        this.handleGroup.add(mesh);
+      }
     }
     // ボーン間の線
     const pairs = [];
@@ -412,7 +439,8 @@ export class Character {
     const frame = this.boneFrame(boneName);
     const fwd = frame.t.clone().applyQuaternion(node.getWorldQuaternion(_q));
     const offsetDir = fwd.addScaledVector(axis, -fwd.dot(axis));
-    if (offsetDir.lengthSq() < 1e-6) {
+    // ボーン軸が捻り軸とほぼ平行(頭など)なら、u 軸(顔の正面など)を基準にする
+    if (offsetDir.length() < 0.3) {
       offsetDir.copy(frame.u).applyQuaternion(node.getWorldQuaternion(_q));
       offsetDir.addScaledVector(axis, -offsetDir.dot(axis));
     }
@@ -432,6 +460,14 @@ export class Character {
         const info = this.twistInfo(h.userData.def.bone, h.userData.def.parent);
         if (info) h.position.copy(info.joint).addScaledVector(info.offsetDir, this.twistRadius());
         h.scale.setScalar(h.userData.baseScale * userScale);
+        continue;
+      }
+      if (h.userData.def.mode === 'finger') {
+        h.visible = !!this.fingerHandlesVisible[h.userData.def.side];
+        if (h.visible) {
+          this.fingertipPos(h.userData.def.side, h.userData.def.finger, h.position);
+          h.scale.setScalar(h.userData.baseScale * userScale);
+        }
         continue;
       }
       if (h.userData.def.bone === '__root') {
@@ -477,6 +513,7 @@ export class Character {
       hipsPos: hipsNode ? hipsNode.position.toArray().map(round5) : undefined,
       pose,
       fingers: JSON.parse(JSON.stringify(this.fingers)),
+      spread: { ...this.spread },
       gaze: { ...this.gaze },
       expressions: this.serializeExpressions(),
     };
@@ -500,6 +537,7 @@ export class Character {
       for (const f of Object.keys(this.fingers.left)) this.fingers.left[f] = state.curlL || 0;
       for (const f of Object.keys(this.fingers.right)) this.fingers.right[f] = state.curlR || 0;
     }
+    this.spread = state.spread ? { ...state.spread } : { left: 0, right: 0 };
     this.gaze = state.gaze ? { ...state.gaze } : { mode: 'none', yaw: 0, pitch: 0 };
     this.resetExpressions();
     if (state.expressions) {
@@ -521,6 +559,7 @@ export class Character {
     for (const side of ['left', 'right']) {
       for (const f of Object.keys(this.fingers[side])) this.fingers[side][f] = 0;
     }
+    this.spread = { left: 0, right: 0 };
     this.gaze = { mode: 'none', yaw: 0, pitch: 0 };
     this.resetExpressions();
     this.root.quaternion.identity();
@@ -549,6 +588,7 @@ export class Character {
     const hn = this.bone('hips');
     if (hn) hn.position.x = -hn.position.x;
     const f = this.fingers.left; this.fingers.left = this.fingers.right; this.fingers.right = f;
+    const sp = this.spread.left; this.spread.left = this.spread.right; this.spread.right = sp;
     const g = this.gaze; if (g.mode === 'manual') g.yaw = -g.yaw;
     this.applyCurls();
   }
@@ -561,9 +601,12 @@ export class Character {
     this.applyCurls();
   }
 
-  /** 指を 1 本ずつ指定(グー/パー/チョキ等のプリセット用) */
+  /** 指を 1 本ずつ指定(グー/パー/チョキ等のプリセット用)。pose.spread があれば開きも設定 */
   setHandPose(side, pose) {
-    Object.assign(this.fingers[side], pose);
+    for (const [k, v] of Object.entries(pose)) {
+      if (k === 'spread') this.spread[side] = v;
+      else if (k in this.fingers[side]) this.fingers[side][k] = v;
+    }
     this.applyCurls();
   }
 
@@ -578,27 +621,74 @@ export class Character {
     this._applyCurlSide('right');
   }
 
-  _applyCurlSide(side) {
+  /** 指 1 本にカール量 t(0-1)を適用する(this.fingers は書き換えない) */
+  applyFingerValue(side, finger, t) {
+    if (finger === 'thumb') {
+      // 親指は palm と平行に曲がるので軸が違う
+      const ySign = (side === 'left' ? -1 : 1) * this.axisFlip;
+      const thumbAngles = { Metacarpal: 25, Proximal: 35, Distal: 45 };
+      for (const [seg, deg] of Object.entries(thumbAngles)) {
+        const node = this.bone(side + 'Thumb' + seg);
+        if (!node) continue;
+        node.quaternion.setFromAxisAngle(_v.set(0, ySign, 0), THREE.MathUtils.degToRad(deg) * t);
+      }
+      return;
+    }
     // VRM1: 左手はローカル -Z 軸で握る。VRM0 はローカル空間が反転しているので逆
     const zSign = (side === 'left' ? -1 : 1) * this.axisFlip;
-    const fv = this.fingers[side];
+    const cap = finger.charAt(0).toUpperCase() + finger.slice(1);
     const angles = { Proximal: 78, Intermediate: 86, Distal: 60 };
-    for (const finger of ['Index', 'Middle', 'Ring', 'Little']) {
-      const t = fv[finger.toLowerCase()];
-      for (const [seg, deg] of Object.entries(angles)) {
-        const node = this.bone(side + finger + seg);
-        if (!node) continue;
-        node.quaternion.setFromAxisAngle(_v.set(0, 0, zSign), THREE.MathUtils.degToRad(deg) * t);
+    for (const [seg, deg] of Object.entries(angles)) {
+      const node = this.bone(side + cap + seg);
+      if (!node) continue;
+      node.quaternion.setFromAxisAngle(_v.set(0, 0, zSign), THREE.MathUtils.degToRad(deg) * t);
+    }
+    // 開き(付け根の扇状回転)。X/Z が同時反転するので VRM0/1 で符号は共通。
+    // 深く握るほど開きは弱める
+    const w = SPREAD_WEIGHTS[finger];
+    const spread = this.spread[side];
+    if (w && spread) {
+      const node = this.bone(side + cap + 'Proximal');
+      if (node) {
+        const ySign = side === 'left' ? -1 : 1;
+        const deg = 15 * w * spread * (1 - t * 0.7);
+        _q.setFromAxisAngle(_v.set(0, ySign, 0), THREE.MathUtils.degToRad(deg));
+        node.quaternion.premultiply(_q);
       }
     }
-    // 親指は palm と平行に曲がるので軸が違う
-    const ySign = (side === 'left' ? -1 : 1) * this.axisFlip;
-    const thumbAngles = { Metacarpal: 25, Proximal: 35, Distal: 45 };
-    for (const [seg, deg] of Object.entries(thumbAngles)) {
-      const node = this.bone(side + 'Thumb' + seg);
-      if (!node) continue;
-      node.quaternion.setFromAxisAngle(_v.set(0, ySign, 0), THREE.MathUtils.degToRad(deg) * fv.thumb);
-    }
+  }
+
+  setSpread(side, v) {
+    this.spread[side] = v;
+    this.applyCurls();
+  }
+
+  _applyCurlSide(side) {
+    const fv = this.fingers[side];
+    for (const finger of Object.keys(fv)) this.applyFingerValue(side, finger, fv[finger]);
+  }
+
+  /** 指の末端セグメントを返す(無い指は null) */
+  _fingerSegs(side, finger) {
+    const cap = finger.charAt(0).toUpperCase() + finger.slice(1);
+    const segs = finger === 'thumb'
+      ? ['Metacarpal', 'Proximal', 'Distal']
+      : ['Proximal', 'Intermediate', 'Distal'];
+    const nodes = segs.map((s) => this.bone(side + cap + s)).filter(Boolean);
+    return nodes.length >= 2 ? nodes : null;
+  }
+
+  /** 指先(末端関節から少し延長した位置)のワールド座標 */
+  fingertipPos(side, finger, out) {
+    const nodes = this._fingerSegs(side, finger);
+    if (!nodes) return null;
+    const last = nodes[nodes.length - 1];
+    const prev = nodes[nodes.length - 2];
+    last.updateWorldMatrix(true, false);
+    prev.updateWorldMatrix(false, false);
+    out.setFromMatrixPosition(last.matrixWorld);
+    _va.setFromMatrixPosition(prev.matrixWorld);
+    return out.addScaledVector(_v.copy(out).sub(_va), 0.9);
   }
 
   // ---- 目線 ----

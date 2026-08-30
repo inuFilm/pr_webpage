@@ -246,6 +246,7 @@ function pickHandle(clientX, clientY) {
   for (const char of allOwners()) {
     if (!char.handleGroup.visible) continue;
     for (const h of char.handles) {
+      if (h.visible === false) continue;
       _v3a.copy(h.position).project(activeCamera);
       if (_v3a.z > 1 || _v3a.z < -1) continue;
       const sx = (_v3a.x * 0.5 + 0.5) * rect.width + rect.left;
@@ -282,10 +283,11 @@ function onPointerDown(e) {
     // 向きハンドルはルート(腰/小物本体)を選択扱いにする
     const rootHandle = hit.char.handles.find((x) => x.userData.def.mode === 'root');
     select(rootHandle ? { char: hit.char, handle: rootHandle } : hit);
-  } else if (pickedMode === 'twist') {
-    // 捻りサテライトは対象の手/足を選択扱いにする
+  } else if (pickedMode === 'twist' || pickedMode === 'finger') {
+    // 捻りサテライト・指先ハンドルは対象の手/足/頭を選択扱いにする
     const jointHandle = hit.char.handles.find(
-      (x) => x.userData.def.bone === hit.handle.userData.def.bone && x.userData.def.mode !== 'twist',
+      (x) => x.userData.def.bone === hit.handle.userData.def.bone
+        && x.userData.def.mode !== 'twist' && x.userData.def.mode !== 'finger',
     );
     select(jointHandle ? { char: hit.char, handle: jointHandle } : hit);
   } else {
@@ -319,6 +321,26 @@ function onPointerDown(e) {
     ctx.grabDir = info.offsetDir;
     ctx.twistStartQuat = ctx.twistNode.quaternion.clone();
     ctx.tPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(info.axis, info.joint);
+    // 軸を横から見ている(円がつぶれて見える)ときは、画面接線方向のドラッグ量で回す
+    const viewDir = activeCamera.getWorldDirection(new THREE.Vector3());
+    ctx.twistEdgeOn = Math.abs(viewDir.dot(info.axis)) < 0.35;
+    if (ctx.twistEdgeOn) {
+      const rect = canvas.getBoundingClientRect();
+      const toScreen = (wp) => {
+        const v = wp.clone().project(activeCamera);
+        return { x: (v.x * 0.5 + 0.5) * rect.width + rect.left, y: (-v.y * 0.5 + 0.5) * rect.height + rect.top };
+      };
+      const r = char.twistRadius();
+      const dTheta = 0.08;
+      const p1 = toScreen(info.joint.clone().addScaledVector(info.offsetDir, r));
+      const rotated = info.offsetDir.clone().applyAxisAngle(info.axis, dTheta);
+      const p2 = toScreen(info.joint.clone().addScaledVector(rotated, r));
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy) || 1;
+      ctx.tanScreen = { x: dx / len, y: dy / len };
+      ctx.pxPerRad = Math.max(len / dTheta, 40);
+      ctx.grabScreen = { x: e.clientX, y: e.clientY };
+    }
     headingRing.position.copy(info.joint);
     headingRing.quaternion.setFromUnitVectors(_v3a.set(0, 1, 0), info.axis);
     headingRing.scale.setScalar(char.twistRadius());
@@ -346,6 +368,8 @@ function onPointerDown(e) {
       ctx.fallbackBend = fwd.negate().add(new THREE.Vector3(0, -0.8, 0)).normalize();
       ctx.forceBend = false;
     }
+  } else if (def.mode === 'finger') {
+    // 共有の plane / grabOffset でカーソルのワールド位置だけ取れれば足りる
   } else {
     const parentName = BONE_PARENT[def.bone];
     const resolved = char.resolveBone(parentName);
@@ -353,6 +377,35 @@ function onPointerDown(e) {
   }
   drag = ctx;
   e.preventDefault();
+}
+
+/** 指先を target へ近づけるカール量を 1 次元探索で求めて適用する */
+function solveFingerCurl(char, side, finger, targetWorld) {
+  let bestT = 0;
+  let bestD = Infinity;
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    char.applyFingerValue(side, finger, t);
+    if (!char.fingertipPos(side, finger, _v3c)) return;
+    const d = _v3c.distanceToSquared(targetWorld);
+    if (d < bestD) { bestD = d; bestT = t; }
+  }
+  let lo = Math.max(0, bestT - 0.05);
+  let hi = Math.min(1, bestT + 0.05);
+  for (let k = 0; k < 10; k++) {
+    const m1 = lo + (hi - lo) / 3;
+    const m2 = hi - (hi - lo) / 3;
+    char.applyFingerValue(side, finger, m1);
+    char.fingertipPos(side, finger, _v3c);
+    const d1 = _v3c.distanceToSquared(targetWorld);
+    char.applyFingerValue(side, finger, m2);
+    char.fingertipPos(side, finger, _v3c);
+    const d2 = _v3c.distanceToSquared(targetWorld);
+    if (d1 < d2) hi = m2; else lo = m1;
+  }
+  const t = Math.round(((lo + hi) / 2) * 100) / 100;
+  char.applyFingerValue(side, finger, t);
+  char.fingers[side][finger] = t;
 }
 
 function onPointerMove(e) {
@@ -378,13 +431,20 @@ function onPointerMove(e) {
   }
 
   if (def.mode === 'twist') {
-    // サテライトを円周に沿って追わせ、掴んだ位置からの回転角をボーンの捻りにする
-    if (!pointerToPlane(e, drag.tPlane, _v3a)) return;
-    _v3a.sub(drag.twistCenter);
-    if (_v3a.lengthSq() < 1e-8) return;
-    _v3a.normalize();
-    _v3b.crossVectors(drag.grabDir, _v3a);
-    const angle = Math.atan2(_v3b.dot(drag.twistAxis), drag.grabDir.dot(_v3a));
+    let angle;
+    if (drag.twistEdgeOn) {
+      // 接線方向のドラッグ量 → 回転角
+      angle = ((e.clientX - drag.grabScreen.x) * drag.tanScreen.x
+        + (e.clientY - drag.grabScreen.y) * drag.tanScreen.y) / drag.pxPerRad;
+    } else {
+      // サテライトを円周に沿って追わせ、掴んだ位置からの回転角をボーンの捻りにする
+      if (!pointerToPlane(e, drag.tPlane, _v3a)) return;
+      _v3a.sub(drag.twistCenter);
+      if (_v3a.lengthSq() < 1e-8) return;
+      _v3a.normalize();
+      _v3b.crossVectors(drag.grabDir, _v3a);
+      angle = Math.atan2(_v3b.dot(drag.twistAxis), drag.grabDir.dot(_v3a));
+    }
     drag.twistNode.quaternion.copy(drag.twistStartQuat);
     twistBone(drag.twistNode, drag.twistAxis, angle);
     e.preventDefault();
@@ -403,6 +463,14 @@ function onPointerMove(e) {
     drag.hipsNode.position.copy(drag.hipsStartLocal).add(_v3a);
     drag.hipsNode.updateWorldMatrix(true, true);
     char.applyPins(drag.pins);
+  } else if (def.mode === 'finger') {
+    solveFingerCurl(char, def.side, def.finger, target);
+    if (state.selection && state.selection.char === char
+      && state.selection.handle.userData.def.bone === def.bone) {
+      const v = char.masterCurl(def.side);
+      $('curlSlider').value = v;
+      $('valCurl').textContent = v.toFixed(2);
+    }
   } else if (def.mode === 'ik') {
     solveTwoBoneIK(drag.chain[0], drag.chain[1], drag.chain[2], target, drag.fallbackBend, drag.forceBend);
     if (drag.footQuat) {
@@ -451,12 +519,19 @@ function select(hit) {
   const isProp = !!hit.char.isProp;
   $('boneTitle').textContent = `${hit.char.name} / ${isProp ? '配置' : jpBoneName(def.bone)}`;
   const isHand = !isProp && (def.bone === 'leftHand' || def.bone === 'rightHand');
+  // 手の選択中はその手の指先IKハンドルを出す
+  for (const c of state.characters) c.fingerHandlesVisible = { left: false, right: false };
+  if (isHand) hit.char.fingerHandlesVisible[def.bone === 'leftHand' ? 'left' : 'right'] = true;
   for (const el of document.querySelectorAll('.curl-only')) el.classList.toggle('hidden', !isHand);
   for (const el of document.querySelectorAll('.scale-only')) el.classList.toggle('hidden', !isProp);
   if (isHand) {
-    const v = hit.char.masterCurl(def.bone === 'leftHand' ? 'left' : 'right');
+    const side = def.bone === 'leftHand' ? 'left' : 'right';
+    const v = hit.char.masterCurl(side);
     $('curlSlider').value = v;
     $('valCurl').textContent = (+v).toFixed(2);
+    const sp = hit.char.spread[side] || 0;
+    $('spreadSlider').value = sp;
+    $('valSpread').textContent = (+sp).toFixed(2);
   }
   syncBoneSliders();
   $('bonePanel').classList.remove('hidden');
@@ -469,6 +544,7 @@ function deselect() {
     h.material.color.setHex(h.userData.baseColor);
   }
   state.selection = null;
+  for (const c of state.characters) c.fingerHandlesVisible = { left: false, right: false };
   $('bonePanel').classList.add('hidden');
 }
 
@@ -559,6 +635,17 @@ $('curlSlider').addEventListener('input', () => {
   $('valCurl').textContent = v.toFixed(2);
 });
 $('curlSlider').addEventListener('change', onSliderEnd);
+
+$('spreadSlider').addEventListener('input', () => {
+  if (!state.selection || state.selection.char.isProp) return;
+  if (!sliderActive) { sliderActive = true; pushUndo(); }
+  const { char, handle } = state.selection;
+  const side = handle.userData.def.bone === 'leftHand' ? 'left' : 'right';
+  const v = parseFloat($('spreadSlider').value);
+  char.setSpread(side, v);
+  $('valSpread').textContent = v.toFixed(2);
+});
+$('spreadSlider').addEventListener('change', onSliderEnd);
 
 $('btnDeselect').addEventListener('click', deselect);
 
