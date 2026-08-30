@@ -198,6 +198,8 @@ export class Character {
     this.spread = { left: 0, right: 0 };
     // 目線: none=モデル任せ / camera=カメラ目線 / manual=yaw,pitch(度)
     this.gaze = { mode: 'none', yaw: 0, pitch: 0 };
+    // 頭部だけの拡縮(生ボーンのスケールで実現。子の髪・目ボーンも道連れになる)
+    this.headScale = 1;
     this._gazeTarget = new THREE.Object3D();
     this.handles = [];
     this.handleGroup = new THREE.Group();
@@ -308,6 +310,13 @@ export class Character {
     return this.vrm.humanoid.getNormalizedBoneNode(name);
   }
 
+  /** 頭部だけ拡縮する。正規化リグはスケールを運ばないので生ボーン側に直接かける */
+  setHeadScale(v) {
+    this.headScale = v;
+    const raw = this.vrm.humanoid.getRawBoneNode('head');
+    if (raw) raw.scale.setScalar(v);
+  }
+
   /** name か、無ければ存在する最も近い祖先ボーンを返す */
   resolveBone(name) {
     let n = name;
@@ -414,11 +423,11 @@ export class Character {
   }
 
   headingRadius() {
-    return this.height * 0.45;
+    return this.height * 0.45 * (this.root.scale.x || 1);
   }
 
   twistRadius() {
-    return this.height * 0.09;
+    return this.height * 0.09 * (this.root.scale.x || 1);
   }
 
   /**
@@ -510,6 +519,8 @@ export class Character {
       modelKey: this.modelKey,
       rootPos: this.root.position.toArray().map(round5),
       rootRot: this.root.quaternion.toArray().map(round5),
+      rootScale: round5(this.root.scale.x),
+      headScale: round5(this.headScale || 1),
       hipsPos: hipsNode ? hipsNode.position.toArray().map(round5) : undefined,
       pose,
       fingers: JSON.parse(JSON.stringify(this.fingers)),
@@ -522,6 +533,8 @@ export class Character {
   applyState(state) {
     if (state.rootPos) this.root.position.fromArray(state.rootPos);
     if (state.rootRot) this.root.quaternion.fromArray(state.rootRot).normalize();
+    if (state.rootScale) this.root.scale.setScalar(state.rootScale);
+    this.setHeadScale(state.headScale || 1);
     this.resetPoseOnly();
     if (state.pose) {
       for (const [name, q] of Object.entries(state.pose)) {
@@ -561,6 +574,7 @@ export class Character {
     }
     this.spread = { left: 0, right: 0 };
     this.gaze = { mode: 'none', yaw: 0, pitch: 0 };
+    this.setHeadScale(1);
     this.resetExpressions();
     this.root.quaternion.identity();
     this.root.position.y = 0;

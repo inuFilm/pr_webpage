@@ -40,9 +40,21 @@
 
 <div id="charbar"></div>
 
+<!-- ＋モデルのメニュー -->
+<div id="addMenu" class="menu hidden">
+  <button data-add="file">ファイルを読み込み (VRM / glTF / GLB)</button>
+  <div class="menu-sep"></div>
+  <button data-add="box">立方体</button>
+  <button data-add="sphere">球</button>
+  <button data-add="cylinder">円柱</button>
+  <button data-add="plane">板 (1m)</button>
+</div>
+
 <!-- シーンパネル -->
 <aside id="panelScenes" class="panel hidden">
   <div class="panel-head"><h3>シーン</h3><button class="close" data-close>✕</button></div>
+  <button id="btnNewScene" class="wide" data-tip="キャラ・小物・カメラ・タイムラインをすべて消して空のシーンから始めます">新規シーン(すべてクリア)</button>
+  <hr>
   <div class="row">
     <input id="sceneName" type="text" placeholder="シーン名" autocomplete="off">
     <button id="btnSaveScene">保存</button>
@@ -116,7 +128,11 @@
   <label class="check-row">書き出し長辺
     <input id="exportLong" type="number" min="256" max="8192" step="64" value="2048" inputmode="numeric"> px
   </label>
+  <label class="slider-row">ガイド枠 <span id="guideScaleVal">100</span>%
+    <input id="guideScale" type="range" min="30" max="100" step="5" value="100">
+  </label>
   <div class="note" id="exportDims"></div>
+  <p class="note">ガイド枠を100%未満にすると構図フレームが画面より小さく表示され、フレームの外側を見ながらポーズを調整できます。書き出しは枠の中身だけが写ります。</p>
 </aside>
 
 <!-- 設定パネル -->
@@ -126,6 +142,12 @@
   <h4>背景</h4>
   <label class="check-row">背景色 <input id="bgColor" type="color" value="#3a3f47"></label>
   <label class="check-row"><input id="alphaToggle" type="checkbox"> PNGを透過背景にする</label>
+
+  <h4>ライト(平行光の向き)</h4>
+  <label class="jog-row">X<input id="lightX" type="range" min="-180" max="180" step="1" value="-50"><span class="val" id="valLightX">-50°</span></label>
+  <label class="jog-row">Y<input id="lightY" type="range" min="-180" max="180" step="1" value="35"><span class="val" id="valLightY">35°</span></label>
+  <label class="jog-row">Z<input id="lightZ" type="range" min="-180" max="180" step="1" value="0"><span class="val" id="valLightZ">0°</span></label>
+  <button id="btnLightReset" class="wide small">ライトをリセット</button>
 
   <h4>メニュー</h4>
   <label class="check-row">表示位置
@@ -168,6 +190,9 @@
     <button id="cutDelete" data-tip="選択中のカットを削除">削除</button>
     <button id="cutLeft" data-tip="カットを左へ移動">◀</button>
     <button id="cutRight" data-tip="カットを右へ移動">▶</button>
+    <label data-tip="選択中カットのコマ数。タイムライン上のキー(◆)をドラッグしても変えられます">コマ
+      <input id="selFrames" type="number" min="1" max="999" value="12" inputmode="numeric" disabled>
+    </label>
     <label>fps
       <select id="conteFps"><option value="24" selected>24</option><option value="30">30</option></select>
     </label>
@@ -178,7 +203,14 @@
     <button id="conteExport" data-tip="全フレームを連番PNG(zip)で書き出し。ホールド分も複製されるので編集ソフトでそのままタイミング確認できます">連番書き出し</button>
     <span id="conteInfo"></span>
   </div>
-  <div id="cutList"></div>
+  <div id="tlZone">
+    <div id="tlInner">
+      <div id="tlRuler"></div>
+      <div id="tlTrack"></div>
+      <div id="tlPlayhead" class="hidden"></div>
+    </div>
+    <p id="tlEmpty" class="note">「＋カット」で現在の状態をカットとして追加。カットをタップで選択、キー(◆)を左右にドラッグでコマ数を調整、目盛りをドラッグでスクラブできます</p>
+  </div>
 </div>
 
 <div id="frameGuide" class="hidden"></div>

@@ -9,20 +9,24 @@ import { buildZip, crc32 } from './zip.js';
 const $ = (id) => document.getElementById(id);
 const canvas = $('view');
 
+const DEFAULT_SETTINGS = {
+  fov: 30, ortho: false, bgColor: '#3a3f47', alphaExport: false,
+  aspect: 'free', exportLong: 2048, guideScale: 100,
+  showHandles: true, showGrid: true, handleScale: 1,
+  panelSide: 'left', showEyeLevel: true,
+  lightX: -50, lightY: 35, lightZ: 0, // 既定値は従来の固定ライト位置(1.2, 2.4, 1.8)相当
+};
+
 const state = {
   characters: [],
-  props: [],                // 小物(glTF/GLB)
+  props: [],                // 小物(glTF/GLB/プリミティブ)
   selection: null,          // { char, handle } ※char は Prop のこともある
   activeChar: null,
   pendingChars: null,       // シーン読込時にモデル未所持だったキャラ状態
   pendingProps: null,
   mode: 'illust',           // 'illust' | 'conte'
   timeline: { fps: 24, cuts: [] },  // カット = { frames, thumb, state }
-  settings: {
-    fov: 30, ortho: false, bgColor: '#3a3f47', alphaExport: false,
-    aspect: 'free', exportLong: 2048, showHandles: true, showGrid: true, handleScale: 1,
-    panelSide: 'left', showEyeLevel: true,
-  },
+  settings: { ...DEFAULT_SETTINGS },
 };
 
 const JP_BONE = {
@@ -52,8 +56,18 @@ let activeCamera = perspCam;
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0x53585f, 1.1));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.4);
-dirLight.position.set(1.2, 2.4, 1.8);
 scene.add(dirLight);
+
+/** 平行光の向きを設定の XYZ 回転(度)から更新する。(0,0,1)=正面からの光を基準に X→Y→Z の順で回す */
+function applyLight() {
+  const s = state.settings;
+  const v = new THREE.Vector3(0, 0, 1)
+    .applyAxisAngle(new THREE.Vector3(1, 0, 0), THREE.MathUtils.degToRad(s.lightX))
+    .applyAxisAngle(new THREE.Vector3(0, 1, 0), THREE.MathUtils.degToRad(s.lightY))
+    .applyAxisAngle(new THREE.Vector3(0, 0, 1), THREE.MathUtils.degToRad(s.lightZ));
+  dirLight.position.copy(v.multiplyScalar(3));
+}
+applyLight();
 
 // 地平線まで続く床グリッド(1m + 10m の二重グリッド、距離でフェード)
 const grid = (() => {
@@ -148,6 +162,7 @@ function resize() {
     orthoCam.updateProjectionMatrix();
   }
   updateFrameGuide();
+  if (state.mode === 'conte') renderTimeline(false);
 }
 
 // ---------- アスペクト比と書き出しサイズ ----------
@@ -169,22 +184,30 @@ function exportSize(longOverride) {
   return ar >= 1 ? [long, Math.max(1, Math.round(long / ar))] : [Math.max(1, Math.round(long * ar)), long];
 }
 
+/** ガイド枠のピクセル寸法。セーフライン(ガイド枠%)で縮む。表示不要なら null */
+function guideDims(rectW, rectH) {
+  const ar = aspectValue();
+  const k = Math.min(1, Math.max(0.1, (state.settings.guideScale || 100) / 100));
+  if (ar === null && k >= 1) return null; // 画面のまま・100% = 枠なし
+  let fw = rectW;
+  let fh = ar === null ? rectH : fw / ar;
+  if (fh > rectH) { fh = rectH; fw = fh * (ar === null ? rectW / rectH : ar); }
+  return { fw: fw * k, fh: fh * k };
+}
+
 /** 書き出し範囲のガイド枠をビューポートに重ねる */
 function updateFrameGuide() {
   const el = $('frameGuide');
   const dims = $('exportDims');
   const [ew, eh] = exportSize();
   if (dims) dims.textContent = `書き出しサイズ: ${ew} × ${eh} px`;
-  const ar = aspectValue();
-  if (ar === null) { el.classList.add('hidden'); return; }
   const rect = canvas.getBoundingClientRect();
-  let fw = rect.width;
-  let fh = fw / ar;
-  if (fh > rect.height) { fh = rect.height; fw = fh * ar; }
-  el.style.left = (rect.left + (rect.width - fw) / 2) + 'px';
-  el.style.top = (rect.top + (rect.height - fh) / 2) + 'px';
-  el.style.width = fw + 'px';
-  el.style.height = fh + 'px';
+  const g = guideDims(rect.width, rect.height);
+  if (!g) { el.classList.add('hidden'); return; }
+  el.style.left = (rect.left + (rect.width - g.fw) / 2) + 'px';
+  el.style.top = (rect.top + (rect.height - g.fh) / 2) + 'px';
+  el.style.width = g.fw + 'px';
+  el.style.height = g.fh + 'px';
   el.classList.remove('hidden');
 }
 window.addEventListener('resize', resize);
@@ -523,7 +546,9 @@ function select(hit) {
   for (const c of state.characters) c.fingerHandlesVisible = { left: false, right: false };
   if (isHand) hit.char.fingerHandlesVisible[def.bone === 'leftHand' ? 'left' : 'right'] = true;
   for (const el of document.querySelectorAll('.curl-only')) el.classList.toggle('hidden', !isHand);
-  for (const el of document.querySelectorAll('.scale-only')) el.classList.toggle('hidden', !isProp);
+  // 大きさ: 小物、キャラの全体ハンドル、または頭(頭部だけの拡縮)選択時
+  const showScale = isProp || def.mode === 'root' || def.bone === 'head';
+  for (const el of document.querySelectorAll('.scale-only')) el.classList.toggle('hidden', !showScale);
   if (isHand) {
     const side = def.bone === 'leftHand' ? 'left' : 'right';
     const v = hit.char.masterCurl(side);
@@ -581,9 +606,13 @@ function syncBoneSliders() {
   set('jogPitch', 'valPitch', r.pitch);
   set('jogYaw', 'valYaw', r.yaw);
   const sel = state.selection;
-  if (sel.char.isProp) {
+  if (sel.char.isProp || sel.handle.userData.def.mode === 'root') {
     $('propScale').value = sel.char.root.scale.x;
     $('valScale').textContent = sel.char.root.scale.x.toFixed(2);
+  } else if (sel.handle.userData.def.bone === 'head') {
+    const v = sel.char.headScale || 1;
+    $('propScale').value = v;
+    $('valScale').textContent = v.toFixed(2);
   }
 }
 
@@ -617,10 +646,14 @@ for (const id of ['jogTwist', 'jogPitch', 'jogYaw']) {
 
 $('propScale').addEventListener('input', () => {
   const sel = state.selection;
-  if (!sel || !sel.char.isProp) return;
+  if (!sel) return;
+  const def = sel.handle.userData.def;
+  const headOnly = !sel.char.isProp && def.bone === 'head';
+  if (!sel.char.isProp && def.mode !== 'root' && !headOnly) return;
   if (!sliderActive) { sliderActive = true; pushUndo(); }
   const v = parseFloat($('propScale').value);
-  sel.char.root.scale.setScalar(v);
+  if (headOnly) sel.char.setHeadScale(v);
+  else sel.char.root.scale.setScalar(v);
   $('valScale').textContent = v.toFixed(2);
 });
 $('propScale').addEventListener('change', onSliderEnd);
@@ -921,6 +954,46 @@ function makeProp(object, key, name) {
   return prop;
 }
 
+// ---------- 基本プリミティブ(modelKey は "prim:○○"。IndexedDB を介さず再生成する) ----------
+
+const PRIMITIVES = {
+  box: { label: '立方体', make: () => new THREE.BoxGeometry(0.5, 0.5, 0.5).translate(0, 0.25, 0) },
+  sphere: { label: '球', make: () => new THREE.SphereGeometry(0.25, 32, 16).translate(0, 0.25, 0) },
+  cylinder: { label: '円柱', make: () => new THREE.CylinderGeometry(0.25, 0.25, 0.5, 32).translate(0, 0.25, 0) },
+  plane: { label: '板', make: () => new THREE.BoxGeometry(1, 0.02, 1).translate(0, 0.01, 0) },
+};
+
+function makePrimitiveObject(kind) {
+  const mesh = new THREE.Mesh(
+    PRIMITIVES[kind].make(),
+    new THREE.MeshStandardMaterial({ color: 0x9aa8b3, roughness: 0.85, metalness: 0 }),
+  );
+  const group = new THREE.Group();
+  group.add(mesh);
+  return group;
+}
+
+function addPrimitive(kind) {
+  if (!PRIMITIVES[kind]) return;
+  const prop = makeProp(makePrimitiveObject(kind), 'prim:' + kind, PRIMITIVES[kind].label);
+  prop.root.position.set(0.3 * (state.props.length - 1), 0, 0.5);
+  toast(`${prop.name}を配置しました`);
+  afterCharsChanged();
+}
+
+/** modelKey から小物を作る(プリミティブは再生成、それ以外は IndexedDB)。無ければ null */
+async function createPropFromKey(key, name) {
+  if (key && key.startsWith('prim:')) {
+    const kind = key.slice(5);
+    if (!PRIMITIVES[kind]) return null;
+    return makeProp(makePrimitiveObject(kind), key, name || PRIMITIVES[kind].label);
+  }
+  const rec = await idb.getModel(key);
+  if (!rec) return null;
+  const buf = await rec.blob.arrayBuffer();
+  return createProp(buf, key, name || rec.name);
+}
+
 function removeProp(prop) {
   if (state.selection && state.selection.char === prop) deselect();
   prop.dispose(scene);
@@ -930,13 +1003,11 @@ function removeProp(prop) {
 }
 
 async function duplicateProp(prop) {
-  const rec = await idb.getModel(prop.modelKey);
-  if (!rec) { toast('モデルデータが見つかりません'); return; }
   showLoading(true);
   try {
-    const buf = await rec.blob.arrayBuffer();
     const st = prop.serialize();
-    const copy = await createProp(buf, prop.modelKey, prop.name + ' コピー');
+    const copy = await createPropFromKey(prop.modelKey, prop.name + ' コピー');
+    if (!copy) { toast('モデルデータが見つかりません'); return; }
     copy.applyState(st);
     copy.name = prop.name + ' コピー';
     copy.root.position.x += 0.4;
@@ -1181,10 +1252,8 @@ async function applyScene(data) {
   }
   const missingProps = [];
   for (const ps of data.props || []) {
-    const rec = await idb.getModel(ps.modelKey);
-    if (!rec) { missingProps.push(ps); continue; }
-    const buf = await rec.blob.arrayBuffer();
-    const prop = await createProp(buf, ps.modelKey, ps.name || rec.name);
+    const prop = await createPropFromKey(ps.modelKey, ps.name);
+    if (!prop) { missingProps.push(ps); continue; }
     prop.applyState(ps);
   }
   if (missing.length || missingProps.length) {
@@ -1229,29 +1298,25 @@ async function renderShot(W, H, asDataURL) {
   const w = canvas.clientWidth, h = canvas.clientHeight;
   const pr = renderer.getPixelRatio();
   const cam = activeCamera;
-  const Ac = w / h;
   const At = W / H;
 
-  // ガイド枠と一致する範囲を切り出すカメラ設定(枠が縦長なら左右を、横長なら上下を削る)
+  // ガイド枠と一致する範囲を切り出すカメラ設定。
+  // 枠の縦がビューポートの何割かぶんだけ画角を絞れば、枠内=書き出しになる
+  const g = guideDims(w, h);
+  const fy = g ? g.fh / h : 1;
   let savedPersp = null;
   let savedOrtho = null;
   if (cam.isPerspectiveCamera) {
     savedPersp = { fov: cam.fov, aspect: cam.aspect };
-    let fov = cam.fov;
-    if (At > Ac) {
-      const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2) * (Ac / At);
-      fov = THREE.MathUtils.radToDeg(2 * Math.atan(t));
-    }
-    cam.fov = fov;
+    const t = Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2) * fy;
+    cam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(t));
     cam.aspect = At;
     cam.updateProjectionMatrix();
   } else {
     savedOrtho = { left: cam.left, right: cam.right, top: cam.top, bottom: cam.bottom };
-    let top = cam.top, right = cam.right;
-    if (At <= Ac) right = top * At;
-    else top = right / At;
+    const top = cam.top * fy;
     cam.top = top; cam.bottom = -top;
-    cam.right = right; cam.left = -right;
+    cam.right = top * At; cam.left = -top * At;
     cam.updateProjectionMatrix();
   }
 
@@ -1314,7 +1379,26 @@ function downloadBlob(blob, name) {
 
 // ---------- UI 配線 ----------
 
-$('btnAddModel').addEventListener('click', () => $('fileModel').click());
+$('btnAddModel').addEventListener('click', () => {
+  const menu = $('addMenu');
+  if (!menu.classList.contains('hidden')) { menu.classList.add('hidden'); return; }
+  const r = $('btnAddModel').getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 240)) + 'px';
+  menu.classList.remove('hidden');
+});
+for (const b of document.querySelectorAll('#addMenu [data-add]')) {
+  b.addEventListener('click', () => {
+    $('addMenu').classList.add('hidden');
+    if (b.dataset.add === 'file') $('fileModel').click();
+    else addPrimitive(b.dataset.add);
+  });
+}
+// メニュー外をタップしたら閉じる(＋モデル自身は click 側のトグルに任せる)
+document.addEventListener('pointerdown', (e) => {
+  const menu = $('addMenu');
+  if (menu.classList.contains('hidden')) return;
+  if (!menu.contains(e.target) && !$('btnAddModel').contains(e.target)) menu.classList.add('hidden');
+});
 $('fileModel').addEventListener('change', async (e) => {
   const f = e.target.files[0];
   e.target.value = '';
@@ -1339,6 +1423,40 @@ for (const b of document.querySelectorAll('[data-close]')) {
 }
 
 // シーンパネル
+function newScene() {
+  if (playState) stopContePlay();
+  deselect();
+  for (const c of [...state.characters]) c.dispose(scene);
+  for (const p of [...state.props]) p.dispose(scene);
+  state.characters = [];
+  state.props = [];
+  state.activeChar = null;
+  state.pendingChars = null;
+  state.pendingProps = null;
+  clearUndo();
+  state.timeline = { fps: 24, cuts: [] };
+  selectedCut = -1;
+  const side = state.settings.panelSide; // UI 側の好みだけ引き継ぐ
+  Object.assign(state.settings, DEFAULT_SETTINGS, { panelSide: side });
+  if (activeCamera !== perspCam) setOrtho(false);
+  perspCam.fov = state.settings.fov;
+  perspCam.position.set(0, 0.95, 2.8);
+  perspCam.updateProjectionMatrix();
+  controls.target.set(0, 0.85, 0);
+  controls.update();
+  scene.background = new THREE.Color(state.settings.bgColor);
+  syncSettingsUI();
+  setMode('illust');
+  renderTimeline(false);
+  renderCharUI();
+  markDirty();
+}
+$('btnNewScene').addEventListener('click', () => {
+  if (!confirm('現在のキャラクター・小物・カメラ・タイムラインをすべて消して、空のシーンから始めますか?')) return;
+  newScene();
+  togglePanel('panelScenes');
+  toast('新規シーンにしました。＋モデルからモデルを読み込んでください');
+});
 $('btnSaveScene').addEventListener('click', async () => {
   const name = ($('sceneName').value || '').trim() || '無題';
   await idb.putScene(name, serializeScene());
@@ -1393,6 +1511,23 @@ $('bgColor').addEventListener('input', (e) => {
   markDirty();
 });
 $('alphaToggle').addEventListener('change', (e) => { state.settings.alphaExport = e.target.checked; markDirty(); });
+for (const ax of ['X', 'Y', 'Z']) {
+  const key = 'light' + ax; // settings のキーも要素 id も lightX / lightY / lightZ
+  $(key).addEventListener('input', () => {
+    state.settings[key] = parseFloat($(key).value) || 0;
+    $('valLight' + ax).textContent = Math.round(state.settings[key]) + '°';
+    applyLight();
+  });
+  $(key).addEventListener('change', markDirty);
+}
+$('btnLightReset').addEventListener('click', () => {
+  state.settings.lightX = DEFAULT_SETTINGS.lightX;
+  state.settings.lightY = DEFAULT_SETTINGS.lightY;
+  state.settings.lightZ = DEFAULT_SETTINGS.lightZ;
+  applyLight();
+  syncSettingsUI();
+  markDirty();
+});
 $('aspectSelect').addEventListener('change', (e) => { state.settings.aspect = e.target.value; updateFrameGuide(); markDirty(); });
 $('exportLong').addEventListener('change', (e) => {
   state.settings.exportLong = Math.max(256, Math.min(8192, parseInt(e.target.value, 10) || 2048));
@@ -1400,6 +1535,12 @@ $('exportLong').addEventListener('change', (e) => {
   updateFrameGuide();
   markDirty();
 });
+$('guideScale').addEventListener('input', (e) => {
+  state.settings.guideScale = parseInt(e.target.value, 10) || 100;
+  $('guideScaleVal').textContent = state.settings.guideScale;
+  updateFrameGuide();
+});
+$('guideScale').addEventListener('change', markDirty);
 $('handleToggle').addEventListener('change', (e) => { state.settings.showHandles = e.target.checked; markDirty(); });
 $('gridToggle').addEventListener('change', (e) => { state.settings.showGrid = e.target.checked; grid.visible = e.target.checked; markDirty(); });
 $('eyeLevelToggle').addEventListener('change', (e) => { state.settings.showEyeLevel = e.target.checked; markDirty(); });
@@ -1422,8 +1563,17 @@ function syncSettingsUI() {
   $('bgColor').value = s.bgColor;
   scene.background = scene.background && new THREE.Color(s.bgColor);
   $('alphaToggle').checked = s.alphaExport;
+  for (const ax of ['X', 'Y', 'Z']) {
+    const key = 'light' + ax;
+    if (typeof s[key] !== 'number') s[key] = DEFAULT_SETTINGS[key];
+    $(key).value = s[key];
+    $('valLight' + ax).textContent = Math.round(s[key]) + '°';
+  }
+  applyLight();
   $('aspectSelect').value = s.aspect || 'free';
   $('exportLong').value = s.exportLong || 2048;
+  $('guideScale').value = s.guideScale || 100;
+  $('guideScaleVal').textContent = s.guideScale || 100;
   updateFrameGuide();
   $('handleToggle').checked = s.showHandles;
   $('gridToggle').checked = s.showGrid;
@@ -1508,57 +1658,204 @@ function selectCut(i, apply) {
   renderTimeline(false);
 }
 
+function totalFrames() {
+  return state.timeline.cuts.reduce((a, c) => a + (c.frames | 0), 0);
+}
+
 function updateConteInfo() {
   const cuts = state.timeline.cuts;
-  const total = cuts.reduce((a, c) => a + (c.frames | 0), 0);
+  const total = totalFrames();
   $('conteInfo').textContent =
     `${cuts.length}カット / ${total}コマ / ${(total / state.timeline.fps).toFixed(2)}秒`;
 }
+
+// タイムライン: 目盛り + カット帯 + キー(◆ = カット終端。左右ドラッグでコマ数を増減) + 再生ヘッド
+let tlPxf = 8;        // 1コマの幅(px)
+let tlSegEls = [];
+let tlKeyEls = [];
 
 function renderTimeline(highlightOnly) {
   updateConteInfo();
   $('conteFps').value = String(state.timeline.fps);
   if (state.timeline.exportLong) $('conteLong').value = state.timeline.exportLong;
-  const list = $('cutList');
+  const cuts = state.timeline.cuts;
+  const cut = cuts[selectedCut];
+  $('selFrames').disabled = !cut;
+  if (cut) $('selFrames').value = cut.frames;
   if (highlightOnly) {
-    [...list.children].forEach((el2, i) => el2.classList.toggle('selected', i === selectedCut));
+    tlSegEls.forEach((el, i) => el.classList.toggle('selected', i === selectedCut));
     return;
   }
-  list.innerHTML = '';
-  state.timeline.cuts.forEach((cut, i) => {
-    const chip = document.createElement('div');
-    chip.className = 'cut-chip' + (i === selectedCut ? ' selected' : '');
-    const img = document.createElement('img');
-    if (cut.thumb) img.src = cut.thumb;
-    chip.appendChild(img);
-    const head = document.createElement('div');
-    head.className = 'cut-head';
-    const idx = document.createElement('span');
-    idx.textContent = String(i + 1);
-    head.appendChild(idx);
-    const fr = document.createElement('input');
-    fr.type = 'number';
-    fr.min = 1; fr.max = 999;
-    fr.value = cut.frames;
-    fr.addEventListener('click', (e) => e.stopPropagation());
-    fr.addEventListener('change', () => {
-      cut.frames = Math.max(1, Math.min(999, parseInt(fr.value, 10) || 1));
-      fr.value = cut.frames;
-      updateConteInfo();
-      markDirty();
-    });
-    head.appendChild(fr);
-    head.appendChild(Object.assign(document.createElement('span'), { textContent: 'k' }));
-    chip.appendChild(head);
-    chip.addEventListener('click', () => selectCut(i, true));
-    list.appendChild(chip);
+  $('tlEmpty').classList.toggle('hidden', !!cuts.length);
+  $('tlInner').style.display = cuts.length ? '' : 'none';
+  const track = $('tlTrack');
+  track.innerHTML = '';
+  tlSegEls = [];
+  tlKeyEls = [];
+  if (!cuts.length) { $('tlPlayhead').classList.add('hidden'); return; }
+
+  const avail = Math.max(200, ($('tlZone').clientWidth || 600) - 24);
+  tlPxf = Math.max(4, Math.min(16, avail / Math.max(totalFrames(), 1)));
+
+  cuts.forEach((c, i) => {
+    const seg = document.createElement('div');
+    seg.className = 'tl-cut' + (i === selectedCut ? ' selected' : '');
+    if (c.thumb) seg.style.backgroundImage = `url(${c.thumb})`;
+    const lb = document.createElement('span');
+    lb.className = 'tl-label';
+    lb.textContent = String(i + 1);
+    const fr = document.createElement('span');
+    fr.className = 'tl-frames';
+    seg.appendChild(lb);
+    seg.appendChild(fr);
+    seg.addEventListener('click', () => selectCut(i, true));
+    track.appendChild(seg);
+    tlSegEls.push(seg);
+
+    const key = document.createElement('div');
+    key.className = 'tl-key';
+    key.addEventListener('pointerdown', (e) => startKeyDrag(e, i, key));
+    track.appendChild(key);
+    tlKeyEls.push(key);
   });
+  layoutTimeline();
+}
+
+/** DOM を作り直さず、コマ数から位置と幅だけ更新する(キーのドラッグ中に呼ぶ) */
+function layoutTimeline() {
+  const cuts = state.timeline.cuts;
+  const fps = state.timeline.fps;
+  const total = totalFrames();
+  const width = total * tlPxf + 40;
+  $('tlInner').style.width = width + 'px';
+
+  const ruler = $('tlRuler');
+  ruler.innerHTML = '';
+  ruler.style.width = width + 'px';
+  const frameStep = tlPxf >= 7 ? 1 : (tlPxf >= 4 ? 2 : 6);
+  for (let f = 0; f <= total; f += frameStep) {
+    if (f % fps === 0) continue;
+    const t = document.createElement('div');
+    t.className = 'tl-tick';
+    t.style.left = (f * tlPxf) + 'px';
+    ruler.appendChild(t);
+  }
+  for (let s = 0; s * fps <= total; s++) {
+    const t = document.createElement('div');
+    t.className = 'tl-tick sec';
+    t.style.left = (s * fps * tlPxf) + 'px';
+    ruler.appendChild(t);
+    const lb = document.createElement('div');
+    lb.className = 'tl-ticklabel';
+    lb.style.left = (s * fps * tlPxf) + 'px';
+    lb.textContent = s + 's';
+    ruler.appendChild(lb);
+  }
+
+  let start = 0;
+  cuts.forEach((c, i) => {
+    const w = (c.frames | 0) * tlPxf;
+    tlSegEls[i].style.left = (start * tlPxf) + 'px';
+    tlSegEls[i].style.width = Math.max(w - 2, 6) + 'px';
+    tlSegEls[i].querySelector('.tl-frames').textContent = c.frames + 'k';
+    tlKeyEls[i].style.left = ((start + (c.frames | 0)) * tlPxf) + 'px';
+    start += c.frames | 0;
+  });
+}
+
+function startKeyDrag(e, i, el) {
+  e.preventDefault();
+  e.stopPropagation();
+  const cut = state.timeline.cuts[i];
+  if (!cut) return;
+  const dragCtx = { pointerId: e.pointerId, startX: e.clientX, orig: cut.frames | 0 };
+  el.classList.add('dragging');
+  try { el.setPointerCapture(e.pointerId); } catch (_) { }
+  const move = (ev) => {
+    if (ev.pointerId !== dragCtx.pointerId) return;
+    const d = Math.round((ev.clientX - dragCtx.startX) / tlPxf);
+    const v = Math.max(1, Math.min(999, dragCtx.orig + d));
+    if (v !== cut.frames) {
+      cut.frames = v;
+      layoutTimeline();
+      updateConteInfo();
+      if (i === selectedCut) $('selFrames').value = v;
+    }
+    ev.preventDefault();
+  };
+  const up = (ev) => {
+    if (ev.pointerId !== dragCtx.pointerId) return;
+    el.classList.remove('dragging');
+    el.removeEventListener('pointermove', move);
+    el.removeEventListener('pointerup', up);
+    el.removeEventListener('pointercancel', up);
+    renderTimeline(false); // コマ幅を再フィット
+    markDirty();
+  };
+  el.addEventListener('pointermove', move);
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+}
+
+// 目盛りのドラッグでスクラブ(そのコマのカットを適用)
+function frameAtX(clientX) {
+  const rect = $('tlInner').getBoundingClientRect();
+  return Math.max(0, Math.round((clientX - rect.left) / tlPxf));
+}
+function cutAtFrame(f) {
+  const cuts = state.timeline.cuts;
+  let start = 0;
+  for (let i = 0; i < cuts.length; i++) {
+    start += cuts[i].frames | 0;
+    if (f < start) return i;
+  }
+  return cuts.length - 1;
+}
+function setPlayhead(f) {
+  const ph = $('tlPlayhead');
+  ph.style.left = (f * tlPxf) + 'px';
+  ph.classList.remove('hidden');
+}
+let scrubbing = null;
+function scrubTo(clientX) {
+  const f = Math.min(frameAtX(clientX), Math.max(totalFrames() - 1, 0));
+  setPlayhead(f);
+  const i = cutAtFrame(f);
+  if (i !== selectedCut && state.timeline.cuts[i]) {
+    selectedCut = i;
+    applyShot(state.timeline.cuts[i].state);
+    syncBoneSliders();
+    renderTimeline(true);
+  }
+}
+$('tlRuler').addEventListener('pointerdown', (e) => {
+  if (!state.timeline.cuts.length) return;
+  if (playState) stopContePlay();
+  pushUndo();
+  scrubbing = { pointerId: e.pointerId };
+  try { $('tlRuler').setPointerCapture(e.pointerId); } catch (_) { }
+  scrubTo(e.clientX);
+  e.preventDefault();
+});
+$('tlRuler').addEventListener('pointermove', (e) => {
+  if (scrubbing && e.pointerId === scrubbing.pointerId) scrubTo(e.clientX);
+});
+for (const ev of ['pointerup', 'pointercancel']) {
+  $('tlRuler').addEventListener(ev, (e) => {
+    if (scrubbing && e.pointerId === scrubbing.pointerId) { scrubbing = null; markDirty(); }
+  });
+}
+
+function markPlaying(i) {
+  tlSegEls.forEach((el, k) => el.classList.toggle('playing', k === i));
 }
 
 function stopContePlay() {
   if (!playState) return;
   clearInterval(playState.timer);
   applyShot(playState.working);
+  markPlaying(-1);
+  $('tlPlayhead').classList.add('hidden');
   playState = null;
   $('contePlay').textContent = '▶ 再生';
 }
@@ -1570,14 +1867,18 @@ function toggleContePlay() {
   const working = captureShot();
   let cutIdx = 0;
   let frameInCut = 0;
+  let globalFrame = 0;
   applyShot(cuts[0].state);
   selectedCut = 0;
   renderTimeline(true);
+  markPlaying(0);
+  setPlayhead(0);
   $('contePlay').textContent = '■ 停止';
   playState = {
     working,
     timer: setInterval(() => {
       frameInCut++;
+      globalFrame++;
       if (frameInCut >= (cuts[cutIdx].frames | 0)) {
         cutIdx++;
         frameInCut = 0;
@@ -1585,7 +1886,9 @@ function toggleContePlay() {
         applyShot(cuts[cutIdx].state);
         selectedCut = cutIdx;
         renderTimeline(true);
+        markPlaying(cutIdx);
       }
+      setPlayhead(globalFrame);
     }, 1000 / state.timeline.fps),
   };
 }
@@ -1640,7 +1943,15 @@ $('cutLeft').addEventListener('click', () => moveCut(-1));
 $('cutRight').addEventListener('click', () => moveCut(1));
 $('conteFps').addEventListener('change', (e) => {
   state.timeline.fps = parseInt(e.target.value, 10) || 24;
-  updateConteInfo();
+  renderTimeline(false); // 秒目盛りが変わる
+  markDirty();
+});
+$('selFrames').addEventListener('change', (e) => {
+  const cut = state.timeline.cuts[selectedCut];
+  if (!cut) return;
+  cut.frames = Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 1));
+  e.target.value = cut.frames;
+  renderTimeline(false);
   markDirty();
 });
 $('conteLong').addEventListener('change', (e) => {
@@ -1714,7 +2025,25 @@ async function boot() {
   } catch (err) {
     console.warn('autosave restore failed', err);
   }
-  toast('右上の「＋モデル」から VRM を読み込んでください');
+  // 初回起動: 既定素体(男女)を読み込む
+  try {
+    showLoading(true);
+    for (const [file, x] of [['sotai_girl.vrm', -0.4], ['sotai_boy.vrm', 0.4]]) {
+      const res = await fetch('./assets/' + file);
+      if (!res.ok) continue;
+      await addModelFromBuffer(await res.arrayBuffer(), file);
+      const char = state.characters[state.characters.length - 1];
+      if (char) char.root.position.set(x, 0, 0);
+    }
+    markDirty();
+  } catch (err) {
+    console.warn('default sotai load failed', err);
+  } finally {
+    showLoading(false);
+  }
+  if (!state.characters.length) {
+    toast('右上の「＋モデル」から VRM を読み込んでください');
+  }
 }
 boot();
 
@@ -1724,7 +2053,7 @@ window.app = {
   THREE, state, scene, renderer,
   get camera() { return activeCamera; },
   get controls() { return controls; },
-  serializeScene, applyScene, exportPNG, pickHandle, updateEyeLine,
+  serializeScene, applyScene, exportPNG, pickHandle, updateEyeLine, renderShot,
   async loadVRMFromURL(url) {
     const res = await fetch(url);
     const buf = await res.arrayBuffer();
