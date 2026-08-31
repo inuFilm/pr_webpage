@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<title>VRM Pose Ref 詳細マニュアル</title>
+<link rel="icon" href="./icons/icon-192.png">
+<style>
+  :root {
+    --bg: #101418; --panel: #1a2027; --border: #2c3540;
+    --fg: #dfe6ee; --dim: #8a97a5; --accent: #3fb6ff;
+    --green: #6fe26f; --blue: #7da9ff; --orange: #ffb62e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font-family: -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif;
+    font-size: 15px; line-height: 1.9;
+    padding: 24px 16px 80px;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 24px; margin: 8px 0 4px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 20px; }
+  h2 {
+    font-size: 19px; margin: 44px 0 12px; padding: 8px 12px;
+    background: var(--panel); border-left: 4px solid var(--accent); border-radius: 4px;
+  }
+  h3 { font-size: 15px; margin: 22px 0 6px; color: var(--accent); }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 4px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  b { color: #fff; }
+  .fig {
+    background: #10151b; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px; margin: 12px 0; max-width: 560px;
+  }
+  .fig svg { display: block; width: 100%; height: auto; }
+  .fig-head { fill: none; stroke: #55606c; stroke-width: 5; }
+  .fig-bone-g line, .fig-bone-g polyline { stroke: #55606c; stroke-width: 5; stroke-linecap: round; fill: none; }
+  .fig-dot circle, circle.fig-dot { stroke: #0a0d10; stroke-width: 1.5; }
+  .fig-t { fill: #cfd8e3; font-size: 11px; }
+  .fig-t.dim { fill: #8a97a5; font-size: 10px; }
+  .fig-arrow, .fig-arrow line, .fig-arrow path { stroke: #dfe6ee; stroke-width: 2; fill: none; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--panel); font-weight: 600; white-space: nowrap; }
+  td:first-child { white-space: nowrap; }
+  .chip { display: inline-block; width: 13px; height: 13px; border-radius: 50%; margin-right: 6px; vertical-align: -2px; border: 1px solid #0a0d10; }
+  .note {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; margin: 12px 0; font-size: 13px; color: var(--dim);
+  }
+  .note b { color: var(--fg); }
+  nav.toc {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 18px; margin: 16px 0 8px; font-size: 14px;
+  }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc ol { margin: 4px 0 0; }
+  a.back {
+    display: inline-block; margin-top: 40px; padding: 10px 20px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--fg); text-decoration: none; font-size: 14px;
+  }
+  kbd {
+    background: #10151b; border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 7px; font-size: 12px; font-family: inherit;
+  }
+</style>
+</head>
+<body>
+<main>
+
+<h1>VRM Pose Ref 詳細マニュアル</h1>
+<p class="sub">iPad / PC のブラウザで動くポーズ資料ツール。モデルもポーズも端末の中だけに保存され、外部には送信されません。</p>
+
+<nav class="toc">
+<b>目次</b>
+<ol>
+  <li><a href="#start">はじめての5分</a></li>
+  <li><a href="#screen">画面の見方</a></li>
+  <li><a href="#handles">ハンドルの色 早見表</a></li>
+  <li><a href="#pose">ポーズを付ける(基本)</a></li>
+  <li><a href="#move">移動と向き</a></li>
+  <li><a href="#fine">細かい向き(緑=捻る・青=向ける)</a></li>
+  <li><a href="#hand">手と指</a></li>
+  <li><a href="#posepanel">ポーズ・表情パネル</a></li>
+  <li><a href="#camera">カメラと構図</a></li>
+  <li><a href="#export">PNG 書き出し</a></li>
+  <li><a href="#models">モデルとシーン</a></li>
+  <li><a href="#conte">コンテモード(実験的)</a></li>
+  <li><a href="#ipad">iPad で使う</a></li>
+  <li><a href="#faq">こまったとき</a></li>
+</ol>
+</nav>
+
+<h2 id="start">1. はじめての5分</h2>
+<ol>
+  <li>開くと<b>素体が2体</b>立っています。左下のチップ(素体A / 素体B)でどちらを操作するか選べます</li>
+  <li>手や足の<b>オレンジの丸をドラッグ</b>してみてください。肘・膝が自然についてきます(IK)</li>
+  <li>空いているところを<b>1本指ドラッグ</b>するとカメラが回ります。<b>2本指</b>で移動・ズーム(PC は右ドラッグ / ホイール)</li>
+  <li>上の「ポーズ」から<b>立ち / 座り</b>のプリセットや手の形を選ぶと早く形になります</li>
+  <li>できたら「PNG書き出し」。<b>失敗しても ↶(元に戻す)でいつでも戻れます</b></li>
+</ol>
+
+<h2 id="screen">2. 画面の見方</h2>
+<div class="fig"><svg viewBox="0 0 380 214" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="372" height="206" rx="8" fill="#151b22" stroke="#2c3540"/>
+  <g font-size="9" fill="#dfe6ee" text-anchor="middle">
+    <rect x="8" y="12" width="38" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="27" y="25">シーン</text>
+    <rect x="50" y="12" width="48" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="74" y="25">＋モデル</text>
+    <rect x="102" y="12" width="38" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="121" y="25">ポーズ</text>
+    <rect x="144" y="12" width="38" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="163" y="25">カメラ</text>
+    <rect x="186" y="12" width="28" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="200" y="25">PNG</text>
+    <rect x="218" y="12" width="18" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="227" y="25">⚙</text>
+    <rect x="240" y="12" width="42" height="18" rx="4" fill="#212a33" stroke="#3fb6ff"/><text x="261" y="25" fill="#3fb6ff">使い方</text>
+    <rect x="288" y="12" width="40" height="18" rx="4" fill="#212a33" stroke="#3fb6ff"/><text x="308" y="25" fill="#3fb6ff">イラスト</text>
+    <rect x="332" y="12" width="40" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="352" y="25">コンテ</text>
+  </g>
+  <g stroke="#55606c" stroke-width="4" stroke-linecap="round" fill="none">
+    <circle cx="150" cy="88" r="11" stroke-width="4"/>
+    <line x1="150" y1="99" x2="150" y2="140"/>
+    <line x1="135" y1="108" x2="165" y2="108"/>
+    <polyline points="135,108 128,128 124,148"/><polyline points="165,108 172,128 176,148"/>
+    <polyline points="143,140 141,168 139,192"/><polyline points="157,140 159,168 161,192"/>
+  </g>
+  <g font-size="9" fill="#dfe6ee" text-anchor="middle">
+    <rect x="16" y="182" width="44" height="17" rx="8" fill="#212a33" stroke="#3fb6ff"/><text x="38" y="194" fill="#3fb6ff">素体A</text>
+    <rect x="64" y="182" width="44" height="17" rx="8" fill="#212a33" stroke="#2c3540"/><text x="86" y="194">素体B</text>
+  </g>
+  <text x="16" y="176" font-size="9" fill="#8a97a5">キャラの切り替え</text>
+  <rect x="248" y="140" width="120" height="60" rx="6" fill="#1a2027" stroke="#2c3540"/>
+  <g stroke="#2c3540" stroke-width="3" stroke-linecap="round">
+    <line x1="258" y1="158" x2="330" y2="158"/><line x1="258" y1="172" x2="330" y2="172"/><line x1="258" y1="186" x2="330" y2="186"/>
+  </g>
+  <circle cx="290" cy="158" r="5" fill="#3fb6ff"/><circle cx="276" cy="172" r="5" fill="#3fb6ff"/><circle cx="304" cy="186" r="5" fill="#3fb6ff"/>
+  <g font-size="8" fill="#8a97a5"><text x="340" y="161">42°</text><text x="340" y="175">-15°</text><text x="340" y="189">8°</text></g>
+  <text x="248" y="134" font-size="9" fill="#8a97a5">関節を選ぶと出るスライダー</text>
+</svg></div>
+<table>
+  <tr><th>シーン</th><td>シーンの保存・読み込み。.json ファイルへの書き出し / 取り込み。<b>新規シーン(すべてクリア)</b>もここ</td></tr>
+  <tr><th>＋モデル</th><td>VRM(キャラ)・glTF / GLB(小物)の読み込み、プリミティブ(立方体 / 球 / 円柱 / 板)の追加</td></tr>
+  <tr><th>ポーズ</th><td>立ち / 座り / Tポーズ、手の形プリセット、目線、表情スライダー</td></tr>
+  <tr><th>カメラ</th><td>FOV(mm 換算)・平行投影・アスペクト比のガイド枠・ガイド枠%・書き出し解像度</td></tr>
+  <tr><th>PNG書き出し</th><td>静止画の書き出し。写る範囲はガイド枠の中身(→ <a href="#export" style="color:var(--accent)">9章</a>)</td></tr>
+  <tr><th>⚙</th><td>背景色・透過 PNG・直接ダウンロード・ライトの向き・メニュー位置・表示設定・キャラ管理(複製 / ミラー / リセット / 削除)</td></tr>
+  <tr><th>使い方</th><td>図解スライド 9 枚。初回起動時は自動で開きます</td></tr>
+  <tr><th>イラスト / コンテ</th><td>モード切替。コンテはカットを並べて連番 PNG を書き出す実験的機能</td></tr>
+  <tr><th>↶ ↷</th><td>元に戻す / やり直す。ポーズもカメラも対象です</td></tr>
+</table>
+<p class="note">ボタンを<b>長押し(PC はマウスを乗せる)</b>と、その場で説明ツールチップが出ます。</p>
+
+<h2 id="handles">3. ハンドルの色 早見表</h2>
+<table>
+  <tr><th>色</th><th>場所</th><th>できること</th></tr>
+  <tr><td><i class="chip" style="background:#ffb62e"></i>オレンジ</td><td>手首・足首</td><td>ドラッグで手足を動かす(IK)。肘・膝がついてくる</td></tr>
+  <tr><td><i class="chip" style="background:#35c8ff"></i>水色</td><td>肩・肘・膝など各関節</td><td>1 関節ずつ回す(FK)</td></tr>
+  <tr><td><i class="chip" style="background:#ffe94a"></i>黄色</td><td>足元</td><td>キャラ全体を移動</td></tr>
+  <tr><td><i class="chip" style="background:#ff9de2"></i>ピンク</td><td>腰</td><td>足を床に残したまま腰だけ移動。しゃがみ・座りを作る</td></tr>
+  <tr><td><i class="chip" style="background:#6fe26f"></i>緑(前方の玉)</td><td>キャラ・小物の前</td><td>円に沿ってドラッグで向き(Y回転)</td></tr>
+  <tr><td><i class="chip" style="background:#6fe26f"></i>緑(小玉)</td><td>頭・手首・足首のそば</td><td><b>捻る</b>。手のひらの向き、つま先の向き、顔の左右の向き</td></tr>
+  <tr><td><i class="chip" style="background:#4d8aff"></i>青(小玉)</td><td>頭の上・指先の少し先</td><td><b>向ける</b>(LookAt式)。うなずき・傾げ、手先の向き。捻りは変わらない</td></tr>
+  <tr><td><i class="chip" style="background:#f0f4ff"></i>白</td><td>指先(手を選択中のみ)</td><td>指を 1 本ずつ曲げる</td></tr>
+  <tr><td><i class="chip" style="background:#b17aff"></i>紫</td><td>小物の中心</td><td>小物を移動</td></tr>
+  <tr><td><i class="chip" style="background:#ff4d6b"></i>赤</td><td>—</td><td>選択中のハンドル</td></tr>
+</table>
+
+<h2 id="pose">4. ポーズを付ける(基本)</h2>
+<div class="fig"><svg viewBox="0 0 240 250" xmlns="http://www.w3.org/2000/svg">
+  <line x1="50" y1="224" x2="190" y2="224" stroke="#2c3540" stroke-width="2"/>
+  <circle class="fig-head" cx="120" cy="40" r="16"/>
+  <g class="fig-bone-g">
+    <line x1="120" y1="56" x2="120" y2="120"/>
+    <line x1="97" y1="72" x2="143" y2="72"/>
+    <polyline points="97,72 86,104 80,136" fill="none"/>
+    <polyline points="143,72 154,104 160,136" fill="none"/>
+    <line x1="108" y1="122" x2="132" y2="122"/>
+    <polyline points="108,122 106,168 104,214" fill="none"/>
+    <polyline points="132,122 134,168 136,214" fill="none"/>
+  </g>
+  <g class="fig-dot" fill="#35c8ff">
+    <circle cx="120" cy="40" r="6"/><circle cx="120" cy="88" r="6"/>
+    <circle cx="97" cy="72" r="6"/><circle cx="143" cy="72" r="6"/>
+    <circle cx="86" cy="104" r="6"/><circle cx="154" cy="104" r="6"/>
+    <circle cx="106" cy="168" r="6"/><circle cx="134" cy="168" r="6"/>
+  </g>
+  <g class="fig-dot" fill="#ffb62e">
+    <circle cx="80" cy="136" r="8"/><circle cx="104" cy="214" r="8"/><circle cx="136" cy="214" r="8"/>
+  </g>
+  <circle class="fig-dot" cx="160" cy="136" r="8" fill="#ff4d6b"/>
+  <path class="fig-arrow" d="M 72 128 Q 56 114 50 96"/>
+  <polygon points="50,96 46,106 55,104" fill="#dfe6ee"/>
+  <text x="28" y="88" class="fig-t">ドラッグ</text>
+  <text x="174" y="140" class="fig-t">選択中は赤</text>
+  <text x="150" y="234" class="fig-t dim">足を引っ張ると膝がついてくる</text>
+</svg></div>
+<ul>
+  <li>体の丸を<b>そのままドラッグ</b>してポーズを付けます。タップすると選択(赤くなる)され、右下にスライダーが出ます</li>
+  <li>スライダーは<b>ひねり / 縦回転 / 横回転</b>の絶対角。右端の数値欄に<b>直接入力</b>もできます</li>
+  <li>空きスペースをタップで選択解除。<kbd>↶</kbd> でいつでも戻せます</li>
+</ul>
+<h3>コツ</h3>
+<ul>
+  <li>大きな形は<b>オレンジ(IK)で先に</b>作り、細部を水色(FK)と緑・青の小玉で詰めるときれいに決まります</li>
+  <li>足のオレンジをドラッグ中は<b>足首の向きが保たれ、膝はつま先の方向</b>に曲がります</li>
+</ul>
+
+<h2 id="move">5. 移動と向き</h2>
+<div class="fig"><svg viewBox="0 0 240 256" xmlns="http://www.w3.org/2000/svg">
+  <circle class="fig-head" cx="120" cy="40" r="16"/>
+  <g class="fig-bone-g">
+    <line x1="120" y1="56" x2="120" y2="120"/>
+    <line x1="97" y1="72" x2="143" y2="72"/>
+    <polyline points="97,72 86,104 80,136" fill="none"/>
+    <polyline points="143,72 154,104 160,136" fill="none"/>
+    <line x1="108" y1="122" x2="132" y2="122"/>
+    <polyline points="108,122 106,168 104,214" fill="none"/>
+    <polyline points="132,122 134,168 136,214" fill="none"/>
+  </g>
+  <ellipse cx="120" cy="222" rx="62" ry="14" fill="none" stroke="#6fe26f" stroke-width="2" stroke-dasharray="5 4" opacity="0.7"/>
+  <circle class="fig-dot" cx="120" cy="122" r="8" fill="#ff9de2"/>
+  <circle class="fig-dot" cx="120" cy="222" r="8" fill="#ffe94a"/>
+  <circle class="fig-dot" cx="120" cy="236" r="7" fill="#6fe26f"/>
+  <g class="fig-arrow">
+    <line x1="94" y1="222" x2="72" y2="222"/><polygon points="66,222 76,217 76,227" fill="#dfe6ee"/>
+    <line x1="146" y1="222" x2="168" y2="222"/><polygon points="174,222 164,217 164,227" fill="#dfe6ee"/>
+    <line x1="120" y1="112" x2="120" y2="96"/><polygon points="120,90 115,100 125,100" fill="#dfe6ee"/>
+    <line x1="120" y1="132" x2="120" y2="148"/><polygon points="120,154 115,144 125,144" fill="#dfe6ee"/>
+    <path d="M 138 238 Q 166 236 178 226"/><polygon points="182,222 172,224 178,232" fill="#dfe6ee"/>
+  </g>
+  <text x="30" y="210" class="fig-t">全体を移動</text>
+  <text x="136" y="118" class="fig-t">腰だけ</text>
+  <text x="176" y="250" class="fig-t">向き</text>
+</svg></div>
+<ul>
+  <li><b>黄色(足元)</b>: キャラ全体をつかんで移動。ポーズは崩れません</li>
+  <li><b>ピンク(腰)</b>: 足を床に置いたまま腰だけ動きます。両脚が自動で追従(IK)し、足首の向きも保たれます。<b>しゃがみ・座りはこれで作るのが基本</b>です</li>
+  <li><b>緑(前方の玉)</b>: 足元の円に沿ってドラッグするとキャラの向きが回ります</li>
+</ul>
+
+<h2 id="fine">6. 細かい向き(緑=捻る・青=向ける)</h2>
+<div class="fig"><svg viewBox="0 0 240 234" xmlns="http://www.w3.org/2000/svg">
+  <line x1="50" y1="224" x2="190" y2="224" stroke="#2c3540" stroke-width="2"/>
+  <circle class="fig-head" cx="120" cy="40" r="16"/>
+  <g class="fig-bone-g">
+    <line x1="120" y1="56" x2="120" y2="120"/>
+    <line x1="97" y1="72" x2="143" y2="72"/>
+    <polyline points="97,72 86,104 80,136" fill="none"/>
+    <polyline points="143,72 154,104 160,136" fill="none"/>
+    <line x1="108" y1="122" x2="132" y2="122"/>
+    <polyline points="108,122 106,168 104,214" fill="none"/>
+    <polyline points="132,122 134,168 136,214" fill="none"/>
+  </g>
+  <g class="fig-dot" fill="#55606c">
+    <circle cx="80" cy="136" r="6"/><circle cx="160" cy="136" r="6"/><circle cx="104" cy="214" r="6"/><circle cx="136" cy="214" r="6"/>
+  </g>
+  <g class="fig-dot" fill="#6fe26f">
+    <circle cx="146" cy="26" r="6"/><circle cx="66" cy="124" r="6"/>
+  </g>
+  <g stroke="#6fe26f" stroke-width="2" fill="none" opacity="0.85">
+    <path d="M 158 20 A 14 14 0 1 1 150 12"/>
+    <path d="M 54 116 A 14 14 0 1 0 62 110"/>
+  </g>
+  <g fill="#6fe26f">
+    <polygon points="150,12 144,16 152,20"/>
+    <polygon points="62,110 56,112 62,118"/>
+  </g>
+  <g class="fig-dot" fill="#4d8aff">
+    <circle cx="120" cy="12" r="7"/><circle cx="60" cy="162" r="7"/>
+  </g>
+  <g class="fig-arrow">
+    <path d="M 108 8 Q 96 6 88 12"/>
+    <path d="M 50 154 Q 40 146 38 136"/>
+  </g>
+  <polygon points="84,16 92,8 94,17" fill="#dfe6ee"/>
+  <polygon points="37,130 33,139 42,140" fill="#dfe6ee"/>
+  <text x="34" y="26" class="fig-t">うなずき・傾げ</text>
+  <text x="8" y="122" class="fig-t">手先の向き</text>
+  <text x="164" y="16" class="fig-t">顔の向き</text>
+  <circle class="fig-dot" cx="176" cy="122" r="5.5" fill="#6fe26f"/>
+  <text x="185" y="127" font-size="13" font-weight="bold" fill="#6fe26f">= 捻る</text>
+  <circle class="fig-dot" cx="176" cy="142" r="5.5" fill="#4d8aff"/>
+  <text x="185" y="147" font-size="13" font-weight="bold" fill="#4d8aff">= 向ける</text>
+</svg></div>
+<ul>
+  <li><b style="color:var(--green)">緑の小玉 = 捻る</b>。円を描くようにドラッグすると軸のまわりに回ります。手首=手のひらの向き、足首=つま先の向き、頭=顔の左右の向き。軸を真横から見ているときは、接線方向のドラッグ量で回ります</li>
+  <li><b style="color:var(--blue)">青の小玉 = 向ける</b>(LookAt式)。<b>頭上の玉</b>をドラッグ=うなずき・首上げ・傾げ。<b>指先の少し先の玉</b>=手先の向き。向けるだけなので<b>捻りの角度は変わりません</b>。緑と青で役割が完全に分かれています</li>
+</ul>
+
+<h2 id="hand">7. 手と指</h2>
+<div class="fig"><svg viewBox="0 0 240 190" xmlns="http://www.w3.org/2000/svg">
+  <rect x="96" y="88" width="56" height="48" rx="12" fill="none" stroke="#55606c" stroke-width="5"/>
+  <g class="fig-bone-g">
+    <line x1="104" y1="88" x2="100" y2="46"/>
+    <line x1="117" y1="88" x2="115" y2="36"/>
+    <line x1="130" y1="88" x2="130" y2="40"/>
+    <line x1="143" y1="88" x2="147" y2="50"/>
+    <line x1="96" y1="106" x2="66" y2="84"/>
+    <line x1="124" y1="136" x2="124" y2="162"/>
+  </g>
+  <g class="fig-dot" fill="#f0f4ff">
+    <circle cx="100" cy="46" r="6"/><circle cx="115" cy="36" r="6"/><circle cx="130" cy="40" r="6"/><circle cx="147" cy="50" r="6"/><circle cx="66" cy="84" r="6"/>
+  </g>
+  <circle class="fig-dot" cx="124" cy="162" r="8" fill="#ff4d6b"/>
+  <path class="fig-arrow" d="M 112 28 Q 96 16 82 16"/>
+  <polygon points="76,16 86,11 86,21" fill="#dfe6ee"/>
+  <text x="30" y="34" class="fig-t">1本ずつ曲げる</text>
+  <text x="140" y="168" class="fig-t">手首(選択中)</text>
+</svg></div>
+<ul>
+  <li>手首のオレンジをタップして選ぶと、右下に<b>「指を握る」「指を開く」</b>スライダーが出ます</li>
+  <li>選択中は<b>指先に白い玉</b>が現れ、1 本ずつドラッグで曲げ量を直接調整できます</li>
+  <li>グー / チョキ / パー / 指差し / 👍 のプリセットは「ポーズ」パネルに(左手・右手 別)</li>
+</ul>
+
+<h2 id="posepanel">8. ポーズ・表情パネル</h2>
+<ul>
+  <li><b>ポーズ</b>: 立ち / 座り / Tポーズ。作り始めの土台に</li>
+  <li><b>目線</b>: カメラ目線の ON/OFF と、左右・上下の角度。眼球の振れ幅はモデル側の設定で 10° 前後に制限されるのが VRM の仕様です(控えめに見えるのは正常)</li>
+  <li><b>表情</b>: にこ・怒り・驚き…などをスライダーで組み合わせ</li>
+  <li>効くのは<b>選択中のキャラ</b>(左下チップで切替)です</li>
+</ul>
+<p class="note">目線や表情が<b>登録されていないモデル</b>(この素体もそうです)では、該当セクションは自動的に表示されません。表示されない=そのモデルに機能が無い、という意味です。</p>
+
+<h2 id="camera">9. カメラと構図 / PNG 書き出し</h2>
+<div class="fig"><svg viewBox="0 0 360 252" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="352" height="198" rx="8" fill="#0d1116" stroke="#2c3540"/>
+  <rect x="36" y="22" width="288" height="162" fill="#151b22" stroke="#ffffff99"/>
+  <text x="44" y="36" font-size="10" fill="#8a97a5">書き出される範囲(ガイド枠)</text>
+  <line x1="4" y1="118" x2="356" y2="118" stroke="#ff9d4d" stroke-width="1.5" stroke-dasharray="6 5"/>
+  <text x="290" y="112" font-size="9" fill="#ffb066">アイレベル 1.2m</text>
+  <g stroke="#55606c" stroke-width="4" stroke-linecap="round" fill="none">
+    <circle cx="180" cy="80" r="11"/>
+    <line x1="180" y1="91" x2="180" y2="130"/>
+    <line x1="166" y1="100" x2="194" y2="100"/>
+    <polyline points="166,100 158,118 154,134"/><polyline points="194,100 202,118 206,134"/>
+    <polyline points="173,130 171,155 169,178"/><polyline points="187,130 189,155 191,178"/>
+  </g>
+  <g transform="translate(50,218)">
+    <circle cx="10" cy="10" r="8" fill="#dfe6ee" opacity="0.9"/>
+    <path class="fig-arrow" d="M 24 4 Q 40 -4 54 2"/>
+    <polygon points="58,4 50,-1 49,8" fill="#dfe6ee"/>
+    <text x="70" y="15" class="fig-t">1本指 = 回転</text>
+  </g>
+  <g transform="translate(210,218)">
+    <circle cx="6" cy="10" r="8" fill="#dfe6ee" opacity="0.9"/>
+    <circle cx="26" cy="10" r="8" fill="#dfe6ee" opacity="0.9"/>
+    <text x="44" y="15" class="fig-t">2本指 = 移動・ズーム</text>
+  </g>
+</svg></div>
+<h3>カメラ</h3>
+<ul>
+  <li><b>FOV</b>: 画角。フルサイズ換算の mm も併記されます。パースを弱くしたいときは FOV を小さく(望遠)、あおり・広角の迫力が欲しいときは大きく</li>
+  <li><b>平行投影</b>: パース無し。三面図的な資料に</li>
+  <li><b>アイレベル</b>: カメラの高さの水平線がオレンジ点線で表示されます(⚙ で OFF 可)</li>
+</ul>
+<h3>構図ガイド</h3>
+<ul>
+  <li><b>アスペクト比</b>を選ぶと構図ガイド枠が出ます。書き出されるのは<b>枠の中身だけ</b></li>
+  <li><b>ガイド枠%</b> を下げると枠が画面より小さくなり、<b>枠の外を見ながら</b>ポーズや配置を調整できます(セーフライン)</li>
+  <li><b>枠内をカメラの範囲にする</b>: ON にすると FOV(mm)が<b>枠基準</b>になります。OFF のときの FOV は画面全体基準なので、枠で切り出した分だけ書き出しは実質望遠になります。レンズ感を厳密にそろえたい人は ON に</li>
+</ul>
+
+<h2 id="export">10. PNG 書き出し</h2>
+<ul>
+  <li>「PNG書き出し」を押すと、<b>ガイド枠の範囲</b>が指定解像度(カメラ → 書き出し長辺 px)で書き出されます</li>
+  <li>保存先は、<b>保存先を選ぶダイアログ</b>(PC の Chrome / Edge など)→ <b>共有シート</b>(iPad)の順で開きます</li>
+  <li>⚙ の<b>「確認なしで直接ダウンロード」</b>を ON にすると、ダイアログを出さず即保存します</li>
+  <li>⚙ の<b>「PNGを透過背景にする」</b>で背景を透明にできます(Procreate に重ねる用)</li>
+</ul>
+
+<h2 id="models">11. モデルとシーン</h2>
+<h3>モデルの追加</h3>
+<ul>
+  <li><b>＋モデル → ファイルを読み込み</b>: VRM(0.x / 1.0 両対応)はキャラとして、glTF / GLB は小物として配置されます</li>
+  <li><b>プリミティブ</b>(立方体 / 球 / 円柱 / 板): あたりや小道具のスタンドインに。シーン保存にも対応</li>
+  <li>複製・ミラー・リセット・削除は ⚙ のキャラクター欄から</li>
+</ul>
+<h3>小物の操作(三軸コントローラー)</h3>
+<ul>
+  <li><i class="chip" style="background:#b17aff"></i>紫 = 移動、<i class="chip" style="background:#ff6b6b"></i>上の赤 = X回転(手前に倒す)、<i class="chip" style="background:#6fe26f"></i>前の緑 = Y回転(向き)、<i class="chip" style="background:#4d8aff"></i>横の青 = Z回転(横に倒す)。玉を<b>円を描くようにドラッグ</b></li>
+  <li>回転はワールド軸基準なので、どれだけ回しても玉の位置は変わりません。細かい角度は選択して右下のスライダーでも</li>
+</ul>
+<h3>そのほか</h3>
+<ul>
+  <li><b>頭部の大きさ</b>: 頭の関節を選ぶと「大きさ」スライダーが出ます。頭だけ拡縮(デフォルメ用)</li>
+  <li><b>ライト</b>: ⚙ → ライト(平行光の向き)を XYZ 回転で調整。リセットボタン付き</li>
+  <li><b>シーン保存</b>: 「シーン」→ 名前を付けて保存 / .json 書き出し・読み込み。ポーズ・カメラ・小物・設定・コンテのタイムラインが入ります。<b>モデル本体は含まれない</b>ので、別端末ではモデルを読み込み直すと復元されます</li>
+  <li><b>ポーズはモデルをまたいで共通形式</b>で保存されます。素体で作ったポーズを本番モデルにそのまま使えます</li>
+</ul>
+
+<h2 id="conte">12. コンテモード(実験的)</h2>
+<div class="fig"><svg viewBox="0 0 360 138" xmlns="http://www.w3.org/2000/svg">
+  <g stroke="#3c4956" stroke-width="1">
+    <line x1="20" y1="24" x2="20" y2="30"/><line x1="44" y1="24" x2="44" y2="30"/><line x1="68" y1="24" x2="68" y2="30"/><line x1="92" y1="24" x2="92" y2="30"/>
+    <line x1="140" y1="24" x2="140" y2="30"/><line x1="164" y1="24" x2="164" y2="30"/><line x1="188" y1="24" x2="188" y2="30"/><line x1="212" y1="24" x2="212" y2="30"/>
+    <line x1="260" y1="24" x2="260" y2="30"/><line x1="284" y1="24" x2="284" y2="30"/><line x1="308" y1="24" x2="308" y2="30"/><line x1="332" y1="24" x2="332" y2="30"/>
+  </g>
+  <g stroke="#71818f" stroke-width="1">
+    <line x1="116" y1="18" x2="116" y2="30"/><line x1="236" y1="18" x2="236" y2="30"/><line x1="356" y1="18" x2="356" y2="30"/>
+  </g>
+  <g font-size="9" fill="#8a97a5"><text x="110" y="14">1s</text><text x="230" y="14">2s</text><text x="350" y="14">3s</text></g>
+  <rect x="10" y="34" width="120" height="56" rx="5" fill="#151b22" stroke="#3fb6ff" stroke-width="2"/>
+  <rect x="132" y="34" width="140" height="56" rx="5" fill="#151b22" stroke="#2c3540" stroke-width="2"/>
+  <rect x="274" y="34" width="76" height="56" rx="5" fill="#151b22" stroke="#2c3540" stroke-width="2"/>
+  <g font-size="10" fill="#dfe6ee">
+    <text x="16" y="48">カット1</text><text x="138" y="48">カット2</text><text x="280" y="48">カット3</text>
+  </g>
+  <g font-size="9" fill="#8a97a5" text-anchor="end">
+    <text x="126" y="86">12コマ</text><text x="268" y="86">14コマ</text><text x="346" y="86">8コマ</text>
+  </g>
+  <g fill="#ffb62e">
+    <rect x="124" y="26" width="11" height="11" transform="rotate(45 129.5 31.5)" rx="2"/>
+    <rect x="266" y="26" width="11" height="11" transform="rotate(45 271.5 31.5)" rx="2"/>
+    <rect x="344" y="26" width="11" height="11" transform="rotate(45 349.5 31.5)" rx="2"/>
+  </g>
+  <g stroke="#ffb62ecc" stroke-width="2"><line x1="130" y1="38" x2="130" y2="90"/><line x1="272" y1="38" x2="272" y2="90"/><line x1="350" y1="38" x2="350" y2="90"/></g>
+  <line x1="190" y1="16" x2="190" y2="94" stroke="#ff4d6b" stroke-width="2"/>
+  <g class="fig-arrow">
+    <line x1="252" y1="110" x2="292" y2="110"/>
+    <polygon points="246,110 256,105 256,115" fill="#dfe6ee"/>
+    <polygon points="298,110 288,105 288,115" fill="#dfe6ee"/>
+  </g>
+  <text x="150" y="132" class="fig-t">◆を左右にドラッグでコマ数を調整</text>
+</svg></div>
+<ul>
+  <li>右上の「コンテ」で切替。<b>カット = 今のポーズ + カメラ + 小物のスナップショット</b>です(補間はしません)</li>
+  <li><b>＋カット</b>で追加 → 帯をタップで選択・その状態が適用されます。「上書き」で今の状態に差し替え、◀▶で並び替え</li>
+  <li><b>キー(◆)を左右にドラッグ</b>でそのカットのコマ数を調整。目盛りをドラッグでスクラブ、数値欄でも指定できます</li>
+  <li>24 / 30 fps を選んで <b>▶ 再生</b>(実時間)。<b>連番書き出し</b>で全コマの PNG が zip になります。ホールド分も複製されるので、編集ソフトに読み込むだけでタイミング確認できます</li>
+  <li>タイムラインはシーン .json に含まれます</li>
+</ul>
+
+<h2 id="ipad">13. iPad で使う</h2>
+<ol>
+  <li>Safari でこのツールの URL を開く</li>
+  <li>共有 → <b>ホーム画面に追加</b>。全画面になり、オフラインでも起動でき、保存データも消えにくくなります</li>
+  <li>Procreate と <b>Split View</b> で並べて、ポーズ資料として使うのがおすすめの使い方です</li>
+  <li>VRM の読み込みは iCloud Drive /「ファイル」経由でできます</li>
+</ol>
+
+<h2 id="faq">14. こまったとき</h2>
+<table>
+  <tr><th>目線・表情の項目が無い</th><td>そのモデルに目線(目ボーン)や表情が入っていません。故障ではありません</td></tr>
+  <tr><th>ポーズが崩れた・戻したい</th><td>右上の ↶ で戻せます。最初からやり直すなら「ポーズ」→ 立ち / Tポーズ</td></tr>
+  <tr><th>書き出した絵の範囲が違う</th><td>書き出されるのは<b>ガイド枠の中身</b>です。「カメラ」でアスペクト比とガイド枠%を確認してください</td></tr>
+  <tr><th>更新したはずが古いまま</th><td>オフライン用のキャッシュが効いています。アプリを<b>一度閉じて開き直す</b>と裏で更新され、次の起動で新しくなります</td></tr>
+  <tr><th>モデルを間違って消した</th><td>モデル本体は端末内のみ保存です。＋モデルから読み込み直してください。ポーズはシーンに保存していれば復元できます</td></tr>
+  <tr><th>動きが重い</th><td>⚙ で「操作ハンドルを表示」を一時 OFF にする、キャラ数を減らす、などで軽くなります</td></tr>
+</table>
+
+<a class="back" href="./index.html">← アプリに戻る</a>
+
+</main>
+</body>
+</html>

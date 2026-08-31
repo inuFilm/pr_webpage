@@ -3,6 +3,7 @@ const CACHE = 'vrmpose-v5';
 const ASSETS = [
   './',
   './index.html',
+  './manual.html',
   './style.css',
   './manifest.webmanifest',
   './js/app.js',

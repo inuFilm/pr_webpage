@@ -267,17 +267,26 @@ body.conte-mode #bonePanel { bottom: calc(170px + var(--safe-bottom)); }
 #helpOverlay {
   position: fixed; inset: 0; z-index: 55;
   background: #05070ac8; backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   padding: calc(8px + var(--safe-top)) 12px calc(8px + var(--safe-bottom));
   touch-action: manipulation;
 }
 #helpOverlay.hidden { display: none; }
 #helpCard {
   width: min(560px, 100%); max-height: 100%;
+  min-height: 0; flex: 0 1 auto;
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px;
   display: flex; flex-direction: column; overflow: hidden;
   backdrop-filter: blur(8px);
 }
+#helpManualBtn {
+  flex: none; display: block; width: min(560px, 100%);
+  text-align: center; padding: 12px 0; border-radius: 12px;
+  background: var(--panel); border: 1px solid var(--panel-border);
+  color: var(--fg); font-size: 13px; text-decoration: none;
+  backdrop-filter: blur(8px);
+}
+#helpManualBtn:active, #helpManualBtn:hover { background: #2e3a46; }
 #helpHead { display: flex; align-items: center; justify-content: space-between; padding: 10px 6px 0 16px; }
 #helpTitle { font-size: 14px; color: var(--accent); }
 #helpSlides {
