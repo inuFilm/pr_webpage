@@ -15,6 +15,8 @@ const DEFAULT_SETTINGS = {
   showHandles: true, showGrid: true, handleScale: 1,
   panelSide: 'left', showEyeLevel: true,
   lightX: -50, lightY: 35, lightZ: 0, // 既定値は従来の固定ライト位置(1.2, 2.4, 1.8)相当
+  directDownload: false,
+  frameIsCamera: false, // ON: FOV をガイド枠基準にする(枠の外は画角の外側を表示)
 };
 
 const state = {
@@ -161,6 +163,7 @@ function resize() {
     orthoCam.right = halfH * (w / h);
     orthoCam.updateProjectionMatrix();
   }
+  applyViewProjection(); // 画面比が変わると枠割合(fy)も変わる
   updateFrameGuide();
   if (state.mode === 'conte') renderTimeline(false);
 }
@@ -210,6 +213,36 @@ function updateFrameGuide() {
   el.style.height = g.fh + 'px';
   el.classList.remove('hidden');
 }
+/** ガイド枠の縦がビューポートに占める割合(枠なしは 1) */
+function guideFy() {
+  const w = canvas.clientWidth || window.innerWidth;
+  const h = canvas.clientHeight || window.innerHeight;
+  const g = guideDims(w, h);
+  return g ? g.fh / h : 1;
+}
+
+// ortho フラスタムに現在掛けている表示倍率(1/fy)。掛け直しの差分計算に使う
+let orthoViewK = 1;
+
+/** 設定の FOV をビューポートカメラへ反映する。
+ *  「枠内をカメラの範囲にする」ON のときは、枠内がちょうど設定 FOV になるよう外側を広げる。
+ *  renderShot は「ビューポート画角 × 枠割合」で切り出すので、書き出しは厳密に設定 FOV になる */
+function applyViewProjection() {
+  const s = state.settings;
+  const fy = s.frameIsCamera ? guideFy() : 1;
+  const t = Math.tan(THREE.MathUtils.degToRad(s.fov) / 2) / fy;
+  perspCam.fov = Math.min(175, THREE.MathUtils.radToDeg(2 * Math.atan(t)));
+  perspCam.updateProjectionMatrix();
+  if (orthoCam) {
+    const k = 1 / fy;
+    const f = k / orthoViewK;
+    orthoCam.top *= f; orthoCam.bottom *= f;
+    orthoCam.left *= f; orthoCam.right *= f;
+    orthoViewK = k;
+    orthoCam.updateProjectionMatrix();
+  }
+}
+
 window.addEventListener('resize', resize);
 window.addEventListener('orientationchange', () => setTimeout(resize, 300));
 resize();
@@ -306,11 +339,11 @@ function onPointerDown(e) {
     // 向きハンドルはルート(腰/小物本体)を選択扱いにする
     const rootHandle = hit.char.handles.find((x) => x.userData.def.mode === 'root');
     select(rootHandle ? { char: hit.char, handle: rootHandle } : hit);
-  } else if (pickedMode === 'twist' || pickedMode === 'finger') {
-    // 捻りサテライト・指先ハンドルは対象の手/足/頭を選択扱いにする
+  } else if (pickedMode === 'twist' || pickedMode === 'finger' || pickedMode === 'aim') {
+    // 捻り・エイム・指先サテライトは対象の手/足/頭(小物なら本体)を選択扱いにする
     const jointHandle = hit.char.handles.find(
       (x) => x.userData.def.bone === hit.handle.userData.def.bone
-        && x.userData.def.mode !== 'twist' && x.userData.def.mode !== 'finger',
+        && !['twist', 'finger', 'aim'].includes(x.userData.def.mode),
     );
     select(jointHandle ? { char: hit.char, handle: jointHandle } : hit);
   } else {
@@ -336,9 +369,10 @@ function onPointerDown(e) {
     headingRing.scale.setScalar(char.headingRadius());
     headingRing.visible = true;
   } else if (def.mode === 'twist') {
-    const info = char.twistInfo(def.bone, def.parent);
+    // def.axis があれば小物の三軸回転(ワールド軸)、なければボーンの捻り
+    const info = def.axis ? char.axisInfo(def.axis) : char.twistInfo(def.bone, def.parent);
     if (!info) { drag = null; controls.enabled = true; return; }
-    ctx.twistNode = char.bone(def.bone);
+    ctx.twistNode = def.axis ? char.root : char.bone(def.bone);
     ctx.twistAxis = info.axis;
     ctx.twistCenter = info.joint;
     ctx.grabDir = info.offsetDir;
@@ -391,8 +425,9 @@ function onPointerDown(e) {
       ctx.fallbackBend = fwd.negate().add(new THREE.Vector3(0, -0.8, 0)).normalize();
       ctx.forceBend = false;
     }
-  } else if (def.mode === 'finger') {
+  } else if (def.mode === 'finger' || def.mode === 'aim') {
     // 共有の plane / grabOffset でカーソルのワールド位置だけ取れれば足りる
+    // (aim は毎フレーム aimInfo を取り直して LookAt するので追加の ctx 不要)
   } else {
     const parentName = BONE_PARENT[def.bone];
     const resolved = char.resolveBone(parentName);
@@ -492,7 +527,7 @@ function onPointerMove(e) {
       && state.selection.handle.userData.def.bone === def.bone) {
       const v = char.masterCurl(def.side);
       $('curlSlider').value = v;
-      $('valCurl').textContent = v.toFixed(2);
+      $('valCurl').value = v.toFixed(2);
     }
   } else if (def.mode === 'ik') {
     solveTwoBoneIK(drag.chain[0], drag.chain[1], drag.chain[2], target, drag.fallbackBend, drag.forceBend);
@@ -501,6 +536,12 @@ function onPointerMove(e) {
       foot.parent.updateWorldMatrix(true, false);
       _q1s.copy(foot.parent.getWorldQuaternion(_q2s)).invert();
       foot.quaternion.copy(_q1s.multiply(drag.footQuat)).normalize();
+    }
+  } else if (def.mode === 'aim') {
+    // LookAt式: ボーン軸(頭頂/指先の方向)がドラッグ先を向くよう最短弧で回す。捻りは変えない
+    const info = char.aimInfo(def.bone);
+    if (info) {
+      aimBone(info.node, info.joint, _v3b.copy(info.joint).addScaledVector(info.dir, info.dist), target);
     }
   } else if (drag.rotNode) {
     drag.rotNode.updateWorldMatrix(true, false);
@@ -553,10 +594,10 @@ function select(hit) {
     const side = def.bone === 'leftHand' ? 'left' : 'right';
     const v = hit.char.masterCurl(side);
     $('curlSlider').value = v;
-    $('valCurl').textContent = (+v).toFixed(2);
+    $('valCurl').value = (+v).toFixed(2);
     const sp = hit.char.spread[side] || 0;
     $('spreadSlider').value = sp;
-    $('valSpread').textContent = (+sp).toFixed(2);
+    $('valSpread').value = (+sp).toFixed(2);
   }
   syncBoneSliders();
   $('bonePanel').classList.remove('hidden');
@@ -600,7 +641,7 @@ function syncBoneSliders() {
   const set = (id, valId, rad) => {
     const deg = THREE.MathUtils.radToDeg(rad);
     $(id).value = deg;
-    $(valId).textContent = Math.round(deg) + '°';
+    $(valId).value = Math.round(deg);
   };
   set('jogTwist', 'valTwist', r.twist);
   set('jogPitch', 'valPitch', r.pitch);
@@ -608,11 +649,11 @@ function syncBoneSliders() {
   const sel = state.selection;
   if (sel.char.isProp || sel.handle.userData.def.mode === 'root') {
     $('propScale').value = sel.char.root.scale.x;
-    $('valScale').textContent = sel.char.root.scale.x.toFixed(2);
+    $('valScale').value = sel.char.root.scale.x.toFixed(2);
   } else if (sel.handle.userData.def.bone === 'head') {
     const v = sel.char.headScale || 1;
     $('propScale').value = v;
-    $('valScale').textContent = v.toFixed(2);
+    $('valScale').value = v.toFixed(2);
   }
 }
 
@@ -634,9 +675,9 @@ function onRotSliderInput() {
     tgt.node.updateWorldMatrix(true, true);
     state.selection.char.applyPins(sliderPins);
   }
-  $('valTwist').textContent = Math.round(THREE.MathUtils.radToDeg(t)) + '°';
-  $('valPitch').textContent = Math.round(THREE.MathUtils.radToDeg(p)) + '°';
-  $('valYaw').textContent = Math.round(THREE.MathUtils.radToDeg(y)) + '°';
+  $('valTwist').value = Math.round(THREE.MathUtils.radToDeg(t));
+  $('valPitch').value = Math.round(THREE.MathUtils.radToDeg(p));
+  $('valYaw').value = Math.round(THREE.MathUtils.radToDeg(y));
 }
 function onSliderEnd() { sliderActive = false; sliderPins = null; markDirty(); }
 for (const id of ['jogTwist', 'jogPitch', 'jogYaw']) {
@@ -654,7 +695,7 @@ $('propScale').addEventListener('input', () => {
   const v = parseFloat($('propScale').value);
   if (headOnly) sel.char.setHeadScale(v);
   else sel.char.root.scale.setScalar(v);
-  $('valScale').textContent = v.toFixed(2);
+  $('valScale').value = v.toFixed(2);
 });
 $('propScale').addEventListener('change', onSliderEnd);
 
@@ -665,7 +706,7 @@ $('curlSlider').addEventListener('input', () => {
   const side = handle.userData.def.bone === 'leftHand' ? 'left' : 'right';
   const v = parseFloat($('curlSlider').value);
   char.setCurl(side, v);
-  $('valCurl').textContent = v.toFixed(2);
+  $('valCurl').value = v.toFixed(2);
 });
 $('curlSlider').addEventListener('change', onSliderEnd);
 
@@ -676,9 +717,26 @@ $('spreadSlider').addEventListener('input', () => {
   const side = handle.userData.def.bone === 'leftHand' ? 'left' : 'right';
   const v = parseFloat($('spreadSlider').value);
   char.setSpread(side, v);
-  $('valSpread').textContent = v.toFixed(2);
+  $('valSpread').value = v.toFixed(2);
 });
 $('spreadSlider').addEventListener('change', onSliderEnd);
+
+// 右側の数値欄からの直接入力: スライダーに反映して既存ハンドラへ流す
+for (const [numId, sliderId] of [
+  ['valTwist', 'jogTwist'], ['valPitch', 'jogPitch'], ['valYaw', 'jogYaw'],
+  ['valCurl', 'curlSlider'], ['valSpread', 'spreadSlider'], ['valScale', 'propScale'],
+]) {
+  const num = $(numId);
+  num.addEventListener('change', () => {
+    const v = parseFloat(num.value);
+    if (!Number.isFinite(v)) { syncBoneSliders(); return; }
+    const slider = $(sliderId);
+    slider.value = Math.min(+slider.max, Math.max(+slider.min, v));
+    slider.dispatchEvent(new Event('input'));
+    slider.dispatchEvent(new Event('change'));
+  });
+  num.addEventListener('keydown', (e) => { if (e.key === 'Enter') num.blur(); });
+}
 
 $('btnDeselect').addEventListener('click', deselect);
 
@@ -693,6 +751,8 @@ const JP_EXP = {
 function renderPosePanel() {
   const char = state.activeChar;
   $('poseTargetName').textContent = char ? `ポーズ・表情: ${char.name}` : 'ポーズ・表情';
+  // 目線が実際に効かないモデル(目ボーンも look 表情も無い)ではセクションごと隠す
+  $('poseGazeSec').classList.toggle('hidden', !(char && char.hasUsableGaze()));
   if (char) {
     $('gazeCamera').checked = char.gaze.mode === 'camera';
     $('gazeYaw').value = char.gaze.yaw;
@@ -702,12 +762,10 @@ function renderPosePanel() {
   }
   const list = $('expressionList');
   list.innerHTML = '';
-  if (!char) return;
-  const names = char.listExpressions().filter((n) => !/^look/.test(n) && n !== 'neutral');
-  if (!names.length) {
-    list.innerHTML = '<p class="note">このモデルに表情はありません</p>';
-    return;
-  }
+  const names = char ? char.listActiveExpressions().filter((n) => !/^look/.test(n) && n !== 'neutral') : [];
+  // 実体のある表情が無いモデル(登録だけで中身が空のプリセット含む)ではセクションごと隠す
+  $('poseExpSec').classList.toggle('hidden', !names.length);
+  if (!names.length) return;
   for (const name of names) {
     const row = document.createElement('label');
     row.className = 'exp-row';
@@ -1125,6 +1183,7 @@ function setOrtho(on) {
     orthoCam = new THREE.OrthographicCamera(-halfH * aspect, halfH * aspect, halfH, -halfH, -100, 3000);
     orthoCam.position.copy(pos);
     orthoCam.quaternion.copy(quat);
+    orthoViewK = 1; // 枠基準で作り直したので表示倍率も初期化
     activeCamera = orthoCam;
   } else {
     perspCam.position.copy(pos);
@@ -1134,6 +1193,7 @@ function setOrtho(on) {
   controls = makeControls(activeCamera);
   controls.target.copy(target);
   controls.update();
+  applyViewProjection();
   $('fovRange').disabled = on;
   markDirty();
 }
@@ -1148,8 +1208,7 @@ $('fovRange').addEventListener('input', () => {
   state.settings.fov = v;
   $('fovVal').textContent = v;
   $('fovMm').textContent = fovToMm(v);
-  perspCam.fov = v;
-  perspCam.updateProjectionMatrix();
+  applyViewProjection();
 });
 $('fovRange').addEventListener('change', markDirty);
 $('orthoToggle').addEventListener('change', (e) => setOrtho(e.target.checked));
@@ -1171,8 +1230,7 @@ function applyCameraState(cam) {
   if (!!cam.ortho !== (activeCamera !== perspCam)) setOrtho(!!cam.ortho);
   $('orthoToggle').checked = !!cam.ortho;
   state.settings.fov = cam.fov || 30;
-  perspCam.fov = state.settings.fov;
-  perspCam.updateProjectionMatrix();
+  applyViewProjection();
   activeCamera.position.fromArray(cam.pos);
   controls.target.fromArray(cam.target);
   if (cam.zoom && activeCamera.isOrthographicCamera) {
@@ -1358,8 +1416,25 @@ async function exportPNG() {
   await deliverFile(blob, `pose_${stamp}.png`, 'image/png');
 }
 
-/** iPad なら共有シート、それ以外はダウンロード */
+/** 保存先ダイアログ(対応ブラウザ)→ 共有シート(iPad)→ ダウンロード の順。⚙の直接ダウンロード ON なら即ダウンロード */
 async function deliverFile(blob, name, type) {
+  if (state.settings.directDownload) { downloadBlob(blob, name); return; }
+  if (window.showSaveFilePicker) {
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: name,
+        types: [{ description: type, accept: { [type]: ['.' + name.split('.').pop()] } }],
+      });
+      const w = await handle.createWritable();
+      await w.write(blob);
+      await w.close();
+      toast(`保存しました: ${handle.name}`);
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // キャンセル
+      console.warn('save picker failed', err);  // 失敗時は従来経路へ
+    }
+  }
   const file = new File([blob], name, { type });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try { await navigator.share({ files: [file] }); return; } catch (err) {
@@ -1490,7 +1565,7 @@ async function refreshSceneList() {
 $('btnExportScene').addEventListener('click', () => {
   const name = ($('sceneName').value || '').trim() || 'scene';
   const json = JSON.stringify(serializeScene(), null, 1);
-  downloadBlob(new Blob([json], { type: 'application/json' }), `vrmpose_${name}.json`);
+  deliverFile(new Blob([json], { type: 'application/json' }), `vrmpose_${name}.json`, 'application/json');
 });
 $('btnImportScene').addEventListener('click', () => $('fileScene').click());
 $('fileScene').addEventListener('change', async (e) => {
@@ -1511,6 +1586,7 @@ $('bgColor').addEventListener('input', (e) => {
   markDirty();
 });
 $('alphaToggle').addEventListener('change', (e) => { state.settings.alphaExport = e.target.checked; markDirty(); });
+$('directDownload').addEventListener('change', (e) => { state.settings.directDownload = e.target.checked; markDirty(); });
 for (const ax of ['X', 'Y', 'Z']) {
   const key = 'light' + ax; // settings のキーも要素 id も lightX / lightY / lightZ
   $(key).addEventListener('input', () => {
@@ -1528,7 +1604,7 @@ $('btnLightReset').addEventListener('click', () => {
   syncSettingsUI();
   markDirty();
 });
-$('aspectSelect').addEventListener('change', (e) => { state.settings.aspect = e.target.value; updateFrameGuide(); markDirty(); });
+$('aspectSelect').addEventListener('change', (e) => { state.settings.aspect = e.target.value; applyViewProjection(); updateFrameGuide(); markDirty(); });
 $('exportLong').addEventListener('change', (e) => {
   state.settings.exportLong = Math.max(256, Math.min(8192, parseInt(e.target.value, 10) || 2048));
   e.target.value = state.settings.exportLong;
@@ -1538,9 +1614,15 @@ $('exportLong').addEventListener('change', (e) => {
 $('guideScale').addEventListener('input', (e) => {
   state.settings.guideScale = parseInt(e.target.value, 10) || 100;
   $('guideScaleVal').textContent = state.settings.guideScale;
+  applyViewProjection();
   updateFrameGuide();
 });
 $('guideScale').addEventListener('change', markDirty);
+$('frameCamToggle').addEventListener('change', (e) => {
+  state.settings.frameIsCamera = e.target.checked;
+  applyViewProjection();
+  markDirty();
+});
 $('handleToggle').addEventListener('change', (e) => { state.settings.showHandles = e.target.checked; markDirty(); });
 $('gridToggle').addEventListener('change', (e) => { state.settings.showGrid = e.target.checked; grid.visible = e.target.checked; markDirty(); });
 $('eyeLevelToggle').addEventListener('change', (e) => { state.settings.showEyeLevel = e.target.checked; markDirty(); });
@@ -1563,6 +1645,7 @@ function syncSettingsUI() {
   $('bgColor').value = s.bgColor;
   scene.background = scene.background && new THREE.Color(s.bgColor);
   $('alphaToggle').checked = s.alphaExport;
+  $('directDownload').checked = !!s.directDownload;
   for (const ax of ['X', 'Y', 'Z']) {
     const key = 'light' + ax;
     if (typeof s[key] !== 'number') s[key] = DEFAULT_SETTINGS[key];
@@ -1574,6 +1657,8 @@ function syncSettingsUI() {
   $('exportLong').value = s.exportLong || 2048;
   $('guideScale').value = s.guideScale || 100;
   $('guideScaleVal').textContent = s.guideScale || 100;
+  $('frameCamToggle').checked = !!s.frameIsCamera;
+  applyViewProjection();
   updateFrameGuide();
   $('handleToggle').checked = s.showHandles;
   $('gridToggle').checked = s.showGrid;
@@ -2004,6 +2089,65 @@ function toast(msg) {
 }
 function showLoading(on) {
   $('loading').classList.toggle('hidden', !on);
+}
+
+// ---------- 使い方スライド ----------
+
+{
+  const overlay = $('helpOverlay');
+  const slidesEl = $('helpSlides');
+  const slides = [...slidesEl.querySelectorAll('.hs')];
+  const dots = $('helpDots');
+  let cur = 0;
+  for (let i = 0; i < slides.length; i++) {
+    const d = document.createElement('div');
+    d.className = 'hdot';
+    d.addEventListener('click', () => showHelp(i));
+    dots.appendChild(d);
+  }
+  function showHelp(i) {
+    cur = Math.max(0, Math.min(slides.length - 1, i));
+    slides.forEach((s, j) => s.classList.toggle('active', j === cur));
+    [...dots.children].forEach((d, j) => d.classList.toggle('active', j === cur));
+    $('helpPrev').disabled = cur === 0;
+    $('helpNext').textContent = cur === slides.length - 1 ? '閉じる' : '次へ ▶';
+    $('helpTitle').textContent = `使い方 ${cur + 1} / ${slides.length}`;
+    slidesEl.scrollTop = 0;
+  }
+  const openHelp = () => { overlay.classList.remove('hidden'); showHelp(0); };
+  const closeHelp = () => overlay.classList.add('hidden');
+  $('btnHelp').addEventListener('click', () => {
+    for (const p of document.querySelectorAll('.panel')) p.classList.add('hidden');
+    openHelp();
+  });
+  $('helpClose').addEventListener('click', closeHelp);
+  $('helpPrev').addEventListener('click', () => showHelp(cur - 1));
+  $('helpNext').addEventListener('click', () => {
+    if (cur === slides.length - 1) closeHelp(); else showHelp(cur + 1);
+  });
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeHelp(); });
+  // スワイプでページ送り
+  let swipe = null;
+  slidesEl.addEventListener('pointerdown', (e) => { swipe = { x: e.clientX, y: e.clientY }; });
+  slidesEl.addEventListener('pointerup', (e) => {
+    if (!swipe) return;
+    const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+    swipe = null;
+    if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.5) showHelp(cur + (dx < 0 ? 1 : -1));
+  });
+  document.addEventListener('keydown', (e) => {
+    if (overlay.classList.contains('hidden')) return;
+    if (e.key === 'ArrowRight') showHelp(cur + 1);
+    else if (e.key === 'ArrowLeft') showHelp(cur - 1);
+    else if (e.key === 'Escape') closeHelp();
+  });
+  // 初回起動時は自動で開く
+  try {
+    if (!localStorage.getItem('vrmpose_help_seen')) {
+      localStorage.setItem('vrmpose_help_seen', '1');
+      openHelp();
+    }
+  } catch (_) { /* localStorage 不可の環境では手動のみ */ }
 }
 
 // ---------- 起動 ----------

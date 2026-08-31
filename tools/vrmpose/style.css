@@ -122,9 +122,19 @@ input[type=range]::-webkit-slider-thumb {
 #bonePanel.hidden { display: none; }
 #boneTitle { font-size: 13px; color: var(--accent); margin-bottom: 4px; }
 .jog-row { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--fg-dim); padding: 2px 0; }
-.jog-row input { flex: 1; }
+.jog-row input[type=range] { flex: 1; }
 .jog-row .val { width: 42px; text-align: right; color: var(--fg); font-variant-numeric: tabular-nums; }
+/* 数値でも直接入力できる欄(右下のボーンパネル) */
+.jog-row input.val {
+  flex: none; width: 48px; height: 26px; padding: 0 4px;
+  background: #10151b; border: 1px solid var(--panel-border); border-radius: 6px;
+  color: var(--fg); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums;
+  -webkit-user-select: text; user-select: text;
+}
+.jog-row input.val::-webkit-inner-spin-button, .jog-row input.val::-webkit-outer-spin-button { -webkit-appearance: none; }
+.jog-row .unit { width: 10px; color: var(--fg-dim); }
 .curl-only.hidden, .scale-only.hidden { display: none; }
+#poseGazeSec.hidden, #poseExpSec.hidden { display: none; }
 /* 回転スライダーの中央(0°)の目印 */
 #jogTwist, #jogPitch, #jogYaw { background: linear-gradient(to right, transparent 49.4%, #55636f 49.4%, #55636f 50.6%, transparent 50.6%); }
 
@@ -252,6 +262,58 @@ body.conte-mode #bonePanel { bottom: calc(170px + var(--safe-bottom)); }
   pointer-events: none; transition: opacity .15s;
 }
 #tooltip.hidden { opacity: 0; visibility: hidden; }
+
+/* ---- 使い方スライド ---- */
+#helpOverlay {
+  position: fixed; inset: 0; z-index: 55;
+  background: #05070ac8; backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  padding: calc(8px + var(--safe-top)) 12px calc(8px + var(--safe-bottom));
+  touch-action: manipulation;
+}
+#helpOverlay.hidden { display: none; }
+#helpCard {
+  width: min(560px, 100%); max-height: 100%;
+  background: var(--panel); border: 1px solid var(--panel-border); border-radius: 14px;
+  display: flex; flex-direction: column; overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+#helpHead { display: flex; align-items: center; justify-content: space-between; padding: 10px 6px 0 16px; }
+#helpTitle { font-size: 14px; color: var(--accent); }
+#helpSlides {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 2px 16px 10px; touch-action: pan-y;
+  -webkit-user-select: none; user-select: none;
+}
+.hs { display: none; }
+.hs.active { display: block; animation: hsIn .18s ease; }
+@keyframes hsIn { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+.hs h4 { font-size: 15px; margin: 6px 0 8px; }
+.hs-fig { background: #10151b; border: 1px solid var(--panel-border); border-radius: 10px; padding: 6px; }
+.hs-fig svg { display: block; width: 100%; height: auto; }
+.hs ul { margin: 10px 0 4px; padding-left: 18px; font-size: 13px; line-height: 1.75; }
+.hs li { margin: 2px 0; }
+.hchip { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 3px; vertical-align: -1px; }
+#helpNav {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 8px 12px 10px; border-top: 1px solid var(--panel-border);
+}
+#helpNav button {
+  height: 38px; padding: 0 16px; border-radius: 8px;
+  border: 1px solid var(--panel-border); background: #212a33; color: var(--fg);
+  font-size: 13px; cursor: pointer;
+}
+#helpNav button:disabled { opacity: .35; }
+#helpDots { display: flex; gap: 7px; }
+.hdot { width: 9px; height: 9px; border-radius: 50%; background: #3c4956; cursor: pointer; }
+.hdot.active { background: var(--accent); }
+/* 図の共通パーツ */
+.fig-head { fill: none; stroke: #55606c; stroke-width: 5; }
+.fig-bone-g line, .fig-bone-g polyline { stroke: #55606c; stroke-width: 5; stroke-linecap: round; fill: none; }
+.fig-dot circle, circle.fig-dot { stroke: #0a0d10; stroke-width: 1.5; }
+.fig-t { fill: #cfd8e3; font-size: 11px; }
+.fig-t.dim { fill: #8a97a5; font-size: 10px; }
+.fig-arrow, .fig-arrow line, .fig-arrow path { stroke: #dfe6ee; stroke-width: 2; fill: none; }
 
 /* ---- toast / loading ---- */
 #toast {

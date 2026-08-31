@@ -31,6 +31,7 @@
   <button id="btnCamera" class="tb" data-tip="FOV・平行投影・アスペクト比(構図ガイド)・書き出し解像度">カメラ</button>
   <button id="btnExport" class="tb" data-tip="静止画(PNG)を書き出します。比率・解像度は「カメラ」、透過背景は⚙で設定">PNG書き出し</button>
   <button id="btnSettings" class="tb icon" data-tip="背景・表示・メニュー位置・キャラクター管理">⚙</button>
+  <button id="btnHelp" class="tb" data-tip="操作方法をスライドで見る">使い方</button>
   <span class="spacer"></span>
   <button id="modeIllust" class="tb mode active" data-tip="1枚絵のポーズ資料モード(通常)">イラスト</button>
   <button id="modeConte" class="tb mode" data-tip="タイムラインでカットを並べ、連番PNGで書き出す絵コンテモード(実験的機能・調整中)">コンテ(実験的機能)</button>
@@ -93,15 +94,19 @@
     <button data-hand="right" data-handpose="グッジョブ">👍</button>
   </div>
 
-  <h4>目線</h4>
-  <label class="check-row"><input id="gazeCamera" type="checkbox"> カメラ目線</label>
-  <label class="jog-row">左右<input id="gazeYaw" type="range" min="-60" max="60" step="1" value="0"><span class="val" id="valGazeYaw">0°</span></label>
-  <label class="jog-row">上下<input id="gazePitch" type="range" min="-40" max="40" step="1" value="0"><span class="val" id="valGazePitch">0°</span></label>
-  <button id="btnGazeReset" class="wide small">目線を正面に戻す</button>
+  <div id="poseGazeSec">
+    <h4>目線</h4>
+    <label class="check-row"><input id="gazeCamera" type="checkbox"> カメラ目線</label>
+    <label class="jog-row">左右<input id="gazeYaw" type="range" min="-60" max="60" step="1" value="0"><span class="val" id="valGazeYaw">0°</span></label>
+    <label class="jog-row">上下<input id="gazePitch" type="range" min="-40" max="40" step="1" value="0"><span class="val" id="valGazePitch">0°</span></label>
+    <button id="btnGazeReset" class="wide small">目線を正面に戻す</button>
+  </div>
 
-  <h4>表情</h4>
-  <div id="expressionList"></div>
-  <button id="btnExpReset" class="wide small">表情をリセット</button>
+  <div id="poseExpSec">
+    <h4>表情</h4>
+    <div id="expressionList"></div>
+    <button id="btnExpReset" class="wide small">表情をリセット</button>
+  </div>
 </aside>
 
 <!-- カメラパネル -->
@@ -131,8 +136,10 @@
   <label class="slider-row">ガイド枠 <span id="guideScaleVal">100</span>%
     <input id="guideScale" type="range" min="30" max="100" step="5" value="100">
   </label>
+  <label class="check-row"><input id="frameCamToggle" type="checkbox"> 枠内をカメラの範囲にする</label>
   <div class="note" id="exportDims"></div>
-  <p class="note">ガイド枠を100%未満にすると構図フレームが画面より小さく表示され、フレームの外側を見ながらポーズを調整できます。書き出しは枠の中身だけが写ります。</p>
+  <p class="note">ガイド枠を100%未満にすると構図フレームが画面より小さく表示され、フレームの外側を見ながらポーズを調整できます。書き出しは枠の中身だけが写ります。<br>
+  「枠内をカメラの範囲にする」を ON にすると FOV(mm)がガイド枠基準になり、枠の外には画角の外側が表示されます(OFF のときの FOV は画面全体基準で、書き出しは実質より望遠になります)。</p>
 </aside>
 
 <!-- 設定パネル -->
@@ -142,6 +149,10 @@
   <h4>背景</h4>
   <label class="check-row">背景色 <input id="bgColor" type="color" value="#3a3f47"></label>
   <label class="check-row"><input id="alphaToggle" type="checkbox"> PNGを透過背景にする</label>
+
+  <h4>書き出し</h4>
+  <label class="check-row"><input id="directDownload" type="checkbox"> 確認なしで直接ダウンロード</label>
+  <p class="note">オフのときは保存先を選ぶダイアログ(対応ブラウザ)または共有シートで書き出します。</p>
 
   <h4>ライト(平行光の向き)</h4>
   <label class="jog-row">X<input id="lightX" type="range" min="-180" max="180" step="1" value="-50"><span class="val" id="valLightX">-50°</span></label>
@@ -173,12 +184,12 @@
 <!-- ボーン操作パネル -->
 <div id="bonePanel" class="hidden">
   <div id="boneTitle">ボーン</div>
-  <label class="jog-row">ひねり<input id="jogTwist" type="range" min="-180" max="180" step="1" value="0"><span class="val" id="valTwist">0°</span></label>
-  <label class="jog-row">縦回転<input id="jogPitch" type="range" min="-89" max="89" step="1" value="0"><span class="val" id="valPitch">0°</span></label>
-  <label class="jog-row">横回転<input id="jogYaw" type="range" min="-180" max="180" step="1" value="0"><span class="val" id="valYaw">0°</span></label>
-  <label class="jog-row curl-only">指を握る<input id="curlSlider" type="range" min="0" max="1" step="0.01" value="0"><span class="val" id="valCurl">0</span></label>
-  <label class="jog-row curl-only">指を開く<input id="spreadSlider" type="range" min="-1" max="1" step="0.01" value="0"><span class="val" id="valSpread">0</span></label>
-  <label class="jog-row scale-only">大きさ<input id="propScale" type="range" min="0.05" max="4" step="0.05" value="1"><span class="val" id="valScale">1.0</span></label>
+  <label class="jog-row">ひねり<input id="jogTwist" type="range" min="-180" max="180" step="1" value="0"><input id="valTwist" class="val" type="number" min="-180" max="180" step="1" value="0"><span class="unit">°</span></label>
+  <label class="jog-row">縦回転<input id="jogPitch" type="range" min="-89" max="89" step="1" value="0"><input id="valPitch" class="val" type="number" min="-89" max="89" step="1" value="0"><span class="unit">°</span></label>
+  <label class="jog-row">横回転<input id="jogYaw" type="range" min="-180" max="180" step="1" value="0"><input id="valYaw" class="val" type="number" min="-180" max="180" step="1" value="0"><span class="unit">°</span></label>
+  <label class="jog-row curl-only">指を握る<input id="curlSlider" type="range" min="0" max="1" step="0.01" value="0"><input id="valCurl" class="val" type="number" min="0" max="1" step="0.01" value="0"><span class="unit"></span></label>
+  <label class="jog-row curl-only">指を開く<input id="spreadSlider" type="range" min="-1" max="1" step="0.01" value="0"><input id="valSpread" class="val" type="number" min="-1" max="1" step="0.01" value="0"><span class="unit"></span></label>
+  <label class="jog-row scale-only">大きさ<input id="propScale" type="range" min="0.05" max="4" step="0.05" value="1"><input id="valScale" class="val" type="number" min="0.05" max="4" step="0.05" value="1"><span class="unit"></span></label>
   <button id="btnDeselect" class="wide small">選択解除</button>
 </div>
 
@@ -210,6 +221,365 @@
       <div id="tlPlayhead" class="hidden"></div>
     </div>
     <p id="tlEmpty" class="note">「＋カット」で現在の状態をカットとして追加。カットをタップで選択、キー(◆)を左右にドラッグでコマ数を調整、目盛りをドラッグでスクラブできます</p>
+  </div>
+</div>
+
+<!-- 使い方スライド -->
+<div id="helpOverlay" class="hidden">
+  <div id="helpCard">
+    <div id="helpHead"><span id="helpTitle">使い方</span><button id="helpClose" class="close">✕</button></div>
+    <div id="helpSlides">
+
+      <section class="hs">
+        <h4>画面の見方</h4>
+        <div class="hs-fig"><svg viewBox="0 0 380 214" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="372" height="206" rx="8" fill="#151b22" stroke="#2c3540"/>
+          <g font-size="9" fill="#dfe6ee" text-anchor="middle">
+            <rect x="8" y="12" width="38" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="27" y="25">シーン</text>
+            <rect x="50" y="12" width="48" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="74" y="25">＋モデル</text>
+            <rect x="102" y="12" width="38" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="121" y="25">ポーズ</text>
+            <rect x="144" y="12" width="38" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="163" y="25">カメラ</text>
+            <rect x="186" y="12" width="28" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="200" y="25">PNG</text>
+            <rect x="218" y="12" width="18" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="227" y="25">⚙</text>
+            <rect x="240" y="12" width="42" height="18" rx="4" fill="#212a33" stroke="#3fb6ff"/><text x="261" y="25" fill="#3fb6ff">使い方</text>
+            <rect x="288" y="12" width="40" height="18" rx="4" fill="#212a33" stroke="#3fb6ff"/><text x="308" y="25" fill="#3fb6ff">イラスト</text>
+            <rect x="332" y="12" width="40" height="18" rx="4" fill="#212a33" stroke="#2c3540"/><text x="352" y="25">コンテ</text>
+          </g>
+          <g stroke="#55606c" stroke-width="4" stroke-linecap="round" fill="none">
+            <circle cx="150" cy="88" r="11" stroke-width="4"/>
+            <line x1="150" y1="99" x2="150" y2="140"/>
+            <line x1="135" y1="108" x2="165" y2="108"/>
+            <polyline points="135,108 128,128 124,148"/><polyline points="165,108 172,128 176,148"/>
+            <polyline points="143,140 141,168 139,192"/><polyline points="157,140 159,168 161,192"/>
+          </g>
+          <g font-size="9" fill="#dfe6ee" text-anchor="middle">
+            <rect x="16" y="182" width="44" height="17" rx="8" fill="#212a33" stroke="#3fb6ff"/><text x="38" y="194" fill="#3fb6ff">素体A</text>
+            <rect x="64" y="182" width="44" height="17" rx="8" fill="#212a33" stroke="#2c3540"/><text x="86" y="194">素体B</text>
+          </g>
+          <text x="16" y="176" font-size="9" fill="#8a97a5">キャラの切り替え</text>
+          <rect x="248" y="140" width="120" height="60" rx="6" fill="#1a2027" stroke="#2c3540"/>
+          <g stroke="#2c3540" stroke-width="3" stroke-linecap="round">
+            <line x1="258" y1="158" x2="330" y2="158"/><line x1="258" y1="172" x2="330" y2="172"/><line x1="258" y1="186" x2="330" y2="186"/>
+          </g>
+          <circle cx="290" cy="158" r="5" fill="#3fb6ff"/><circle cx="276" cy="172" r="5" fill="#3fb6ff"/><circle cx="304" cy="186" r="5" fill="#3fb6ff"/>
+          <g font-size="8" fill="#8a97a5"><text x="340" y="161">42°</text><text x="340" y="175">-15°</text><text x="340" y="189">8°</text></g>
+          <text x="248" y="134" font-size="9" fill="#8a97a5">関節を選ぶと出るスライダー</text>
+        </svg></div>
+        <ul>
+          <li>上のバーからすべての機能に入れます。ボタンを<b>長押し(PCはマウスを乗せる)</b>と説明が出ます</li>
+          <li>左下のチップで操作するキャラを切り替え。右下には選択した関節のスライダーが出ます</li>
+          <li>右上で<b>イラスト⇔コンテ</b>のモード切替。↶↷でいつでも元に戻せます</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>ポーズを付ける(基本)</h4>
+        <div class="hs-fig"><svg viewBox="0 0 240 250" xmlns="http://www.w3.org/2000/svg">
+          <line x1="50" y1="224" x2="190" y2="224" stroke="#2c3540" stroke-width="2"/>
+          <circle class="fig-head" cx="120" cy="40" r="16"/>
+          <g class="fig-bone-g">
+            <line x1="120" y1="56" x2="120" y2="120"/>
+            <line x1="97" y1="72" x2="143" y2="72"/>
+            <polyline points="97,72 86,104 80,136" fill="none"/>
+            <polyline points="143,72 154,104 160,136" fill="none"/>
+            <line x1="108" y1="122" x2="132" y2="122"/>
+            <polyline points="108,122 106,168 104,214" fill="none"/>
+            <polyline points="132,122 134,168 136,214" fill="none"/>
+          </g>
+          <g class="fig-dot" fill="#35c8ff">
+            <circle cx="120" cy="40" r="6"/><circle cx="120" cy="88" r="6"/>
+            <circle cx="97" cy="72" r="6"/><circle cx="143" cy="72" r="6"/>
+            <circle cx="86" cy="104" r="6"/><circle cx="154" cy="104" r="6"/>
+            <circle cx="106" cy="168" r="6"/><circle cx="134" cy="168" r="6"/>
+          </g>
+          <g class="fig-dot" fill="#ffb62e">
+            <circle cx="80" cy="136" r="8"/><circle cx="104" cy="214" r="8"/><circle cx="136" cy="214" r="8"/>
+          </g>
+          <circle class="fig-dot" cx="160" cy="136" r="8" fill="#ff4d6b"/>
+          <path class="fig-arrow" d="M 72 128 Q 56 114 50 96"/>
+          <polygon points="50,96 46,106 55,104" fill="#dfe6ee"/>
+          <text x="28" y="88" class="fig-t">ドラッグ</text>
+          <text x="174" y="140" class="fig-t">選択中は赤</text>
+          <text x="150" y="234" class="fig-t dim">足を引っ張ると膝がついてくる</text>
+        </svg></div>
+        <ul>
+          <li>体の丸を<b>そのままドラッグ</b>してポーズを付けます。<i class="hchip" style="background:#ffb62e"></i><b>オレンジ(手・足)= IK</b>: 引っ張ると肘・膝が自然についてきます</li>
+          <li><i class="hchip" style="background:#35c8ff"></i><b>水色 = 1関節ずつ</b>の回転(FK)</li>
+          <li>タップで選択(赤くなる)すると右下にスライダーが出ます。<b>数値入力も可</b></li>
+          <li>空きスペースをタップで選択解除。失敗しても ↶ で戻せます</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>移動と向き</h4>
+        <div class="hs-fig"><svg viewBox="0 0 240 256" xmlns="http://www.w3.org/2000/svg">
+          <circle class="fig-head" cx="120" cy="40" r="16"/>
+          <g class="fig-bone-g">
+            <line x1="120" y1="56" x2="120" y2="120"/>
+            <line x1="97" y1="72" x2="143" y2="72"/>
+            <polyline points="97,72 86,104 80,136" fill="none"/>
+            <polyline points="143,72 154,104 160,136" fill="none"/>
+            <line x1="108" y1="122" x2="132" y2="122"/>
+            <polyline points="108,122 106,168 104,214" fill="none"/>
+            <polyline points="132,122 134,168 136,214" fill="none"/>
+          </g>
+          <ellipse cx="120" cy="222" rx="62" ry="14" fill="none" stroke="#6fe26f" stroke-width="2" stroke-dasharray="5 4" opacity="0.7"/>
+          <circle class="fig-dot" cx="120" cy="122" r="8" fill="#ff9de2"/>
+          <circle class="fig-dot" cx="120" cy="222" r="8" fill="#ffe94a"/>
+          <circle class="fig-dot" cx="120" cy="236" r="7" fill="#6fe26f"/>
+          <g class="fig-arrow">
+            <line x1="94" y1="222" x2="72" y2="222"/><polygon points="66,222 76,217 76,227" fill="#dfe6ee"/>
+            <line x1="146" y1="222" x2="168" y2="222"/><polygon points="174,222 164,217 164,227" fill="#dfe6ee"/>
+            <line x1="120" y1="112" x2="120" y2="96"/><polygon points="120,90 115,100 125,100" fill="#dfe6ee"/>
+            <line x1="120" y1="132" x2="120" y2="148"/><polygon points="120,154 115,144 125,144" fill="#dfe6ee"/>
+            <path d="M 138 238 Q 166 236 178 226"/><polygon points="182,222 172,224 178,232" fill="#dfe6ee"/>
+          </g>
+          <text x="30" y="210" class="fig-t">全体を移動</text>
+          <text x="136" y="118" class="fig-t">腰だけ</text>
+          <text x="176" y="250" class="fig-t">向き</text>
+        </svg></div>
+        <ul>
+          <li><i class="hchip" style="background:#ffe94a"></i><b>黄色(足元)</b>= キャラ全体をつかんで移動</li>
+          <li><i class="hchip" style="background:#ff9de2"></i><b>ピンク(腰)</b>= 足を床に残したまま腰だけ動く。<b>しゃがみ・座りはこれ</b>で作ります</li>
+          <li><i class="hchip" style="background:#6fe26f"></i><b>緑(前方)</b>= 円に沿ってドラッグでキャラの向きを回す</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>細かい向き(緑・青の小玉)</h4>
+        <div class="hs-fig"><svg viewBox="0 0 240 234" xmlns="http://www.w3.org/2000/svg">
+          <line x1="50" y1="224" x2="190" y2="224" stroke="#2c3540" stroke-width="2"/>
+          <circle class="fig-head" cx="120" cy="40" r="16"/>
+          <g class="fig-bone-g">
+            <line x1="120" y1="56" x2="120" y2="120"/>
+            <line x1="97" y1="72" x2="143" y2="72"/>
+            <polyline points="97,72 86,104 80,136" fill="none"/>
+            <polyline points="143,72 154,104 160,136" fill="none"/>
+            <line x1="108" y1="122" x2="132" y2="122"/>
+            <polyline points="108,122 106,168 104,214" fill="none"/>
+            <polyline points="132,122 134,168 136,214" fill="none"/>
+          </g>
+          <g class="fig-dot" fill="#55606c">
+            <circle cx="80" cy="136" r="6"/><circle cx="160" cy="136" r="6"/><circle cx="104" cy="214" r="6"/><circle cx="136" cy="214" r="6"/>
+          </g>
+          <g class="fig-dot" fill="#6fe26f">
+            <circle cx="146" cy="26" r="6"/><circle cx="66" cy="124" r="6"/>
+          </g>
+          <g stroke="#6fe26f" stroke-width="2" fill="none" opacity="0.85">
+            <path d="M 158 20 A 14 14 0 1 1 150 12"/>
+            <path d="M 54 116 A 14 14 0 1 0 62 110"/>
+          </g>
+          <g fill="#6fe26f">
+            <polygon points="150,12 144,16 152,20"/>
+            <polygon points="62,110 56,112 62,118"/>
+          </g>
+          <g class="fig-dot" fill="#4d8aff">
+            <circle cx="120" cy="12" r="7"/><circle cx="60" cy="162" r="7"/>
+          </g>
+          <g class="fig-arrow">
+            <path d="M 108 8 Q 96 6 88 12"/>
+            <path d="M 50 154 Q 40 146 38 136"/>
+          </g>
+          <polygon points="84,16 92,8 94,17" fill="#dfe6ee"/>
+          <polygon points="37,130 33,139 42,140" fill="#dfe6ee"/>
+          <text x="34" y="26" class="fig-t">うなずき・傾げ</text>
+          <text x="8" y="122" class="fig-t">手先の向き</text>
+          <text x="164" y="16" class="fig-t">顔の向き</text>
+          <circle class="fig-dot" cx="176" cy="122" r="5.5" fill="#6fe26f"/>
+          <text x="185" y="127" font-size="13" font-weight="bold" fill="#6fe26f">= 捻る</text>
+          <circle class="fig-dot" cx="176" cy="142" r="5.5" fill="#4d8aff"/>
+          <text x="185" y="147" font-size="13" font-weight="bold" fill="#4d8aff">= 向ける</text>
+        </svg></div>
+        <ul>
+          <li><i class="hchip" style="background:#6fe26f"></i><b style="color:#6fe26f">緑の小玉 = 捻る</b>。円を描くようにドラッグ。手首=手のひらの向き、足首=つま先の向き、頭=顔の左右の向き</li>
+          <li><i class="hchip" style="background:#4d8aff"></i><b style="color:#7da9ff">青の小玉 = 向ける</b>(LookAt式)。頭上の玉=うなずき・首上げ・傾げ、指先の先の玉=手先の向き。捻りは変わりません</li>
+          <li>細かい角度は関節を選んで右下のスライダー(数値入力可)でも調整できます</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>手と指</h4>
+        <div class="hs-fig"><svg viewBox="0 0 240 190" xmlns="http://www.w3.org/2000/svg">
+          <rect x="96" y="88" width="56" height="48" rx="12" fill="none" stroke="#55606c" stroke-width="5"/>
+          <g class="fig-bone-g">
+            <line x1="104" y1="88" x2="100" y2="46"/>
+            <line x1="117" y1="88" x2="115" y2="36"/>
+            <line x1="130" y1="88" x2="130" y2="40"/>
+            <line x1="143" y1="88" x2="147" y2="50"/>
+            <line x1="96" y1="106" x2="66" y2="84"/>
+            <line x1="124" y1="136" x2="124" y2="162"/>
+          </g>
+          <g class="fig-dot" fill="#f0f4ff">
+            <circle cx="100" cy="46" r="6"/><circle cx="115" cy="36" r="6"/><circle cx="130" cy="40" r="6"/><circle cx="147" cy="50" r="6"/><circle cx="66" cy="84" r="6"/>
+          </g>
+          <circle class="fig-dot" cx="124" cy="162" r="8" fill="#ff4d6b"/>
+          <path class="fig-arrow" d="M 112 28 Q 96 16 82 16"/>
+          <polygon points="76,16 86,11 86,21" fill="#dfe6ee"/>
+          <text x="30" y="34" class="fig-t">1本ずつ曲げる</text>
+          <text x="140" y="168" class="fig-t">手首(選択中)</text>
+        </svg></div>
+        <ul>
+          <li>手の関節(オレンジ)をタップ → 右下に<b>「指を握る」「指を開く」</b>スライダー</li>
+          <li>選択中は<b>指先に白い玉</b>が出て、ドラッグで 1 本ずつ曲げられます</li>
+          <li>グー・チョキ・パー・指差し・👍 のプリセットは「ポーズ」パネルに(左右別)</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>ポーズ・表情パネル</h4>
+        <div class="hs-fig"><svg viewBox="0 0 300 186" xmlns="http://www.w3.org/2000/svg">
+          <rect x="20" y="6" width="260" height="174" rx="10" fill="#1a2027" stroke="#2c3540"/>
+          <text x="34" y="26" font-size="11" fill="#dfe6ee">ポーズ・表情</text>
+          <g font-size="9" fill="#dfe6ee" text-anchor="middle">
+            <rect x="34" y="36" width="70" height="20" rx="5" fill="#212a33" stroke="#2c3540"/><text x="69" y="49">立ち</text>
+            <rect x="110" y="36" width="70" height="20" rx="5" fill="#212a33" stroke="#2c3540"/><text x="145" y="49">座り</text>
+            <rect x="186" y="36" width="70" height="20" rx="5" fill="#212a33" stroke="#2c3540"/><text x="221" y="49">Tポーズ</text>
+          </g>
+          <g font-size="9" fill="#dfe6ee" text-anchor="middle">
+            <rect x="34" y="66" width="42" height="18" rx="5" fill="#212a33" stroke="#2c3540"/><text x="55" y="78">グー</text>
+            <rect x="80" y="66" width="42" height="18" rx="5" fill="#212a33" stroke="#2c3540"/><text x="101" y="78">チョキ</text>
+            <rect x="126" y="66" width="42" height="18" rx="5" fill="#212a33" stroke="#2c3540"/><text x="147" y="78">パー</text>
+            <rect x="172" y="66" width="42" height="18" rx="5" fill="#212a33" stroke="#2c3540"/><text x="193" y="78">指差し</text>
+            <rect x="218" y="66" width="38" height="18" rx="5" fill="#212a33" stroke="#2c3540"/><text x="237" y="78">👍</text>
+          </g>
+          <text x="34" y="106" font-size="10" fill="#8a97a5">目線</text>
+          <line x1="70" y1="102" x2="240" y2="102" stroke="#2c3540" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="150" cy="102" r="6" fill="#3fb6ff"/>
+          <text x="34" y="132" font-size="10" fill="#8a97a5">にこ</text>
+          <line x1="70" y1="128" x2="240" y2="128" stroke="#2c3540" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="200" cy="128" r="6" fill="#3fb6ff"/>
+          <text x="34" y="158" font-size="10" fill="#8a97a5">驚き</text>
+          <line x1="70" y1="154" x2="240" y2="154" stroke="#2c3540" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="90" cy="154" r="6" fill="#3fb6ff"/>
+        </svg></div>
+        <ul>
+          <li>上の「ポーズ」ボタンで開きます。<b>立ち・座り・Tポーズ</b>から始めると早いです</li>
+          <li>目線はカメラ目線 ON/OFF と上下左右。表情はスライダーで組み合わせられます</li>
+          <li>効くのは<b>選択中のキャラ</b>(左下のチップで切替)です</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>カメラと構図</h4>
+        <div class="hs-fig"><svg viewBox="0 0 360 252" xmlns="http://www.w3.org/2000/svg">
+          <rect x="4" y="4" width="352" height="198" rx="8" fill="#0d1116" stroke="#2c3540"/>
+          <rect x="36" y="22" width="288" height="162" fill="#151b22" stroke="#ffffff99"/>
+          <text x="44" y="36" font-size="10" fill="#8a97a5">書き出される範囲(ガイド枠)</text>
+          <line x1="4" y1="118" x2="356" y2="118" stroke="#ff9d4d" stroke-width="1.5" stroke-dasharray="6 5"/>
+          <text x="290" y="112" font-size="9" fill="#ffb066">アイレベル 1.2m</text>
+          <g stroke="#55606c" stroke-width="4" stroke-linecap="round" fill="none">
+            <circle cx="180" cy="80" r="11"/>
+            <line x1="180" y1="91" x2="180" y2="130"/>
+            <line x1="166" y1="100" x2="194" y2="100"/>
+            <polyline points="166,100 158,118 154,134"/><polyline points="194,100 202,118 206,134"/>
+            <polyline points="173,130 171,155 169,178"/><polyline points="187,130 189,155 191,178"/>
+          </g>
+          <g transform="translate(50,218)">
+            <circle cx="10" cy="10" r="8" fill="#dfe6ee" opacity="0.9"/>
+            <path class="fig-arrow" d="M 24 4 Q 40 -4 54 2"/>
+            <polygon points="58,4 50,-1 49,8" fill="#dfe6ee"/>
+            <text x="70" y="15" class="fig-t">1本指 = 回転</text>
+          </g>
+          <g transform="translate(210,218)">
+            <circle cx="6" cy="10" r="8" fill="#dfe6ee" opacity="0.9"/>
+            <circle cx="26" cy="10" r="8" fill="#dfe6ee" opacity="0.9"/>
+            <text x="44" y="15" class="fig-t">2本指 = 移動・ズーム</text>
+          </g>
+        </svg></div>
+        <ul>
+          <li>空きスペースを<b>1本指ドラッグで回転</b>、<b>2本指で移動・ズーム</b>(PCは右ドラッグ/ホイール)</li>
+          <li>「カメラ」で FOV(mm換算)・平行投影・<b>アスペクト比のガイド枠</b>・書き出し解像度を設定</li>
+          <li><b>ガイド枠%</b>を下げると枠が画面より小さくなり、枠の外を見ながら構図を作れます。<b>PNG に写るのは枠の中だけ</b></li>
+          <li>オレンジの点線はアイレベル(カメラの高さ)。⚙ で非表示にできます</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>モデルとシーン</h4>
+        <div class="hs-fig"><svg viewBox="0 0 340 168" xmlns="http://www.w3.org/2000/svg">
+          <rect x="134" y="8" width="72" height="24" rx="6" fill="#212a33" stroke="#3fb6ff"/>
+          <text x="170" y="24" font-size="11" fill="#3fb6ff" text-anchor="middle">＋モデル</text>
+          <g stroke="#55606c" stroke-width="1.5" fill="none">
+            <path d="M 150 32 Q 70 48 62 70"/><path d="M 170 32 L 170 70"/><path d="M 190 32 Q 270 48 278 70"/>
+          </g>
+          <g stroke="#55606c" stroke-width="3.5" stroke-linecap="round" fill="none">
+            <circle cx="62" cy="88" r="9"/>
+            <line x1="62" y1="97" x2="62" y2="126"/>
+            <line x1="51" y1="104" x2="73" y2="104"/>
+            <polyline points="55,126 53,144 51,158"/><polyline points="69,126 71,144 73,158"/>
+          </g>
+          <text x="62" y="166" font-size="10" fill="#8a97a5" text-anchor="middle" dy="-1">VRM(キャラ)</text>
+          <g transform="translate(140,76)">
+            <rect x="0" y="24" width="56" height="34" rx="4" fill="none" stroke="#b17aff" stroke-width="3"/>
+            <line x1="4" y1="58" x2="4" y2="72" stroke="#b17aff" stroke-width="3"/>
+            <line x1="52" y1="58" x2="52" y2="72" stroke="#b17aff" stroke-width="3"/>
+            <rect x="0" y="0" width="56" height="24" rx="4" fill="none" stroke="#b17aff" stroke-width="3"/>
+          </g>
+          <text x="168" y="165" font-size="10" fill="#8a97a5" text-anchor="middle">glTF / GLB(小物)</text>
+          <g stroke="#9aa8b3" stroke-width="2.5" fill="none">
+            <rect x="252" y="88" width="34" height="34" rx="2"/>
+            <circle cx="316" cy="105" r="18"/>
+          </g>
+          <text x="286" y="165" font-size="10" fill="#8a97a5" text-anchor="middle">プリミティブ</text>
+        </svg></div>
+        <ul>
+          <li><b>＋モデル</b>から VRM(キャラ)・glTF/GLB(小物)・プリミティブ(立方体/球/円柱/板)を追加。複製は ⚙ のキャラクター欄</li>
+          <li>小物の回転は<b>三軸の玉</b>を円周ドラッグ: <i class="hchip" style="background:#ff6b6b"></i>上=X(手前に倒す)、<i class="hchip" style="background:#6fe26f"></i>前=Y(向き)、<i class="hchip" style="background:#4d8aff"></i>横=Z(横に倒す)</li>
+          <li>頭の関節を選ぶと「大きさ」で<b>頭だけ拡縮</b>(デフォルメ用)。ライトの向き・背景色は ⚙</li>
+          <li>「シーン」で保存・.json 書き出し・<b>新規シーン(すべてクリア)</b></li>
+          <li>モデルもポーズも<b>端末の中だけ</b>に保存されます。外部には送信されません</li>
+        </ul>
+      </section>
+
+      <section class="hs">
+        <h4>コンテモード(実験的)</h4>
+        <div class="hs-fig"><svg viewBox="0 0 360 138" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#3c4956" stroke-width="1">
+            <line x1="20" y1="24" x2="20" y2="30"/><line x1="44" y1="24" x2="44" y2="30"/><line x1="68" y1="24" x2="68" y2="30"/><line x1="92" y1="24" x2="92" y2="30"/>
+            <line x1="140" y1="24" x2="140" y2="30"/><line x1="164" y1="24" x2="164" y2="30"/><line x1="188" y1="24" x2="188" y2="30"/><line x1="212" y1="24" x2="212" y2="30"/>
+            <line x1="260" y1="24" x2="260" y2="30"/><line x1="284" y1="24" x2="284" y2="30"/><line x1="308" y1="24" x2="308" y2="30"/><line x1="332" y1="24" x2="332" y2="30"/>
+          </g>
+          <g stroke="#71818f" stroke-width="1">
+            <line x1="116" y1="18" x2="116" y2="30"/><line x1="236" y1="18" x2="236" y2="30"/><line x1="356" y1="18" x2="356" y2="30"/>
+          </g>
+          <g font-size="9" fill="#8a97a5"><text x="110" y="14">1s</text><text x="230" y="14">2s</text><text x="350" y="14">3s</text></g>
+          <rect x="10" y="34" width="120" height="56" rx="5" fill="#151b22" stroke="#3fb6ff" stroke-width="2"/>
+          <rect x="132" y="34" width="140" height="56" rx="5" fill="#151b22" stroke="#2c3540" stroke-width="2"/>
+          <rect x="274" y="34" width="76" height="56" rx="5" fill="#151b22" stroke="#2c3540" stroke-width="2"/>
+          <g font-size="10" fill="#dfe6ee">
+            <text x="16" y="48">カット1</text><text x="138" y="48">カット2</text><text x="280" y="48">カット3</text>
+          </g>
+          <g font-size="9" fill="#8a97a5" text-anchor="end">
+            <text x="126" y="86">12コマ</text><text x="268" y="86">14コマ</text><text x="346" y="86">8コマ</text>
+          </g>
+          <g fill="#ffb62e">
+            <rect x="124" y="26" width="11" height="11" transform="rotate(45 129.5 31.5)" rx="2"/>
+            <rect x="266" y="26" width="11" height="11" transform="rotate(45 271.5 31.5)" rx="2"/>
+            <rect x="344" y="26" width="11" height="11" transform="rotate(45 349.5 31.5)" rx="2"/>
+          </g>
+          <g stroke="#ffb62ecc" stroke-width="2"><line x1="130" y1="38" x2="130" y2="90"/><line x1="272" y1="38" x2="272" y2="90"/><line x1="350" y1="38" x2="350" y2="90"/></g>
+          <line x1="190" y1="16" x2="190" y2="94" stroke="#ff4d6b" stroke-width="2"/>
+          <g class="fig-arrow">
+            <line x1="252" y1="110" x2="292" y2="110"/>
+            <polygon points="246,110 256,105 256,115" fill="#dfe6ee"/>
+            <polygon points="298,110 288,105 288,115" fill="#dfe6ee"/>
+          </g>
+          <text x="150" y="132" class="fig-t">◆を左右にドラッグでコマ数を調整</text>
+        </svg></div>
+        <ul>
+          <li>右上の「コンテ」でポーズ+カメラの状態を<b>カット</b>として並べ、簡単な絵コンテが作れます</li>
+          <li><b>＋カット</b>で追加、帯をタップで選択・適用、「上書き」で差し替え</li>
+          <li><b>キー(◆)を左右ドラッグ</b>でコマ数調整、目盛りをドラッグでスクラブ、▶ で実時間再生</li>
+          <li>連番 PNG(zip)で書き出して、そのまま編集ソフトでタイミング確認できます</li>
+        </ul>
+      </section>
+
+    </div>
+    <div id="helpNav">
+      <button id="helpPrev">◀ 前へ</button>
+      <div id="helpDots"></div>
+      <button id="helpNext">次へ ▶</button>
+    </div>
   </div>
 </div>
 

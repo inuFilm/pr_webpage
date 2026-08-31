@@ -381,6 +381,24 @@ export class Character {
       this.handles.push(mesh);
       this.handleGroup.add(mesh);
     }
+    // 青エイムサテライト(LookAt式)。頭=頭上の玉でうなずき・首上げ・傾げ、
+    // 手=指先の少し先の玉で手先の向き。捻り(緑)と成分が重ならない(最短弧回転)
+    for (const bone of ['head', 'leftHand', 'rightHand']) {
+      if (!this.bone(bone)) continue;
+      const mat = new THREE.MeshBasicMaterial({
+        color: 0x4d8aff, depthTest: false, depthWrite: false, transparent: true, opacity: 0.9,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.renderOrder = 999;
+      mesh.scale.setScalar(r * 0.9);
+      mesh.userData = {
+        charId: this.id,
+        def: { bone, mode: 'aim' },
+        baseScale: r * 0.9, baseColor: 0x4d8aff,
+      };
+      this.handles.push(mesh);
+      this.handleGroup.add(mesh);
+    }
     // 指先IKハンドル(手を選択したときだけ表示)
     this.fingerHandlesVisible = { left: false, right: false };
     for (const side of ['left', 'right']) {
@@ -458,11 +476,32 @@ export class Character {
     return { joint, axis, offsetDir };
   }
 
+  /**
+   * 青エイムサテライト用の情報。dir=ボーン軸の現在のワールド方向
+   * (頭=頭頂方向、手=指先方向)。frame.t は正規化リグの規約でボーンに固定
+   */
+  aimInfo(boneName) {
+    const node = this.bone(boneName);
+    if (!node) return null;
+    node.updateWorldMatrix(true, false);
+    const joint = new THREE.Vector3().setFromMatrixPosition(node.matrixWorld);
+    const dir = this.boneFrame(boneName).t.clone()
+      .applyQuaternion(node.getWorldQuaternion(_q)).normalize();
+    const dist = (boneName === 'head' ? 0.14 : 0.16) * this.height * (this.root.scale.x || 1);
+    return { node, joint, dir, dist };
+  }
+
   /** ハンドル・線の位置を現在のポーズへ追従させる(毎フレーム) */
   updateHandles(userScale) {
     for (const h of this.handles) {
       if (h.userData.def.mode === 'heading') {
         placeHeadingHandle(this, h, userScale);
+        continue;
+      }
+      if (h.userData.def.mode === 'aim') {
+        const info = this.aimInfo(h.userData.def.bone);
+        if (info) h.position.copy(info.joint).addScaledVector(info.dir, info.dist);
+        h.scale.setScalar(h.userData.baseScale * userScale);
         continue;
       }
       if (h.userData.def.mode === 'twist') {
@@ -738,6 +777,27 @@ export class Character {
     return Object.keys(em.expressionMap || {});
   }
 
+  /** 実際に何かを動かす(バインドを持つ)表情だけを返す。
+   *  VRM はプリセット表情が中身空でも登録されがちなので、名前の有無では判定できない */
+  listActiveExpressions() {
+    const em = this.vrm.expressionManager;
+    if (!em) return [];
+    return Object.keys(em.expressionMap || {}).filter((n) => {
+      const exp = em.expressionMap[n];
+      const binds = exp && (exp.binds || exp._binds);
+      return binds ? binds.length > 0 : true; // binds が取れないビルドでは隠さない側に倒す
+    });
+  }
+
+  /** 目線(lookAt)が実際に効くか: 目ボーンがあるか、look系表情が実体を持つか */
+  hasUsableGaze() {
+    if (!this.vrm.lookAt) return false;
+    const h = this.vrm.humanoid;
+    if (h && (h.getRawBoneNode('leftEye') || h.getRawBoneNode('rightEye'))) return true;
+    const active = this.listActiveExpressions();
+    return ['lookLeft', 'lookRight', 'lookUp', 'lookDown'].some((n) => active.includes(n));
+  }
+
   setExpression(name, weight) {
     const em = this.vrm.expressionManager;
     if (em && em.expressionMap && em.expressionMap[name]) em.setValue(name, weight);
@@ -828,10 +888,42 @@ export class Prop {
     this._headingHandle = makeHeadingHandle(this.id, scale * 0.9);
     this.handles.push(this._headingHandle);
     this.handleGroup.add(this._headingHandle);
+    // 三軸回転サテライト: X=赤(上に配置)、Z=青(横に配置)。Y は既存の緑(向き)。
+    // ワールド軸まわりの回転なので、玉の位置は小物の回転に依らず一定
+    this._axisHandles = [];
+    for (const [axis, color] of [['x', 0xff6b6b], ['z', 0x4d8aff]]) {
+      const m = new THREE.MeshBasicMaterial({
+        color, depthTest: false, depthWrite: false, transparent: true, opacity: 0.9,
+      });
+      const s = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), m);
+      s.renderOrder = 999;
+      s.scale.setScalar(scale * 0.75);
+      s.userData = {
+        charId: this.id,
+        def: { bone: '__prop', mode: 'twist', kind: 'prop', axis },
+        baseScale: scale * 0.75, baseColor: color,
+      };
+      this.handles.push(s);
+      this._axisHandles.push(s);
+      this.handleGroup.add(s);
+    }
   }
 
   headingRadius() {
     return Math.max(0.3, this.size * 0.55 * this.root.scale.x);
+  }
+
+  twistRadius() {
+    return Math.max(0.18, this.size * 0.4 * this.root.scale.x);
+  }
+
+  /** 三軸回転サテライト情報。axis=回転軸(ワールド)、offsetDir=玉の配置方向 */
+  axisInfo(axisName) {
+    this.root.updateWorldMatrix(true, false);
+    const joint = this.center.clone().applyMatrix4(this.root.matrixWorld);
+    const axis = axisName === 'x' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1);
+    const offsetDir = axisName === 'x' ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+    return { joint, axis, offsetDir };
   }
 
   updateHandles(userScale) {
@@ -840,6 +932,11 @@ export class Prop {
     h.position.copy(this.center).applyMatrix4(this.root.matrixWorld);
     h.scale.setScalar(h.userData.baseScale * userScale);
     placeHeadingHandle(this, this._headingHandle, userScale);
+    for (const s of this._axisHandles) {
+      const info = this.axisInfo(s.userData.def.axis);
+      s.position.copy(info.joint).addScaledVector(info.offsetDir, this.twistRadius());
+      s.scale.setScalar(s.userData.baseScale * userScale);
+    }
   }
 
   serialize() {

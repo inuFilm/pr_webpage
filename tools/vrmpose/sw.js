@@ -1,5 +1,5 @@
 // アプリシェルをキャッシュしてオフライン起動を可能にする(モデルは IndexedDB 側)
-const CACHE = 'vrmpose-v4';
+const CACHE = 'vrmpose-v5';
 const ASSETS = [
   './',
   './index.html',
