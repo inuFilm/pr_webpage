@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>COPs の地形を Solaris でレンダリングする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="解像度を COPnet 側で管理し、Convert Height Field でメッシュ化して Solaris へ。侵食の副産物を Cable Pack でマスクとして持ち出す方法と、大気を効かせるにはスケールが現実的である必要がある話。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>COPs の地形を Solaris でレンダリングする</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=IeVvQt0bHQ0">Houdini 22 | How to Render Terrains in Solaris | Height Fields from COPs to LOPs</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 18:07 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/IeVvQt0bHQ0"
+          title="Houdini 22 | How to Render Terrains in Solaris" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回の位置</h2>
+
+<p><a href="howto-terrains-in-cops.html">Copernicus で地形を作る回</a>で作った地形を、
+レンダリングできる形にして Solaris に持ち込みます。</p>
+
+<p>内容は2本立てです。<strong>COPs → LOPs の橋渡しの実務</strong>と、
+<strong>H22 の新しいレンダリング機能（Image Filter）</strong>。</p>
+
+<h2>1. 解像度を正しい場所で管理する</h2>
+
+<p>既定では解像度パラメータが<strong>最初の height field レイヤー</strong>に付いています。
+これをオフにして、<strong>COP Network ノード側の Default Resolution をオンにします</strong>。</p>
+
+<p>これで COPnet のメニューから <strong>2K / 4K</strong> と切り替えるだけで地形のディテール量を変えられます。
+最終レンダーは 4K を使います。</p>
+
+<h3>なぜ場所を移すのか</h3>
+
+<p>解像度をレイヤー側に持たせると、<strong>ネットワークの中に入って探さないと変えられません</strong>。
+COPnet ノードに出しておけば外から一発で切り替えられ、
+<strong>下書きは 2K・本番は 4K</strong> という運用が楽になります。</p>
+
+<h2>2. メッシュに変換する</h2>
+
+<p>COPnet の出力を中ボタンで確認すると、
+<strong>これはメッシュではなく height field と color field を含むボリューム</strong>です。
+このままではレンダリングできません。</p>
+
+<p><code>Tab</code> → <strong>Convert Height Field</strong> で内部変換が走り、
+<strong>400万ポリゴン</strong>のメッシュになります。<code>height</code> と <code>Cd</code> が
+ジオメトリアトリビュートとして乗ります。</p>
+
+<h2>3. 表示フラグに振り回されないようにする</h2>
+
+<p>COPnet を選んで <strong>Use External COP をオンにします</strong>。
+ここで指定したノードが、<strong>中の表示フラグの位置に関係なく常に上のレベルに出てきます</strong>。</p>
+
+<p>オフのままだと、中を見て回ったあとに
+<strong>意図しないノード（色データなど）が出力されてしまう</strong>事故が起きます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>手順</th></tr></thead>
+  <tbody>
+    <tr><td>1. Height Field Visualize の後に <code>Tab</code> → <code>Null</code> を作り <code>OUT_terrain_for_render</code> と命名</td></tr>
+    <tr><td>2. その Null を選んで <code>Ctrl</code> + <code>C</code></td></tr>
+    <tr><td>3. 上のレベルに戻って External COP の欄で <code>Ctrl</code> + <code>V</code></td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted"><a href="sidefx-foundations-03-uvs.html">Foundations のレッスン3</a>で出てきた
+Output ノードと同じ考え方です。<strong>「中で何を見ていても、外に出るものは固定する」</strong>という発想が
+Houdini のあちこちに用意されています。</p>
+
+<h2>4. 侵食の副産物をマスクとして持ち出す</h2>
+
+<p><strong>HF Erode は debris / sediment / flow といった追加フィールドを出しています。</strong>
+これらはレンダリング時のマスクに使えます。</p>
+
+<p>持ち出すには <strong>Height Field Visualize の layers 入力</strong>に繋ぎます。
+ただし<strong>1本しか繋げない</strong>ので、まとめる必要があります。</p>
+
+<ol>
+  <li><code>Y</code> で余計なノードを外します</li>
+  <li><code>Tab</code> → <strong>Cable Pack</strong>。debris / sediment / flow を入力に繋ぎます</li>
+  <li><strong>Set Fields from Inputs を押すのが重要です。</strong>
+      名前が付き、<strong>アトリビュートがその名前を継承します</strong></li>
+  <li>パックした cable を layers に繋ぎます</li>
+</ol>
+
+<img src="img/howto-render-terrains-000520.png" alt="Cable Pack ノード（cablepack1）のパラメータ。Input Nodes に heightfield_erode1 の出力が3つ繋がれ、Set Fields from Inputs のボタンがある。出力は cable 1本にまとまっている">
+
+<p><code>U</code> で上がって Convert Height Field を中ボタンで見ると、追加アトリビュートが全部乗っています。</p>
+
+<p><strong>「侵食シミュレーションの途中の値を、マテリアルのマスクとして使う」</strong>という発想が良いなと思いました。
+岩肌と堆積物を塗り分けるのに、わざわざマスクを描く必要がありません。</p>
+
+<h2>5. Solaris に持ち込む</h2>
+
+<ol>
+  <li><code>Tab</code> → <code>Null</code> で出力チェックポイント（<code>OUT_terrain_for_solaris</code>）を作ります</li>
+  <li>Solaris へ行くのは2通り。パンくずの <code>obj</code> をクリック＆ホールドして <code>stage</code> を選ぶ、
+      または <code>Tab</code> → <strong>LOP Network</strong></li>
+  <li><code>Tab</code> → <strong>Scene Import All</strong> で地形が入ります。
+      オブジェクトが複数あるなら <strong>except pattern</strong> で絞り込めます</li>
+</ol>
+
+<h2>6. 空と大気</h2>
+
+<ol>
+  <li><code>Tab</code> → <strong>Karma Physical Sky</strong> を繋ぎます</li>
+  <li>角度を決めてから<strong>そのビューからカメラを作ります</strong>
+      （作った直後はロックされているので、動かしたければロックアイコンを外します）</li>
+  <li>Karma XPU でテストレンダー。<strong>ライトが見えないときは Scene Lights のプレビューを確認します</strong></li>
+</ol>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>この例の値</th></tr></thead>
+  <tbody>
+    <tr><td>Intensity</td><td><code>2.5</code></td></tr>
+    <tr><td>Solar Altitude</td><td><code>30</code></td></tr>
+    <tr><td>Sky Mode の Dome Light</td><td><strong>Atmospheric</strong>（遠景の霞を作るため）</td></tr>
+    <tr><td>Rayleigh Scale</td><td>かなり高めに</td></tr>
+    <tr><td>Scatter Distribution</td><td><code>6.25</code></td></tr>
+    <tr><td>Solar Azimuth（最終）</td><td><code>30</code> 度（画面右から陽が当たる）</td></tr>
+  </tbody>
+</table></div>
+
+<h3>スケールが合っていないと大気が効かない</h3>
+
+<p>ここが実務的に大事な話です。<strong>地形が現実のスケールに近くないと、大気の効果が正しく出ません。</strong></p>
+
+<p>この例の地形を中ボタンで確認すると <strong>1km × 1km</strong> でした。
+砂漠の広がりとしては小さすぎるので、<strong>5倍にスケールします</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>つまずき</th><th>対処</th></tr></thead>
+  <tbody>
+    <tr><td>Transform を置いて Uniform Scale を 5 にしても<strong>何も起きない</strong></td>
+        <td><strong>Primitives の欄で「all mesh primitives」を選びます。</strong>
+        何を変形するのか指定しないと Transform は動きません</td></tr>
+  </tbody>
+</table></div>
+
+<p>スケールすると<strong>大気が地形を覆う様子が一気に自然になります</strong>。
+遠景に霞がかかるのは、距離が現実的になったからです。</p>
+
+<p class="tx-muted">最終構図では Y 軸に −90 度回転も加えています。</p>
+
+<h2>7. マテリアル</h2>
+
+<ol>
+  <li><code>Tab</code> → <strong>Quick Surface Material</strong> を置きます</li>
+  <li>マテリアルを選んで<strong>地形にドラッグ＆ドロップします</strong>。
+      どのジオメトリプリムに当てるか聞かれるので <code>height</code> を選びます</li>
+</ol>
+
+<p>当てた直後は<strong>やたらツヤツヤになります</strong>。
+Quick Surface Material は既定で <strong>display color アトリビュートを読みます</strong>が、
+スペキュラとラフネスが砂漠の岩には合っていないためです。</p>
+
+<p><strong>Roughness を上げます</strong>（この例では 175 相当まで）。これで一気に岩らしくなります。</p>
+
+<p class="tx-muted">Quick Surface Material の中身については
+<a href="sidefx-summonvfx-04-unreal.html">Summon VFX の第4回</a>ではなく
+<a href="sidefx-foundations-05-solaris-materials.html">Foundations のレッスン5</a>にまとめています。
+同梱の USD を参照する仕組みなので、クックが速いという性質があります。</p>
+
+<h2>8. 2K と 4K を見比べる</h2>
+
+<p>レンダー前に<strong>スナップショットを撮って比較します</strong>。</p>
+
+<ol>
+  <li>今（2K）の状態でスナップショットを撮ります</li>
+  <li>Scene Import All から OBJ に飛び、height field の COPnet を <strong>4K</strong> にします</li>
+  <li>Karma を再スタートしてもう1枚スナップショット</li>
+  <li>2枚をダブルクリックすると比較ウィンドウが開きます</li>
+</ol>
+
+<p><strong>侵食のディテールがはっきり変わります。</strong>
+講師は「8K ならさらに上がる」とも言っています。
+第1節で解像度を COPnet に出しておいたのが、ここで効いてきます。</p>
+
+<h2>9. Karma と Image Filter（H22 の新機能）</h2>
+
+<ol>
+  <li><code>Tab</code> → <strong>Karma Setup</strong>。シェーダのプリコンパイルを聞かれますが、
+      Quick Surface Material 1枚だけなので <strong>precompile しない</strong>で進めます</li>
+  <li>Assign Material を Karma Render Settings に繋ぎ、表示フラグを Karma Render Settings に立てます</li>
+  <li><strong>カメラ名が自分のカメラと一致しているか確認します</strong>（これで使うカメラが決まります）</li>
+</ol>
+
+<img src="img/howto-render-terrains-001700.png" alt="Karma Render Settings の Filters セクション。Image Filter が追加され、chromatic aberration と vignetting と tone mapping のパラメータが並んでいる。ネットワークは Assign Material から Karma Render Settings に繋がっている">
+
+<p><strong>Filters</strong> の <code>+</code> を押すと <strong>Image Filter</strong> が追加できます。
+レンダー前に画像に効果を足せます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>フィルタ</th><th>この例の値</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Chromatic Aberration</strong></td>
+        <td>既定は強すぎるので <strong>Global Distortion を 10 で割ります</strong></td></tr>
+    <tr><td><strong>Vignetting</strong></td><td><code>0.75</code> / <code>1.25</code> / 全体 <code>0.5</code></td></tr>
+    <tr><td><strong>Tone Mapping</strong></td><td><strong>ACES Filmic</strong>。映画寄りの絵になります</td></tr>
+  </tbody>
+</table></div>
+
+<p>あとは <strong>Render to MPlay</strong> または <strong>Render to Disk</strong> で完成です。</p>
+
+<p class="tx-muted">音声では ACES Filmic が「Asus Filmic」のように聞こえますが、<strong>ACES Filmic</strong> です。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>解像度は<strong>COPnet 側の Default Resolution</strong> に出します。外から 2K / 4K を切り替えられます</li>
+  <li>COPnet の出力は<strong>メッシュではなくボリューム</strong>です。<strong>Convert Height Field</strong> でメッシュ化します（この例で400万ポリゴン）</li>
+  <li><strong>Use External COP</strong> をオンにすると、中の表示フラグに関係なく指定したノードが外に出ます</li>
+  <li>HF Erode の <strong>debris / sediment / flow</strong> は <strong>Cable Pack でまとめて</strong>持ち出せます。<strong>Set Fields from Inputs</strong> を押すのが要点です</li>
+  <li>大気を効かせるには<strong>地形が現実のスケールに近い</strong>必要があります。この例では 1km を5倍に</li>
+  <li>Transform で<strong>何も起きないときは Primitives に「all mesh primitives」</strong>を指定します</li>
+  <li>Quick Surface Material は <strong>display color を読みます</strong>。当てた直後のツヤは <strong>Roughness</strong> で落とします</li>
+  <li><strong>スナップショットで 2K と 4K を比較</strong>できます</li>
+  <li>H22 の <strong>Image Filter</strong> で chromatic aberration / vignetting / <strong>ACES Filmic</strong> のトーンマッピングを足せます</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

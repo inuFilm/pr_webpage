@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>リグにプロシージャルな動きを乗せて戻す — Animation from Skeleton | 技術メモ | makeinufilm</title>
+  <meta name="description" content="APEX からスケルトンを出し、SOP で好きに変形して APEX に戻します。戻した動きはアニメーションレイヤーとして乗るので、非破壊のまま上からさらに手付けできます。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>リグにプロシージャルな動きを乗せて戻す — Animation from Skeleton</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=BRSJx1lWlJM">Houdini 22 | How to Procedurally Deform Rigs</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 8:33 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+ノード名とパラメータ名は Houdini 22.0.368 の実機で照合しています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/BRSJx1lWlJM"
+          title="Houdini 22 | How to Procedurally Deform Rigs" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回がやること</h2>
+
+<p><strong>APEX からスケルトンを取り出し、SOP で好きなだけプロシージャルに変形して、APEX に戻します。</strong></p>
+
+<p>戻した動きは<strong>アニメーションレイヤーとして乗る</strong>ので、
+非破壊のまま上にさらに手付けできます。
+「手付けアニメの上に揺れ・振動・ノイズを足したい」という要求に対する Houdini の答えです。</p>
+
+<p>短い How-To の中でも、<strong>いちばん応用が効く回</strong>だと思います。</p>
+
+<h2>1. スケルトンを取り出す</h2>
+
+<p>APEX シーンの中身は<strong>全部パックされている</strong>ので、ノードを選んでも何も選択できません。
+中に手を入れる必要があります。</p>
+
+<ol>
+  <li><strong>APEX Unpack Character</strong> を配置します</li>
+  <li><strong>Character Name</strong>（<code>charname</code>）に対象キャラを指定します（この例では <code>harry</code>）</li>
+</ol>
+
+<img src="img/howto-deform-rigs-000135.png" alt="ネットワークビューの unpackcharacter1 ノードの下に4つの出力コネクタが横並びで出ている。ナレーションによれば左から APEX シーンのパススルー、rest geo、rest skeleton、animated skeleton">
+
+<h3>4つの出力</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>内容</th><th>使う？</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>APEX シーンのパススルー（そのまま別の Scene Animate に繋いで続けられます）</td><td></td></tr>
+    <tr><td>2</td><td>rest geo</td><td></td></tr>
+    <tr><td>3</td><td>rest skeleton</td><td></td></tr>
+    <tr><td>4</td><td><strong>animated skeleton</strong></td><td><strong>これを使います</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">実機で確認すると <code>visoutput</code>（Visualize Output）のメニューが
+<code>character</code> / <code>skin</code> / <code>capturepose</code> / <code>animatedpose</code> となっていて、
+4つの出力がそれぞれこれに対応しているのが分かります。
+Shape Path / Skeleton Path / Rig Path の既定値はそれぞれ
+<code>/Base.shp</code> / <code>/Base.skel</code> / <code>/Base.rig</code> です。</p>
+
+<h2>2. SOP で好きに変形する</h2>
+
+<p>ここが気持ちのいいところです。<strong>スケルトンは単なるジオメトリ（点の集まり）なので、
+SOP で何をしてもよい</strong>のです。</p>
+
+<p>この回では <code>attribvop</code>（Attribute VOP）を使います。</p>
+
+<ol>
+  <li>VOP の中に <strong>Anti-Aliased Flow Noise</strong> を置きます</li>
+  <li>点の <code>P</code> をノイズの position に繋ぎます</li>
+  <li>結果を <code>P</code> に<strong>加算</strong>して出力します</li>
+  <li>Flow Noise を <strong>3D Motion</strong> に設定し、<strong>Time を flow value に繋ぎます</strong>
+      → 時間で流れる動きになります</li>
+  <li><code>bonedeform</code>（Bone Deform）に繋いで結果を確認します</li>
+</ol>
+
+<p>これで手付けアニメの上にプロシージャルな動きが<strong>重なっている</strong>のが見えます。</p>
+
+<h3>効かせるタイミングを制御する</h3>
+
+<p>ノイズの <strong>Amplitude をプロモートして上位でキーフレームを打ちます</strong>。</p>
+
+<p><code>0</code> → 着地で <code>0.6</code> → すぐ <code>0</code> に戻す、とすれば
+<strong>踵が着いた瞬間だけ揺れます</strong>。</p>
+
+<p>常時揺れているのではなく「ここだけ」にできるのが実用上大きいと思います。</p>
+
+<h2>3. APEX に戻す</h2>
+
+<p><strong>APEX Animation from Skeleton</strong> を使います。
+<strong>SOP / KineFX の世界と APEX の世界を繋ぐノード</strong>で、この回の主役です。</p>
+
+<img src="img/howto-deform-rigs-000540.png" alt="APEX Animation from Skeleton の全パラメータ。Rig Path と Skeleton Path にキャラのベースリグとベーススケルトンのパスが入り、Frame Range、Clip Name、Layer Name、Controls の欄が並んでいる">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>値</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>Rig Path / Skeleton Path</td>
+        <td>例: <code>/Harry.char/Base.rig</code> / <code>/Harry.char/Base.skel</code></td>
+        <td>キャラのベースリグ／ベーススケルトンを指定します</td></tr>
+    <tr><td>Frame Range</td><td>例では <code>1〜150</code></td>
+        <td><strong>必要な範囲に絞ります。</strong>下の注意を参照</td></tr>
+    <tr><td>Clip Name</td><td><code>default</code> のまま</td><td>Scene Animate の default クリップに書かれます</td></tr>
+    <tr><td><strong>Layer Name</strong><br><span class="tx-muted">newlayer</span></td>
+        <td>例: <code>proc_motion</code></td>
+        <td><strong>ここが重要です。</strong>名前を付けると<strong>新しいアニメーションレイヤーとして乗ります</strong>。
+        既定値は <code>$OS</code> なので、ノード名がそのままレイヤー名になります</td></tr>
+    <tr><td>Controls</td><td><strong>空のまま</strong></td><td>空だと全コントロールに適用されます。絞りたいときだけ指定します</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Frame Range を絞る意味は大きいです。</strong>
+このノードは<strong>アニメーションデータを channel primitive に変換する</strong>ので時間がかかります。
+必要な範囲だけにしておくと待ち時間が変わります。</p>
+
+<h3>配線</h3>
+
+<p>変形したスケルトン（Unpack Character の4番目の出力を SOP で加工したもの）を
+<strong>第2入力</strong>に繋ぎます。第1入力には APEX シーンが入ります。</p>
+
+<p>最初はエラーが出ますが、パラメータを埋めれば消えます。
+そのまま <strong>Scene Animate</strong> に繋いでビューアステートに入れば、
+プロシージャルな動きが乗ったリグが動きます。</p>
+
+<h2>4. 非破壊であることの意味</h2>
+
+<p>ここがこの回の要点です。乗った動きは<strong>別のレイヤー</strong>なので、</p>
+
+<ul>
+  <li><strong>オフにできます</strong></li>
+  <li><strong>ウェイトを触って効き具合を調整できます</strong>（「ちょっとだけ欲しい」ができます）</li>
+  <li>全コントロールを選んで<strong>その上に新しいレイヤーを足し</strong>（<code>fix</code> など）、
+      <strong>その上からさらに手付けできます</strong></li>
+</ul>
+
+<p>つまり<strong>「手付け → プロシージャル → また手付け」</strong>が積み上げられます。
+一度プロシージャルを乗せたら手が出せない、ということになりません。</p>
+
+<p>講師も「この一区切りの中でやれることはほぼ無制限で、
+そのまま HDA にしてツール化することもできる」と言っています。
+実際、この流れは<strong>スケルトンを出す → SOP で加工する → Animation from Skeleton で戻す</strong>
+という3手なので、ツールにしやすい形だと思います。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>APEX の中身はパックされているので <strong>APEX Unpack Character</strong> で開けます</li>
+  <li>出力は4つ。使うのは<strong>4番目の animated skeleton</strong> です</li>
+  <li><strong>スケルトンは点の集まりなので、SOP で何をしてもよい</strong>のがこの回の解放感です</li>
+  <li>Flow Noise を <strong>3D Motion</strong> にして <strong>Time を flow value に</strong>繋ぐと時間で流れます</li>
+  <li>Amplitude を<strong>プロモートしてキーを打てば</strong>、着地の瞬間だけ揺らすといった制御ができます</li>
+  <li>戻すのは <strong>APEX Animation from Skeleton</strong>。変形したスケルトンは<strong>第2入力</strong>です</li>
+  <li><strong>Frame Range は絞ります。</strong>channel primitive への変換に時間がかかります</li>
+  <li><strong>Layer Name を付けると新しいレイヤーになります</strong>（既定は <code>$OS</code>）。だから非破壊で、
+      オフにもウェイト調整も、上からの手付けもできます</li>
+  <li>Controls は空のままで全体に適用されます</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

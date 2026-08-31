@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summon VFX 4 — Unreal でマテリアルと Niagara を組む | 技術メモ | makeinufilm</title>
+  <meta name="description" content="sRGB とマスク圧縮のインポート設定から、Channel Mask Parameter を軸にした共通マテリアル、Point Attraction と Vortex の使い分け、Parallax Occlusion Mapping、VAT の Num Customized UVs まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Summon VFX 4 — Unreal でマテリアルと Niagara を組む</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=7RnVqSF3MmI">Summon VFX | 4 | Import to Unreal</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/realtime-summon-vfx/">Realtime Summon VFX</a> の第4回 / 講師 Cesar Merchan さん / Unreal Engine 5.7 / 42:16 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-summonvfx-03-cloth.html">Vellum で布をドレープして破る</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/7RnVqSF3MmI"
+          title="Summon VFX | 4 | Import to Unreal" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li><strong>持ち込みの設定</strong>。ここを間違えると後の全部が狂います</li>
+  <li>Houdini 側で用意した<strong>パックテクスチャを Unreal でどう使うか</strong>。共通パターンが1つあります</li>
+  <li>Niagara システム<strong>2つ</strong>の役割分担と、<strong>Loop Delay</strong> で第2部を3秒後に始める組み方</li>
+  <li>火の粉を集める <strong>Point Attraction Force</strong> と、開いた瞬間に散らす <strong>Vortex Force</strong></li>
+  <li><strong>Parallax Occlusion Mapping</strong> でポータルに深さを出すこと</li>
+  <li>前回の VAT を受け取るマテリアルの作り方。<strong>Num Customized UVs = 5</strong> が鍵です</li>
+  <li>煙は Labs のテンプレートを<strong>複製して使う</strong>という前提になっていること</li>
+</ul>
+
+<p>42分あってエミッタの数も多いのですが、<strong>materialの作り方はほぼ1パターンの繰り返し</strong>です。
+そこを最初に押さえてしまえば、あとは「どのエミッタで何を変えたか」を追うだけになります。</p>
+
+<h2>1. 持ち込みの設定</h2>
+
+<p>ここは動画の中でいちばん実用的な部分だと思います。既定のままだと正しく動きません。</p>
+
+<h3>メッシュ</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th><th>なぜ</th></tr></thead>
+  <tbody>
+    <tr><td>Vertex Color Import Option</td><td><strong>Replace</strong></td><td>前回メッシュに焼いた頂点カラーを、そのまま持ち込むためです</td></tr>
+    <tr><td>Import Materials</td><td><strong>オフ</strong></td><td>マテリアルは Unreal 側で作るので、要りません。オンだと余計なものが増えます</td></tr>
+  </tbody>
+</table></div>
+
+<p>取り込んだらスタティックメッシュを開いて、<strong>Vertex Color 表示で頂点カラーが入っているか</strong>を確認します。
+第1回で仕込んだグラデーションがここで生きているかどうかの確認です。</p>
+
+<h3>テクスチャ</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>種類</th><th>設定</th></tr></thead>
+  <tbody>
+    <tr><td>パックテクスチャ</td><td><strong>sRGB をオフ</strong>、Compression Settings を <strong>Masks</strong> に</td></tr>
+    <tr><td>法線マップ</td><td>Compression Settings を <strong>Normal map</strong> に</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>sRGB をオフにする理由</strong>は、パックテクスチャの中身が「色」ではなく「値」だからです。
+R に模様、G に別の模様、B にさらに別の模様を詰めているので、
+色として補正されてしまうと数値が変わってしまいます。</p>
+
+<h3>スクリプトに任せられるもの</h3>
+
+<p>フリップブックと VAT のテクスチャは設定項目が多いのですが、
+<strong>Labs プラグインがスクリプトを用意してくれています</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>対象</th><th>操作</th><th>設定される内容</th></tr></thead>
+  <tbody>
+    <tr><td>フリップブック</td><td>右クリック → <strong>Scripted Asset Actions</strong> → Houdini Config Texture for Flipbook</td>
+        <td>Compression Settings を <strong>BC7</strong>（高品質圧縮）に、sRGB をオフ</td></tr>
+    <tr><td>VAT のテクスチャ</td><td>右クリック → Scripted Asset Actions → Houdini Config Textures for HDR</td>
+        <td>Compression を <strong>HDR</strong> に、sRGB をオフ</td></tr>
+  </tbody>
+</table></div>
+
+<p>VAT のテクスチャは Houdini から HDR で書き出しているので、HDR 用のほうを選びます。
+加えて <strong>Filter を Nearest</strong> にしておくのが良いそうです。
+頂点の位置が入っているテクスチャなので、補間されると位置がずれます。</p>
+
+<p class="tx-muted">スクリプトが何を設定しているかは実行後に確認できるので、
+中身を見てから使うのが安心だと思います。</p>
+
+<h2>2. マテリアルの共通パターン</h2>
+
+<p>この回のマテリアルはほとんど同じ骨格をしています。</p>
+
+<img src="img/sidefx-summonvfx-04-unreal-000500.png" alt="Unreal のマテリアルエディタ。パックテクスチャを Texture Sample で読み、Channel（Channel Mask Parameter、Mask Channel は Red）でチャンネルを選び、Multiply で Particle Color を掛けている。上部のタブにこの回で作るマテリアルが多数並んでいる">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>段</th><th>ノード</th><th>役</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Texture Sample</td><td>パックテクスチャを読みます</td></tr>
+    <tr><td>2</td><td><strong>Channel Mask Parameter</strong></td><td><strong>どのチャンネルを使うかをパラメータで選びます</strong>。Mask Channel = Red など</td></tr>
+    <tr><td>3</td><td>Multiply</td><td><strong>Particle Color</strong> を掛けます。色は Niagara 側から来ます</td></tr>
+    <tr><td>4</td><td>Multiply</td><td>Emissive の強さを掛けます</td></tr>
+    <tr><td>5</td><td>Multiply</td><td>不透明度に<strong>頂点カラー</strong>を掛けます（第1回で焼いたもの）</td></tr>
+    <tr><td>6</td><td><strong>Depth Fade</strong></td><td>メッシュと床の<strong>硬い境目を消します</strong></td></tr>
+    <tr><td>7</td><td><strong>Fresnel</strong></td><td>縁をなめらかに抜きます</td></tr>
+    <tr><td>8</td><td><strong>Dynamic Material Parameter</strong></td><td>侵食（エロージョン）を Niagara から駆動します</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Channel Mask Parameter がパックテクスチャの受け皿です。</strong>
+1枚のテクスチャから「今回は R」「こちらは G」と選ぶだけで別の模様になります。
+第2回でわざわざ詰めた意味がここで出ます。</p>
+
+<p><strong>Depth Fade と Fresnel はほぼ全部のマテリアルに入っています。</strong>
+板や円盤が床に刺さっている境目が硬く見えるのを消すためで、
+リアルタイムの見た目を整える定番の手当てだと思います。</p>
+
+<h2>3. 第1部 — エネルギーを集める</h2>
+
+<p>Niagara システムは2つあります。1つ目（<code>NS_SummonVFX</code>）が召喚エフェクト全体、
+2つ目がキャラクターの登場です。まずは1つ目の中身です。</p>
+
+<h3>円の模様 3枚</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th><th>狙い</th></tr></thead>
+  <tbody>
+    <tr><td>スポーン</td><td><strong>Spawn Burst</strong></td><td>一度だけ出します</td></tr>
+    <tr><td>Sprite Facing and Alignment</td><td>床に合わせる</td><td>地面に貼り付いた模様にします</td></tr>
+    <tr><td>Kill Particles</td><td><strong>オフ</strong></td><td>ポータルが開いているあいだ<strong>消えないようにします</strong></td></tr>
+    <tr><td>Sprite Rotation Rate</td><td>速く始めて 100 前後へ</td><td>最初に勢いよく回して、だんだん一定の回転に落ち着かせます</td></tr>
+    <tr><td>Dynamic Material Parameter</td><td>侵食を駆動</td><td>模様がじわじわ現れます</td></tr>
+  </tbody>
+</table></div>
+
+<p>3枚のうち中と中心のものは<strong>同じ作りで Scale のカーブを −1 にします</strong>。
+これだけで<strong>回転方向が逆になります</strong>。1枚は右回り、1枚は左回り、
+もう1枚は右回りだけれど弱め、という具合に差を付けています。</p>
+
+<h3>ソーラークラスタ — テクスチャをスクロールさせる</h3>
+
+<p>ここは <strong>Mesh Renderer</strong> を使い、第1回で作った3つのメッシュを全部登録します。</p>
+
+<p>マテリアルで面白いのは<strong>UV のスクロールの作り方</strong>です。
+単純に Panner を使うのではなく、こうしています。</p>
+
+<ol>
+  <li>テクスチャのアドレスモードを <strong>Clamp</strong> にします（今回はタイリングしたくないので）</li>
+  <li>UV に Tiling の値を掛けます</li>
+  <li>UV の<strong>2成分を分離</strong>します</li>
+  <li>R（U）はそのまま、<strong>G（V）は 1 から引いて値を足します</strong></li>
+</ol>
+
+<p><strong>なぜ 1 から引くのか</strong>という説明が丁寧でした。
+そのまま Panner で流すと値が 0 から −1 に動きます。
+1 から引いておけば <strong>1 から 0 に動く</strong>ので、
+Niagara から渡す値を 0〜1 の範囲で扱えます。</p>
+
+<p>扱いやすい値の範囲に合わせるための一手間で、こういう細かい配慮が要所だなと思います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Niagara 側の設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>Spawn Rate</td><td><code>8</code></td></tr>
+    <tr><td>Life / Lifetime</td><td>Mean と Max を低めに</td></tr>
+    <tr><td>Mesh Scale</td><td><strong>Random Uniform 1〜2</strong></td></tr>
+    <tr><td>メッシュのインデックス</td><td><code>0</code>〜<code>2</code>（3つのメッシュから引きます）</td></tr>
+    <tr><td>Initial Mesh Orientation</td><td>ランダムに散らします</td></tr>
+    <tr><td>Scale Color</td><td>フェードイン・フェードアウト</td></tr>
+    <tr><td>スクロール速度</td><td><strong>パーティクルごとにランダム</strong>。速いものと遅いものが混ざります</td></tr>
+  </tbody>
+</table></div>
+
+<h3>集まってくる火の粉 — Point Attraction Force</h3>
+
+<p>ここで第2回の<strong>2×2 アトラス</strong>が効きます。
+動画の言い方だと「ただの球や退屈なスパークのテクスチャを使わずに済む」ためです。</p>
+
+<ol>
+  <li><strong>Sprite Renderer</strong> にアトラスのマテリアルインスタンスを設定します</li>
+  <li><strong>Sub Image Index</strong> を <strong>Distribution Weight</strong> で振り、
+      インデックス 0 か 3 を引かせます</li>
+  <li><strong>Shape Location</strong> で球の半径上に発生させます</li>
+  <li><strong>Point Attraction Force</strong> を、<strong>最初は効かせず、だんだん中心へ引く</strong>ように上げていきます</li>
+  <li>Curl Noise を少しだけ足します</li>
+</ol>
+
+<p><strong>引力を時間で立ち上げる</strong>のがこのエフェクトの芯だと思います。
+最初はふわふわ浮いていて、やがて中心に吸い込まれていく、という流れがこれで作れます。</p>
+
+<h3>吸い込みの円盤と、中心の球</h3>
+
+<p>円盤は第1回の disc メッシュに、ノイズを X と Y にタイリング・パンニングしたマテリアルを当てます。
+Emissive はテクスチャから<strong>マスクの G を引いた</strong>もの、
+不透明度は Particle Color のアルファと頂点カラーを掛けたものです。
+最後に <strong>Dynamic Material Parameter を引いて</strong>侵食させます。</p>
+
+<p>中心の球は2種類のマテリアルを使います。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>1つ目</td><td>ノイズを <strong>Vector to Radial Value</strong> で U に渡して放射状にし、
+        <strong>Radial Gradient Exponential</strong> を掛けて外側を切ります</td></tr>
+    <tr><td>2つ目</td><td>Radial Gradient Exponential だけの単純な光球です</td></tr>
+  </tbody>
+</table></div>
+
+<p>エミッタ側は速度を持たせません。<strong>中心に留めたいので、動かす要素をあえて入れていません。</strong>
+代わりに <strong>Camera Offset</strong> を少し入れて、他のものより手前に来るようにしています。</p>
+
+<h2>4. 第2部 — ポータルが開く</h2>
+
+<h3>Loop Delay で3秒後に始める</h3>
+
+<p>第2部のエミッタには <strong>Loop Delay</strong> を入れて、
+<strong>第1部が終わるタイミング（3秒後）にまとめて開始させます</strong>。</p>
+
+<p>1つの Niagara システムの中で「エネルギーを集める」→「ポータルが開く」という
+2段構成を作るのに、時間軸をずらすだけで済ませています。
+シーケンサ側でタイミングを取るより、システム内で完結していて分かりやすいと思います。</p>
+
+<h3>ポータル本体 — Parallax Occlusion Mapping</h3>
+
+<img src="img/sidefx-summonvfx-04-unreal-003217.png" alt="Unreal のビューポートに開いたポータル。左のアウトライナには第1回で作った8つのメッシュがそのまま並んでいる。下部には NS_SummonVFX のエミッタ一覧、右側には Erode を Float from Curve で駆動する Dynamic Material Parameters の設定が見える">
+
+<p>ポータルには<strong>深さがあるように見せたい</strong>ので、
+<strong>Parallax Occlusion Mapping</strong> を使います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>入力</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>Texture Object</td><td>Ramps のテクスチャの <strong>B チャンネル</strong></td></tr>
+    <tr><td>Height Ratio</td><td><code>0.1</code></td></tr>
+    <tr><td>Min / Max Steps</td><td>調整</td></tr>
+  </tbody>
+</table></div>
+
+<p>Height Ratio について、動画がノードのツールチップをそのまま読み上げています。
+<strong>「高さマップが幅に対してどれくらい深いか。典型的な値は 0.005 から 0.1」</strong>。
+講師の推奨は <strong>0.2 から 0.1 くらい</strong>で、深くしすぎない範囲に収めています。</p>
+
+<p>そのうえで、ノイズで歪ませ、Particle Color を掛け、
+<strong>Lerp で「その結果」と「真っ黒」を頂点カラーで混ぜます</strong>。
+これがポータルの中心の黒い穴になります。
+第1回でメッシュに焼いたグラデーションが、そのまま穴の形を決めているわけです。</p>
+
+<h3>開いた瞬間に散らす — Vortex Force</h3>
+
+<p>火の粉のエミッタをもう1つ作りますが、こちらは
+<strong>Point Attraction Force ではなく Vortex Force</strong> を使います。
+<strong>Force Amount</strong> と <strong>Origin Pull Amount</strong> を調整します。</p>
+
+<p>第1部で中心に引き寄せていたものを、第2部では渦で散らす。
+<strong>同じエミッタ構成で力だけを差し替える</strong>と流れが反転する、という分かりやすい対比です。</p>
+
+<h3>回るリングと光条</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>要素</th><th>作り</th></tr></thead>
+  <tbody>
+    <tr><td>リング</td><td>ring メッシュ。<strong>Update Mesh Orientation</strong> で回転させ続け、ライフタイムは無限。
+        マテリアルはノイズをパンニング＋タイリングして別のノイズで歪ませ、
+        <strong>反転した Generated Band</strong> を掛けます。不透明度は ramps × 頂点カラー × Particle Color</td></tr>
+    <tr><td>光条</td><td>cylinder メッシュ。ノイズをスクロールさせ、UV にタイリングを掛けます。
+        <strong>Four Vector を使っているが実際に使うのは R と G だけ</strong>（Append Vector と同じ結果）。
+        最後にランプを掛けて上をフェードさせ、メッシュのスケールを 0 → 1 にしながら回します</td></tr>
+  </tbody>
+</table></div>
+
+<p>リングは2つ用意して、<strong>片方を赤く、もう片方を黒く</strong>保っています。
+同じ形でも色で役割を分ける、という使い方です。</p>
+
+<h3>飛び散る破片</h3>
+
+<p>破片には既存のマテリアル（edge energy、cylinder energy）を再利用し、
+球用に2つだけ新しく作ります。作りは他と同じ<strong>「ノイズを XY にパンニングして歪ませる」</strong>レシピです。</p>
+
+<p>違うのは<strong>寿命の扱い</strong>です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>ライフタイム</th></tr></thead>
+  <tbody>
+    <tr><td>ポータル本体・リング・光条</td><td><strong>無限</strong>（開いているあいだ残す）</td></tr>
+    <tr><td>破片</td><td><strong>寿命が来たら消す</strong>。値もかなり低く、形を素早くスケールさせます</td></tr>
+  </tbody>
+</table></div>
+
+<p>「残すもの」と「一瞬で消えるもの」を分けているだけですが、
+これがあると<strong>開いた瞬間の衝撃と、開き続けている状態</strong>が両立します。</p>
+
+<h2>5. VAT のキャラクターを受け取る</h2>
+
+<p>前回 Houdini から書き出した VAT を、Unreal 側で動かすためのマテリアルを作ります。
+使うのは Labs プラグインの <strong>Houdini Vertex Animation Soft Body Deformation</strong> です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th><th>なぜ</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Num Customized UVs</strong></td><td><code>5</code></td>
+        <td><strong>ここが鍵です。</strong>UV1 が1番目、UV2 が2番目…と対応するので、必要な数だけ確保します</td></tr>
+    <tr><td>Tangent Space Normal</td><td><strong>オフ</strong></td><td>法線を VAT 側から与えるためです</td></tr>
+    <tr><td>Normal</td><td>関数の出力を接続</td><td>—</td></tr>
+    <tr><td><strong>World Position Offset</strong></td><td>関数の出力を接続</td><td><strong>頂点をここで動かします。</strong>VAT の本体です</td></tr>
+  </tbody>
+</table></div>
+
+<p>マスターマテリアルを保存すると、マテリアルインスタンスに
+<strong>Houdini Vertex Animation Texture</strong> という項目が現れます。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>Playback Speed</td><td>再生速度</td></tr>
+    <tr><td><strong>Houdini FPS</strong></td><td><strong>Houdini 側で作業した FPS</strong>。ここが合っていないと速度が狂います</td></tr>
+    <tr><td>Position / Rotation Textures</td><td>書き出したテクスチャを差し込みます</td></tr>
+  </tbody>
+</table></div>
+
+<p>これを<strong>体用と布用で別々のマテリアルインスタンス</strong>として作り、
+それぞれのメッシュに割り当てます。前回 VAT を2つ書き出したのはこのためです。</p>
+
+<h2>6. 第3部 — 登場の煙</h2>
+
+<p>2つ目の Niagara システムです。新しい要素は<strong>煙</strong>で、
+第2回で作った 8×8 のフリップブックをここで使います。</p>
+
+<h3>テンプレートを複製して使う</h3>
+
+<p>煙のマテリアルは自分で組むのではなく、Labs が用意した
+<strong>Template Vat Advanced Base</strong> を複製して使います。
+Plugins → SideFX Labs のマテリアルテンプレートの中にあり、
+<strong>テンプレート自身に「これを複製して自分のフォルダに保存してください」と書かれています</strong>。</p>
+
+<p>変えたのは次の点だけです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>箇所</th><th>変更</th></tr></thead>
+  <tbody>
+    <tr><td>Time</td><td>2つのスカラー値を掛けます。1つは <strong>Flipbook Speed</strong>、もう1つは <strong>Start Frame</strong></td></tr>
+    <tr><td>Base Color</td><td>Particle Color を直接繋ぎます</td></tr>
+    <tr><td>Emissive</td><td>既定の入力 × Particle Color × <strong>0.02</strong> くらい（ほんのり光る程度に）</td></tr>
+    <tr><td>Opacity</td><td>既定の入力 × Particle Color × Depth Fade</td></tr>
+  </tbody>
+</table></div>
+
+<p>マテリアルインスタンスには <strong>Houdini FB Textures</strong> の項目が出るので、
+Houdini から書き出したフリップブックをそこに差します。
+<strong>Motion Vector Scale はかなり低く</strong>しています。</p>
+
+<h3>煙のエミッタ4種</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>エミッタ</th><th>特徴</th></tr></thead>
+  <tbody>
+    <tr><td>中心の煙</td><td>速度は低く、<strong>Shape Location は Torus</strong>。Drag を少し。
+        Scale Color を 0 → 1 → 0。<strong>Flipbook Speed を 0.1〜0.2 でランダム</strong>にし、
+        <strong>開始フレームもランダム</strong>（0 から始まるものと14から始まるものが混ざります）</td></tr>
+    <tr><td>外へ広がる煙</td><td>速度を点から外向きに。円の模様の方向に合わせています。Camera Offset を少し</td></tr>
+    <tr><td>引き伸ばした煙</td><td><strong>非均等スケール</strong>（50〜200）でキャラクターに添わせます</td></tr>
+    <tr><td>上へ昇る火の粉</td><td>速度は <strong>Z 軸方向のみの Linear</strong>。最小・最大をランダムに。Curl Noise を少し</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>フリップブックの開始フレームをランダムにする</strong>のが効いています。
+同じ 64 コマのループでも、パーティクルごとに違うコマから始まれば同じ動きに見えません。
+テクスチャを1枚しか持っていないのに変化を作る、という発想がここでも出ています。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>メッシュは <strong>Vertex Color Import Option = Replace</strong>、<strong>Import Materials はオフ</strong></li>
+  <li>パックテクスチャは <strong>sRGB オフ + Compression = Masks</strong>。色ではなく値なので補正されると壊れます</li>
+  <li>フリップブックと VAT のテクスチャは <strong>Scripted Asset Actions</strong> のスクリプトに任せられます（BC7 / HDR）</li>
+  <li>VAT のテクスチャは <strong>Filter = Nearest</strong>。位置情報なので補間させません</li>
+  <li>マテリアルは<strong>1パターンの繰り返し</strong>です。Texture Sample → <strong>Channel Mask Parameter</strong> → Particle Color → Depth Fade / Fresnel → Dynamic Material Parameter</li>
+  <li>Scale カーブを <strong>−1</strong> にするだけで回転方向が反転します</li>
+  <li>UV スクロールは <strong>V を 1 から引いておく</strong>と、Niagara 側で 0〜1 のまま扱えます</li>
+  <li><strong>Point Attraction Force を時間で立ち上げる</strong>と「集まってくる」動きになります。第2部では <strong>Vortex Force</strong> に差し替えて散らします</li>
+  <li><strong>Loop Delay</strong> で、1つのシステムの中に2段構成（3秒後に第2部）を作れます</li>
+  <li><strong>Parallax Occlusion Mapping</strong> の Height Ratio は 0.005〜0.1 が典型値。深くしすぎません</li>
+  <li>ポータルの黒い穴は <strong>Lerp を頂点カラーで駆動</strong>して作ります</li>
+  <li>「残すもの」は<strong>ライフタイム無限</strong>、「一瞬のもの」は<strong>寿命で消す</strong>。この分け方で衝撃と持続が両立します</li>
+  <li>VAT は <strong>Num Customized UVs = 5</strong>、Tangent Space Normal オフ、<strong>World Position Offset</strong> に接続。<strong>Houdini FPS</strong> を合わせないと速度が狂います</li>
+  <li>煙は Labs の <strong>Template Vat Advanced Base</strong> を<strong>複製して</strong>使うのが前提です</li>
+  <li>フリップブックは<strong>開始フレームをランダムに</strong>すると、1枚でも同じ動きに見えません</li>
+</ul>
+
+<p>次の第5回は最後の4分です。Sequencer にカメラ・カメラシェイク・
+Niagara 2つ・ポストプロセス・ライト・キャラクターを並べて1カットに仕上げます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

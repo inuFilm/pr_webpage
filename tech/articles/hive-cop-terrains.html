@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Copernicus で地形を作る — HIVE 講演 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="フラグ2つで投影できるようになった話から、Height Field Project でポリゴンを地形に混ぜる、侵食をスケールを下げながら重ねる、Save Selected Items as a Tool でレシピ化する、ID をセルに貼って解像度と独立させるまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Copernicus で地形を作る — HIVE 講演</h1>
+        <p class="tech-meta">houdini-cop / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=p18cfW0iX5I">H22 - Terrains in Copernicus | Dmitrii Vlasenko | Houdini 22 HIVE</a>
+（SideFX 公式 Houdini 22 HIVE の講演 / 講演者 Dmitrii Vlasenko さん / Houdini 22 / 32:15 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/p18cfW0iX5I"
+          title="H22 - Terrains in Copernicus | Dmitrii Vlasenko | Houdini 22 HIVE" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>話の流れ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>時刻</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>03:40</td><td><strong>フラグを立てるだけで投影できる</strong>という話</td></tr>
+    <tr><td>07:25</td><td><strong>Height Field Project</strong>。ポリゴンをハイトフィールドに変換して入力とブレンド</td></tr>
+    <tr><td>11:11</td><td>侵食を<strong>スケールを下げながら複数回</strong>かける</td></tr>
+    <tr><td>14:52</td><td>ネットワークが小さいこと。<strong>解像度を変えるだけで 4K 地形</strong>になる</td></tr>
+    <tr><td>18:32</td><td><strong>Save Selected Items as a Tool</strong> でレシピを保存</td></tr>
+    <tr><td>22:15</td><td>縁を焼けた・風化した見た目にする仕上げ</td></tr>
+    <tr><td>25:56</td><td><strong>ID をセルに貼り付ける</strong>方法（石畳）</td></tr>
+    <tr><td>29:44</td><td>Q&amp;A: 遠景でのテクスチャの細部管理</td></tr>
+  </tbody>
+</table></div>
+
+<h2>1. フラグを立てるだけで投影できる</h2>
+
+<p><strong>height 出力にオレンジフラグ、テクスチャに青フラグ</strong>を立てるだけで投影できます。</p>
+
+<p><strong>以前の height field プレビューマテリアルの手順が不要になりました。</strong>
+講演者の言葉だと「何にでも何でも投影できる」。</p>
+
+<p>準備の手数が減るのは地味に効きます。見ながら作る作業では、
+確認のための設定が要らないほうが手が止まりません。</p>
+
+<h2>2. Height Field Project — ポリゴンを地形に混ぜる</h2>
+
+<p>ポリゴンジオメトリを Copernicus に戻し、<strong>ハイトフィールドに変換して入力とブレンドします</strong>
+（ブレンド方法も選べます）。向きのランダム化もできます。</p>
+
+<p>手でモデリングした岩や構造物を、手続き的な地形に馴染ませる、という使い方になります。
+<strong>「全部プロシージャル」と「全部手作業」の間を埋める</strong>ノードだと思います。</p>
+
+<h2>3. 侵食はスケールを下げながら複数回かける</h2>
+
+<p>これが実務的な話です。侵食を<strong>スケールを下げながら複数回</strong>かけて馴染ませます。</p>
+
+<p>面白いのはその結果です。<strong>それでも strata の線は透けて残ります。</strong>
+前段で作った sediment も効いています。</p>
+
+<p><a href="howto-terrains-in-cops.html">ハウツーの地形の回</a>でも
+「Terrace の段は侵食しても消えない」という話が出てきましたが、
+同じ性質を<strong>意図して使っている</strong>のがこの講演です。
+消えないことを前提に、消えかけた層を残すために侵食を重ねます。</p>
+
+<h2>4. ネットワークは小さい</h2>
+
+<p>14:52 で強調されています。<strong>ネットワークは小さく、すべてプロシージャルなので、
+最初に戻って解像度を変えるだけで 4K 地形になります。</strong></p>
+
+<p>ハウツーの回で「解像度を COPnet 側で管理する」という話が出てきましたが、
+<strong>その運用がそのまま効いている状態</strong>です。
+下書きは低解像度で組んで、最後に上げる。</p>
+
+<h2>5. レシピとして保存する</h2>
+
+<p><strong>Save Selected Items as a Tool</strong> を使います。</p>
+
+<p>選択したノードが小さなノードグラフとして表示され、
+<strong>レシピに名前を付けて保存できます</strong>。
+<strong>同一セッション内で Tab メニューに出てきます。</strong></p>
+
+<img src="img/hive-cop-terrains-001900.png" alt="講演のスライド。保存したレシピが Tab メニューに表示されている様子と、Copernicus の Tab カテゴリ一覧が並んでいる">
+
+<p>このスライドで <strong>Copernicus の Tab カテゴリ一覧</strong>も読めます。
+どんな道具が揃っているかの見取り図になります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Copernicus の Tab カテゴリ</th></tr></thead>
+  <tbody>
+    <tr><td>Analysis / Color / Digital Assets / Dynamics / File IO / Filters / Geometry / Group / Layer /
+        Machine Learning / Managers / Mattes / Patterns / <strong>Recipes</strong> / Shapes /
+        <strong>Terrain</strong> / Test Geometry / Texture Maps / Time / Transform / Utility</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Recipes と Terrain が独立したカテゴリとしてある</strong>のが分かります。
+レシピは「便利機能」ではなく、最初から想定された使い方だということです。</p>
+
+<h2>6. 仕上げ — 縁を焼く</h2>
+
+<p>22:15 で最後にもう1つノイズを通し、
+<strong>ハイトフィールドの縁を選んで焼けた・風化した見た目</strong>にし、
+<strong>Bright</strong> ノードで仕上げます。</p>
+
+<p>講演者の言葉で<strong>「短いノードチェーンでここまで行ける」</strong>とまとめられています。</p>
+
+<h2>7. ID をセルに貼り付ける（石畳）</h2>
+
+<p>25:56 からの話です。<strong>ID をセルに貼り付ける</strong>ことで、
+<strong>石畳のセルを正確に表現しつつ、入力解像度が変わっても均一に保てます</strong>。</p>
+
+<p>これが重要なのは、解像度を後から上げる運用と噛み合うからです。
+セルの数がピクセル数に依存してしまうと、4K にしたときに石の大きさが変わってしまいます。
+<strong>ID として持てば、解像度と独立します。</strong></p>
+
+<h2>8. Q&amp;A — 遠景の細部管理</h2>
+
+<blockquote>複数のハイトフィールドを作ってブレンドする。</blockquote>
+
+<p>そして<strong>石畳のレシピはそのまま上に重ねられます</strong>。
+レシピ化しておく意味が、ここで回収されています。</p>
+
+<h2>この講演から持ち帰るもの</h2>
+<ul>
+  <li><strong>height にオレンジ、テクスチャに青のフラグ</strong>を立てるだけで投影できます。プレビューマテリアルの手順は不要になりました</li>
+  <li><strong>Height Field Project</strong> でポリゴンを地形に混ぜられます。手作業と手続きの間を埋められます</li>
+  <li>侵食は<strong>スケールを下げながら複数回</strong>。それでも <code>strata</code> の線は透けて残ります</li>
+  <li><strong>ネットワークは小さく、解像度を変えるだけで 4K になります</strong></li>
+  <li><strong>Save Selected Items as a Tool</strong> でレシピ化でき、同一セッション内で Tab に出ます。Tab には <strong>Recipes</strong> カテゴリが最初からあります</li>
+  <li><strong>ID をセルに貼り付ける</strong>と、入力解像度が変わっても石畳の大きさが変わりません</li>
+  <li>遠景は<strong>複数のハイトフィールドをブレンド</strong>。レシピはそのまま上に重ねられます</li>
+</ul>
+
+<p>この講演で「何ができるか」を見て、
+<a href="howto-terrains-in-cops.html">Copernicus で地形を作る回</a>と
+<a href="howto-render-terrains.html">Solaris でレンダリングする回</a>で手を動かすのが良い順番だと思います。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

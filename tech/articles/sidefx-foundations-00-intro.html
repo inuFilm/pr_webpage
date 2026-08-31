@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門の地図 — サッカーボール1個で全工程を通す | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式の H22 Foundations 全9本（1時間35分）の入口です。4つの階層の地図、レッスン3までに組み上がる15ノードのチェーン、最初にやる Set Project と覚えておく変数をまとめました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門の地図 — サッカーボール1個で全工程を通す</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=YHUXW8yah7w">H22 Foundations | Model Render Animate | Introduction</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の Introduction / Houdini 22 / 3:28 / 英語）。
+このページは、上記のシリーズ全9本を見ながら自分用にまとめた日本語の学習メモの入口です。SideFX 公式の翻訳ではありません。
+ノード名とパラメータ名は Houdini 22.0.368 の実機で照合しています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/YHUXW8yah7w"
+          title="H22 Foundations | Model Render Animate | Introduction" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>このシリーズについて</h2>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><th>項目</th><th>内容</th></tr>
+    <tr><td>コース名</td><td>H22 Foundations: Model, Render, Animate</td></tr>
+    <tr><td>提供</td><td>SideFX 公式（Houdini チャンネル）</td></tr>
+    <tr><td>対象バージョン</td><td>Houdini 22</td></tr>
+    <tr><td>難易度</td><td>Beginner — Houdini をこれから触る人向けです</td></tr>
+    <tr><td>本数 / 総尺</td><td>全9本（Intro + レッスン8本） / 1時間35分</td></tr>
+    <tr><td>公開</td><td>2026-07-28</td></tr>
+    <tr><td>題材</td><td>サッカーボール1個。モデリング → UV → ルックデブ → リグ → アニメーション → 連番レンダリングまで通します</td></tr>
+  </tbody>
+</table></div>
+
+<p>1時間半で Houdini の主要な工程をひと通り通せる作りになっています。
+機能の網羅ではなく<strong>1つのショットを最後まで持っていく</strong>構成なので、
+「どこで何をする場所なのか」の地図が手に入るところが良いシリーズだと思います。</p>
+
+<h2>先に持っておきたい地図 — 4つの階層</h2>
+
+<p>Houdini でつまずく原因は、機能を知らないことよりも<strong>自分がいまどの階層にいるか分からなくなること</strong>のほうが多いように思います。
+このコースは4つの世界を行き来するので、手を動かす前にここだけ入れておくと迷子になりにくいです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>階層</th><th>何をする場所か</th><th>登場するレッスン</th></tr></thead>
+  <tbody>
+    <tr><td><code>/obj</code><br>オブジェクトレベル</td>
+        <td>シーンに置かれた「もの」の単位。パラメータは<strong>そのオブジェクト全体の移動・回転</strong>とレンダー設定です。今回は <code>box_object1</code> として生まれて、後で <code>soccerball_geo</code> にリネームされます</td>
+        <td>1〜3</td></tr>
+    <tr><td>SOP<br>ジオメトリレベル</td>
+        <td>オブジェクトの中に入った先。<strong>形を作るノードネットワーク</strong>がここにあります</td>
+        <td>1〜3、4の一部</td></tr>
+    <tr><td><code>/stage</code><br>Solaris（LOP）</td>
+        <td>USD で組む<strong>ルックデブ・レイアウト・ライティング専用の世界</strong>。カメラ・ライト・マテリアル・レンダリングは全部ここです</td>
+        <td>4・5・8</td></tr>
+    <tr><td>アニメーションステート</td>
+        <td><code>Enter</code> で入る Pose ツールの世界。リグのコントロールを掴んでキーを打ちます</td>
+        <td>6・7</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>SOP は「形を計算する」場所、Solaris は「シーンを組んで絵にする」場所です。</strong>
+だから SOP で作った形は、そのままでは Solaris に存在しません。レッスン4で <code>Scene Import</code> を使って明示的に持ち込みます。
+この一方通行が分かると、コースの構造もそのまま見通せるようになります。</p>
+
+<h2>全9本の構成</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>尺</th><th>階層</th><th>やること</th></tr></thead>
+  <tbody>
+    <tr><td>Intro</td><td>3:28</td><td>—</td><td>コース全体の予告。飛ばしても進められます</td></tr>
+    <tr><td>1</td><td>5:49</td><td><code>/obj</code> SOP</td><td>ワークスペースとビュー操作。box → Poly Extrude → Subdivide と組んでから、box を Platonic Solids に差し替えます</td></tr>
+    <tr><td>2</td><td>8:43</td><td>SOP</td><td><strong>このコースの山場。</strong><code>Ray</code> で真円化し、<code>patches</code> アトリビュートを作って For-Each でパッチ単位に押し出します</td></tr>
+    <tr><td>3</td><td>7:18</td><td>SOP</td><td><code>UV Flatten</code> を2つ使って暗いパッチと明るいパッチを UV 空間で分け、<code>Match Size</code> で 1×1×1 に正規化します</td></tr>
+    <tr><td>4</td><td>12:34</td><td><code>/stage</code></td><td>Solaris へ持ち込み、backdrop を作り、カメラとライトを置きます。Karma XPU で見ながらライティングします</td></tr>
+    <tr><td>5</td><td>10:24</td><td><code>/stage</code></td><td>Quick Surface Material と Material Linker。テクスチャ4枚（color / reflect / roughness / normal）を割り当てます</td></tr>
+    <tr><td>6</td><td>27:03</td><td>Rig</td><td>スケルトンとキャプチャ、APEX のセットドリブンキーでスクワッシュ＆ストレッチを仕込み、リグを1つのアセットに固めます</td></tr>
+    <tr><td>7</td><td>9:33</td><td>アニメーション</td><td>バウンシングボール。キーフレーム、タンジェントの切断、モーションパス、そして USD 書き出しです</td></tr>
+    <tr><td>8</td><td>10:26</td><td><code>/stage</code></td><td>1つの Solaris ネットワークに<strong>2つのショットを共存させて</strong>、120フレームを連番レンダリングします</td></tr>
+  </tbody>
+</table></div>
+
+<h2>レッスン3までに組み上がるもの</h2>
+
+<p>レッスン1〜3のゴールは、SOP の1本のチェーンです。
+Houdini のグラフは<strong>上から下へ</strong>流れます。先に完成形を見ておくと、
+途中でノードを差し込む場面で迷いにくいと思います。ノード名は Houdini が自動で付けるものそのままです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>ノード</th><th>この時点の設定</th><th>回</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><code>platonic1</code></td><td>Solid Type: Soccer Ball / Radius 0.5</td><td>1</td></tr>
+    <tr><td>2</td><td><code>attribcreate1</code></td><td><code>patches</code> = <code>@primnum</code> / Class: Primitive</td><td>2</td></tr>
+    <tr><td>3</td><td><code>subdivide1</code></td><td>Depth 2。32 プリミティブが <strong>720</strong> になります</td><td>2</td></tr>
+    <tr><td>4</td><td><code>sphere1</code></td><td><code>ray1</code> の<strong>第2入力</strong>へ / radius 1</td><td>2</td></tr>
+    <tr><td>5</td><td><code>ray1</code></td><td>Method: Project Rays / Entity: Primitives</td><td>2</td></tr>
+    <tr><td>6</td><td><code>foreach_begin</code></td><td>ここからループ</td><td>2</td></tr>
+    <tr><td>7</td><td><code>polyextrude1</code></td><td>Distance 0.1 / Inset −0.02</td><td>2</td></tr>
+    <tr><td>8</td><td><code>foreach_end</code></td><td>Piece Attribute: <code>patches</code></td><td>2</td></tr>
+    <tr><td>9</td><td><code>uvquickshade1</code></td><td>UV の確認用。最後にオフにします</td><td>3</td></tr>
+    <tr><td>10</td><td><code>uvflatten1</code></td><td>Group: <code>@patches&gt;19</code>（暗いパッチ）</td><td>3</td></tr>
+    <tr><td>11</td><td><code>uvflatten2</code></td><td>Group: <code>@patches&lt;20</code>（明るいパッチ）</td><td>3</td></tr>
+    <tr><td>12</td><td><code>fuse1</code></td><td>押し出したピースを溶接します</td><td>2</td></tr>
+    <tr><td>13</td><td><code>subdivide2</code></td><td>Depth 1</td><td>2</td></tr>
+    <tr><td>14</td><td><code>matchsize1</code></td><td>Justify Y: Min / Target Size 1,1,1 / Scale to Fit</td><td>3</td></tr>
+    <tr><td>15</td><td><code>SOCCERBALL_OUT</code></td><td>Output / Index 0</td><td>3</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>sphere1</code> だけが縦一列から外れます。<code>ray1</code> の第2入力に繋いで、
+レイを飛ばす先の「完全な球」を渡すためです。ここがこのネットワークで唯一の分岐になります。</p>
+
+<p>ひとつ見落としやすいのが <strong>UV の3つが <code>fuse1</code> より前にいる</strong>ことです。
+レッスン2で <code>fuse1</code> → <code>subdivide2</code> まで組んだあと、
+レッスン3では<strong>そのあいだではなく上流側に</strong>UV のノードを差し込みます。
+記事を書くにあたって画面で確かめたところ、<code>fuse1</code> と <code>subdivide2</code> は直結していました。</p>
+
+<h2>用意しておくもの</h2>
+
+<ul>
+  <li><strong>Houdini 22</strong>。この内容は Apprentice でも追えます</li>
+  <li>コース付属のレッスンファイル。<code>tex/</code> にテクスチャ4枚（<code>soccerball_color</code> / <code>reflect</code> / <code>roughness</code> / <code>normal</code>）と backdrop 用のものが入っています</li>
+  <li>レッスン7では、レッスン6で書き出した <code>ball_rig.bgeo</code> を読み込みます</li>
+</ul>
+
+<p>最初にやることは1つだけです。<strong>File &gt; Set Project</strong> でプロジェクトディレクトリを指定してから保存します。
+これで <code>$HIP</code> が確定するので、レッスン5でテクスチャを <code>$HIP/tex/…</code> と書けるようになります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>変数</th><th>意味</th><th>使うところ</th></tr></thead>
+  <tbody>
+    <tr><td><code>$HIP</code></td><td>hip ファイルのあるディレクトリ</td><td>レッスン5のテクスチャパス</td></tr>
+    <tr><td><code>$OS</code></td><td>そのノード自身の名前</td><td>レッスン7の書き出しパス</td></tr>
+    <tr><td><code>$F2</code></td><td>2桁パディングのフレーム番号</td><td>レッスン8の連番レンダリング</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>パスを直に打たずに変数で書く</strong>のが Houdini の作法です。
+このコースでも自然にそう書かれているので、真似しておくと後で困りません。</p>
+
+<h2>このシリーズの日本語メモ</h2>
+
+<p>全8回ぶんのメモです。上から順に読めるようにしてあります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>メモ</th><th>主な内容</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><a href="sidefx-foundations-01-soccerball.html">上流を差し替えてサッカーボールを作る</a></td>
+        <td>Set Project / ビュー操作 / <code>splittype</code> / 上流の差し替え</td></tr>
+    <tr><td>2</td><td><a href="sidefx-foundations-02-for-each.html">Ray で真円にして For-Each でパッチごとに押し出す</a></td>
+        <td><code>Ray</code> / <code>patches</code> アトリビュート / For-Each ループ</td></tr>
+    <tr><td>3</td><td><a href="sidefx-foundations-03-uvs.html">UV Flatten 2つでパッチを塗り分ける</a></td>
+        <td><code>UV Flatten</code> / <code>UV Quick Shade</code> / <code>Match Size</code></td></tr>
+    <tr><td>4</td><td><a href="sidefx-foundations-04-solaris-objects.html">Solaris に持ち込んでカメラとライトを置く</a></td>
+        <td><code>Scene Import</code> / Karma XPU / Light Mixer</td></tr>
+    <tr><td>5</td><td><a href="sidefx-foundations-05-solaris-materials.html">Quick Surface Material でテクスチャを割り当てる</a></td>
+        <td>Material Linker / Scene Graph / <code>$HIP/tex/</code></td></tr>
+    <tr><td>6</td><td><a href="sidefx-foundations-06-rig.html">APEX でスクワッシュ＆ストレッチを仕込む</a></td>
+        <td>スケルトンとキャプチャ / APEX Set Driven Key / リグのアセット化</td></tr>
+    <tr><td>7</td><td><a href="sidefx-foundations-07-bouncing-ball.html">バウンシングボールをアニメートする</a></td>
+        <td>キーフレーム / タンジェント / モーションパス / USD 書き出し</td></tr>
+    <tr><td>8</td><td><a href="sidefx-foundations-08-lights-camera.html">1つのネットワークに2ショット置いてレンダリングする</a></td>
+        <td>ショットの分岐 / <code>$F2</code> / 連番レンダリング</td></tr>
+  </tbody>
+</table></div>
+
+<h2>訳語について</h2>
+
+<p>ノード名やパラメータ名は、Houdini の UI 表記に合わせて英語のままにしています
+（<code>Poly Extrude</code>、<code>UV Flatten</code>、<code>Karma XPU</code>、<code>APEX</code> など）。
+検索したときに公式ドキュメントや動画と突き合わせやすいほうがよいかなと思ってそうしました。</p>
+
+<h2>おことわり</h2>
+
+<blockquote>このページは個人的な学習メモで、SideFX 公式の翻訳でも、SideFX に承認されたものでもありません。
+内容は元動画が優先ですので、食い違いがあればそちらが正しいと思ってください。
+元のコースは無料で公開されていますので、よろしければそちらもあわせてご覧ください。</blockquote>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

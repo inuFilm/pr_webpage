@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 1 — 上流を差し替えてサッカーボールを作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Set Project から始めて、箱を押し出して細分化し、最後にその箱を Platonic Solids に差し替えます。下流を作り直さずに形だけ入れ替えられるという、Houdini のいちばん基本的な性質を確かめる回です。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 1 — 上流を差し替えてサッカーボールを作る</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=fhAOli20vZ4">H22 Foundations | Model Render Animate 1 | Create a Soccerball</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第1回 / Houdini 22 / 5:49 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体の構成は<a href="sidefx-foundations-00-intro.html">第0回のメモ</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/fhAOli20vZ4"
+          title="H22 Foundations | Model Render Animate 1 | Create a Soccerball" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>作業を始める前に <strong>Set Project</strong> でプロジェクトを決めておくと、以降の保存先とテクスチャの参照が楽になること</li>
+  <li>ビューポート・パラメータ・ネットワークビューの3つのペインと、<strong>オブジェクトレベル</strong>と<strong>ジオメトリレベル</strong>の行き来</li>
+  <li>ビュー操作のホットキー。とくに<strong>スペースキーを押している間だけビューツールになる</strong>使い方</li>
+  <li>Poly Extrude を面ごとに独立させて押し出す設定</li>
+  <li>この回のいちばん大事なところ — <strong>できあがったネットワークの上流だけを別のノードに差し替える</strong>と、下流の処理がそのまま新しい形に効くこと</li>
+</ul>
+
+<h2>1. プロジェクトを決めてから保存する</h2>
+
+<p>いきなりモデリングを始めたくなるところですが、先に <strong>File &gt; Set Project</strong> でプロジェクトディレクトリを指定します。
+ここを決めておくと、このあと <strong>File &gt; Save As</strong> したときに最初から正しい場所が開くので、ファイルが散らばらずに済みます。
+動画ではレッスンファイルを置いたディレクトリを選んで Accept を押し、そのまま <code>soccerball_01</code> として保存しています。</p>
+
+<p>地味な工程ですが、ここで <code>$HIP</code>（hip ファイルのあるディレクトリ）が確定します。
+レッスン5でテクスチャを <code>$HIP/tex/…</code> と書けるのはこのおかげなので、飛ばさないほうが後が楽だと思います。</p>
+
+<p class="tx-muted">この時点でレッスンファイルの中身はテクスチャのディレクトリだけですが、この回で必要なのはそれだけです。</p>
+
+<h2>2. 3つのペインと、2つの階層</h2>
+
+<p>触るペインは3つです。<strong>ビューポート</strong>で形を見て触り、<strong>パラメータ</strong>でノードの数値を詰め、
+<strong>ネットワークビュー</strong>でノードを繋いでいきます。</p>
+
+<p>ここで一度つまずきやすいのが階層です。<code>C</code> で Create &gt; Geometry &gt; Box を出して <code>Enter</code> で原点に置くと、
+ネットワークビューにノードが1つ現れますが、このとき見えているパラメータは<strong>オブジェクトレベルの変換</strong>です。
+ダブルクリックで中に入ると、そこに<strong>箱の形そのもの</strong>を持つ別のノードがあって、こちらには別のパラメータが並んでいます。
+同じ「箱」に見えて、外側と中身で持ち物が違うという作りになっています。</p>
+
+<h3>覚えておくと楽な操作</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>やりたいこと</th><th>操作</th></tr></thead>
+  <tbody>
+    <tr><td>中（ジオメトリレベル）に入る</td><td>ノードをダブルクリック、またはオブジェクトを選んで <code>I</code></td></tr>
+    <tr><td>外（オブジェクトレベル）に戻る</td><td>パス表示の上位をクリック</td></tr>
+    <tr><td>ビューツールに切り替える</td><td><code>Esc</code></td></tr>
+    <tr><td>別のツール中に一時的にビューを動かす</td><td><strong><code>スペース</code>を押したまま</strong>左／中／右ドラッグ</td></tr>
+    <tr><td>見たいものに寄る</td><td><code>スペース</code> → <code>G</code></td></tr>
+    <tr><td>選択ツール</td><td><code>S</code>（右クリックで点／エッジ／プリミティブを切り替え）</td></tr>
+    <tr><td>全部選ぶ</td><td><code>N</code>（ジオメトリをダブルクリックでも同じ）</td></tr>
+  </tbody>
+</table></div>
+
+<p>ビューポートでは左ドラッグでタンブル、中ドラッグでトラック、右ドラッグでドリーです。
+ネットワークビューは中ドラッグでパン、右ドラッグでズームになります。
+移動ツールなどが入っているときにビューを動かそうとするとモデルが動いてしまうので、
+そこだけ <code>スペース</code> を押しながら操作するのがコツです。</p>
+
+<h2>3. 押し出して細分化する</h2>
+
+<ol>
+  <li><code>S</code> で選択ツールにして、右クリックから<strong>プリミティブ</strong>選択にします（動画では最初からプリミティブでした）。</li>
+  <li><code>N</code> で面を全部選びます。</li>
+  <li><code>C</code> → Model &gt; Polygons &gt; <strong>Poly Extrude</strong> でハンドルを引き出します。</li>
+  <li>このままだと全部が繋がったまま同じだけ動くので、<strong>面ごとに独立</strong>させます。</li>
+  <li>もう一度 <code>N</code> で全選択し、<code>Tab</code> から <strong>Subdivide</strong> を足して Depth を <code>2</code> にします。</li>
+</ol>
+
+<p>4番目が要点です。ビューポート上部の操作ツールバーからも切り替えられますが、
+ノード側の <strong>Divide Into</strong> パラメータが同じものです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>パラメータ</th><th>この回の値</th></tr></thead>
+  <tbody>
+    <tr><td>Poly Extrude<br><span class="tx-muted">polyextrude::2.0</span></td>
+        <td><code>splittype</code> — Divide Into</td>
+        <td><strong>Individual Elements</strong>。既定の Connected Components だと、隣り合った面がひとつの塊として扱われます</td></tr>
+    <tr><td>Subdivide<br><span class="tx-muted">subdivide</span></td>
+        <td><code>iterations</code> — Depth</td>
+        <td><code>2</code>。<span class="tx-muted">ラベルは Depth ですが、内部名は <code>iterations</code> です</span></td></tr>
+  </tbody>
+</table></div>
+
+<p>ここで動画は箱のサイズを決め忘れていたことに気づいて、<strong>上流の箱のノードに戻って</strong>
+<code>Shift</code> を押しながらサイズを変えます。すると押し出しも細分化も付いてきます。
+下流を作り直さなくていいというのが、この後ずっと効いてくる性質です。</p>
+
+<p class="tx-muted">上流のノードを選んでも表示は下流のまま（ワイヤーフレームが重なって見える状態）なので、
+下流の結果を見ながら上流の数値を触れます。</p>
+
+<h2>4. 上流を差し替える — ここがこの回の山場</h2>
+
+<p>サッカーボールを作るのに、箱から始める必要はありませんでした。
+シェルフの <strong>Platonic Solids</strong> をネットワークビューに直接ドラッグして（<code>Tab</code> からでも同じです）、
+<strong>箱の代わりに繋ぎ替えます</strong>。箱はもう要らないので消してしまえます。</p>
+
+<p>Platonic Solids の既定は正四面体なので、<strong>Solid Type</strong> を <strong>Soccer Ball</strong> に変えます。
+この時点ではまだサッカーボールには見えませんが、押し出しと細分化はそのまま効いています。
+あとは Poly Extrude に戻って押し出し量を下げていくと、それらしい形になっていきます。</p>
+
+<img src="img/sidefx-foundations-01-soccerball-000503.png" alt="Platonic Solids ノードのパラメータパネル。Solid Type が Soccer Ball、Orientation が Y axis、Radius が 0.5、Position と Rotate は 0。ネットワークビューは platonic1 から polyextrude1、subdivide1（Depth: 2）と縦に繋がっている。ビューポートのボールは押し出しが強すぎて各面が丸く膨らんでいる">
+
+<p>押し出し量を下げる前なので、面がぼこぼこに膨らんでいます。
+ネットワークは <code>platonic1</code> → <code>polyextrude1</code> → <code>subdivide1</code> の3つだけです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>既定</th><th>この回</th></tr></thead>
+  <tbody>
+    <tr><td><code>type</code> — Solid Type</td><td>Tetrahedron</td><td><strong>Soccer Ball</strong></td></tr>
+    <tr><td><code>orient</code> — Orientation</td><td>—</td><td>Y axis</td></tr>
+    <tr><td><code>radius</code> — Radius</td><td><code>1</code></td><td><code>0.5</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>ひとつ気をつけたいのは、差し替え自体はうまくいっても<strong>押し出し量は前の形に合わせた値のまま</strong>だということです。
+形が崩れて見えたらノードの繋ぎ方を疑うより先に、Poly Extrude に戻って数値を詰め直すほうが早いと思います。</p>
+
+<p>最後に <code>subdivide1</code> を選んでスムーズシェーディングで見ると、ボールの形が確認できます。
+ただ、この段階のものは動画の言い方だと「ビーチで買うようなプラスチックのボール」で、
+革のボールにするのは次の回からになります。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>先に <strong>Set Project</strong> をやっておくと <code>$HIP</code> が決まり、後のテクスチャ参照が素直に書けます</li>
+  <li>オブジェクトレベルは<strong>変換とレンダー設定</strong>、ジオメトリレベルが<strong>形</strong>です。パラメータが想像と違うときはまずここを疑うとよさそうです</li>
+  <li>Poly Extrude の <code>splittype</code>（Divide Into）を <strong>Individual Elements</strong> にしないと、全体がひとつの塊として膨らみます</li>
+  <li>Subdivide の Depth は 3 以上にしないほうが無難です。公式ヘルプにも「高い値は避けて必要な場所にだけ足す」と書かれています</li>
+  <li><strong>上流のノードは後から差し替えられます。</strong>箱で組んだ押し出しと細分化が、Platonic Solids に繋ぎ替えてもそのまま効きます</li>
+</ul>
+
+<p>次の第2回はこのコースの山場で、<code>Ray</code> で真円にしてから
+<code>patches</code> というアトリビュートを自分で作り、For-Each ループでパッチ単位に押し出していきます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Set Driven Key — クランクを回すと蓋が開くリグを作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="びっくり箱を題材に、駆動される側のアニメーションを作ってから駆動する側を繋ぎます。コロンでチャンネルを指定する書き方と、Fit Min/Max に実測値を貼るやり方まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Set Driven Key — クランクを回すと蓋が開くリグを作る</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=cfuhda2Po6A">Houdini 22 | How to Use Set Driven Keys</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 6:19 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/cfuhda2Po6A"
+          title="Houdini 22 | How to Use Set Driven Keys" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>題材が良い回です</h2>
+
+<p><strong>びっくり箱（jack-in-the-box）のリグで、クランクを回すと蓋が開く</strong>という機構を作ります。
+「あるコントロールの動きが別の動きを駆動する」という Set Driven Key の意味が、そのまま形になっている例です。</p>
+
+<p><a href="sidefx-foundations-06-rig.html">Foundations のレッスン6</a>でも Set Driven Key を使っていますが、
+あちらは<strong>転がりとスクワッシュ</strong>、こちらは<strong>機構</strong>なので、
+両方見ると理解が固まると思います。</p>
+
+<h2>1. 駆動される側を作る</h2>
+
+<ol>
+  <li><strong>Set Driven Key レシピ</strong>を配置すると必要なノードが一式置かれます。
+      <strong>レシピ自身がネットワーク内に手順メモを書いてくれている</strong>ので、それを読みながら進められます</li>
+  <li>新しく登場した <strong>APEX Rig Pose</strong> ノードを使います。
+      <strong>auto rig component 無しで APEX リグをテストできる</strong>のが利点で、レストポーズの設定などもできます</li>
+</ol>
+
+<h3>rotate の <code>*</code> を消す</h3>
+
+<p>既定では rotate が <code>*</code> になっていて、
+<strong>リグの全ジョイントを拾って promote してしまいます</strong>。これを消します。
+必要なのは蓋のコントロール1つだけです。</p>
+
+<p>ここは最初に引っかかるところだと思います。全部のジョイントが上がってくると、
+どれが目的のものか分からなくなります。</p>
+
+<h3>蓋のアニメーションを付ける</h3>
+
+<ol>
+  <li>蓋のコントロールを選び、<strong>新しいレイヤーに追加</strong>して <code>box_open</code> と命名します</li>
+  <li><strong>全コントロールを隠してから、選択中のものだけ表示</strong>すると作業しやすくなります</li>
+  <li><code>Shift</code> + <code>R</code> で全回転チャンネルを扱えるようにし、蓋を開くアニメーションを付けます</li>
+  <li>少し<strong>フォロースルー</strong>を入れて、テンポを詰めます</li>
+</ol>
+
+<h2>2. 駆動する側を繋ぐ</h2>
+
+<p>ステートを抜けて <strong>Set Driven Keys</strong> へ行きます。
+これは<strong>新しい auto rig component</strong> で、コンポーネント一覧の中にあります。</p>
+
+<ol>
+  <li><code>box_open</code> アニメーションレイヤーを指定します</li>
+  <li>ステートに入ると<strong>設定用コントロールとスライダが自動で出ます</strong></li>
+  <li>スライダで 0→1 とアニメーションが動きます</li>
+</ol>
+
+<h3>スライダを振り切る前に終わってしまう</h3>
+
+<p>最初はここでずれます。<strong>Start Frame / End Frame が合っていない</strong>のが原因です。</p>
+
+<p>Rig Pose に戻ってアニメーションの終わりを確認します（この例では<strong>フレーム 19</strong>）。
+End Frame を 19 にすると、スライダの端でちょうど開き切ります。</p>
+
+<h2>3. クランクで駆動する</h2>
+
+<p>スライダではなく<strong>クランクで駆動したい</strong>場合は Driver を設定します。
+クランクのコントロール名は <code>crank_base</code> です。</p>
+
+<img src="img/howto-set-driven-keys-000545.png" alt="Set Driven Keys のパラメータ。Driver に crank_base:rx とコロン区切りでチャンネルが指定され、Fit Minimum にクランクを回したときの実測値が入っている。ネットワークビューにはレシピ自身が書いた手順メモが付箋のように配置されている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>手順</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>名前の取得</td><td><strong>Current Selection のドロップダウンからコピペ</strong>するのが確実です</td></tr>
+    <tr><td>チャンネルの指定</td><td><strong>コロンで繋ぎます。</strong>回転 X なら <code>crank_base:rx</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>チャンネルをコロンで指定する</strong>のがこの回で覚えるべき書き方です。
+コントロール名だけでは足りません。</p>
+
+<h3>一瞬で開き切ってしまう問題</h3>
+
+<p>そのままだと<strong>一瞬で開き切ります</strong>。回転 X が 0→1 の範囲にすぐ到達してしまうためです。</p>
+
+<p>直すには <strong>Fit Minimum / Fit Maximum</strong> を使います。</p>
+
+<ol>
+  <li>クランクを何回も回して、<strong>そのときの回転値をコピーして Fit Min に貼ります</strong>
+      （小数を落として整数にすると読みやすくなります）</li>
+  <li>さらに回して同様に Fit Max に貼ります</li>
+</ol>
+
+<p>これでクランクを回すと蓋が徐々に開きます。
+<strong>クランクをアニメートすれば蓋の開閉も自動で付いてきます。</strong></p>
+
+<p class="tx-muted">「実際に動かして値を見てから Fit に入れる」というやり方が実用的だと思います。
+計算するより回してみるほうが早いです。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>Set Driven Key レシピ</strong>を置くと一式揃い、<strong>レシピ自身が手順メモを書いてくれます</strong></li>
+  <li><strong>APEX Rig Pose</strong> は auto rig component 無しでリグをテストできます</li>
+  <li>rotate の <code>*</code> は消します。全ジョイントを promote してしまうためです</li>
+  <li>全コントロールを隠して<strong>選択中だけ表示</strong>すると作業しやすくなります</li>
+  <li>スライダを振り切る前に終わるのは <strong>End Frame が合っていない</strong>だけです。Rig Pose 側で終端フレームを確認します</li>
+  <li>Driver は<strong>コロンでチャンネルを指定</strong>します（<code>crank_base:rx</code>）。名前はドロップダウンからコピペが確実です</li>
+  <li>一瞬で開き切るのは <strong>Fit Minimum / Fit Maximum</strong> で直します。<strong>実際に回した値をコピーして貼ります</strong></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

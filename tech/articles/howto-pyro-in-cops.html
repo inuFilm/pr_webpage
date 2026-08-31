@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Copernicus で Pyro を作る — Pyro レシピと2Dへの落とし方 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="COP Pyro Block 2.0 は主要な設定が全部 Block End に載っています。入力は Begin・設定は End という形と、色が出ないのは density を見ているだけという話、Mono to RGB に temperature を入れて炎の色を作るところまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Copernicus で Pyro を作る — Pyro レシピと2Dへの落とし方</h1>
+        <p class="tech-meta">houdini-cop / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=xKrHwJRo-nI">Houdini 22 | How to Create Pyro in COPs | Configure Pyro Recipes</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 14:36 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/xKrHwJRo-nI"
+          title="Houdini 22 | How to Create Pyro in COPs | Configure Pyro Recipes" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>まず前提</h2>
+
+<p>レシピは <strong>COP Pyro Block 2.0</strong> を使います。
+2.0 では<strong>ソルバの主要コントロールが全部 Block End ノードに載り</strong>、
+dissipation / disturbance / buoyancy といった標準的な機能のために
+ブロックの内側へノードを置く必要がなくなりました。</p>
+
+<p>SOP の Pyro を触ったことがあれば、そのままの感覚で読めます。</p>
+
+<h2>1. Billowy Smoke を置く</h2>
+
+<ol>
+  <li><code>/obj</code> で <strong>COP Network</strong> を作ります
+      （これがジオメトリオブジェクトとして複数の COP ネットを抱える器になります）。<code>cop_pyro_recipes</code> と命名</li>
+  <li>中に入って煙用の COP ネットを作り <code>smoke</code> と命名。さらに中へ</li>
+  <li><code>Tab</code> → <code>pyro config</code> と打つと、
+      <strong>Pyro Configure Fire / Fireballs / Candle Flame / Cigarette Smoke</strong> などのレシピ一覧が出ます</li>
+  <li><strong>Billowy Smoke</strong> を配置すると関連ノードが一式まとめて置かれます</li>
+</ol>
+
+<p class="tx-muted"><strong>Pyro Configure 単体はデータ整形用のヘルパー</strong>です。レシピの一部として使われます。
+グリッド表示をオンにし、背景をダークグレーに変えると見やすくなります。</p>
+
+<h3>Block Begin は End へのポインタ</h3>
+
+<p><strong>入力はすべて Begin に差し、設定は End 側で行います。</strong></p>
+
+<p>Block End に <strong>bounds / collisions / sourcing（density・temperature・velocity）/ fields / forces</strong>
+がまとまっています。<strong>SOP・DOP の Pyro と同じ構成</strong>なので、
+どこに何があるか探し直す必要はありません。</p>
+
+<h2>2. なぜ最後に2Dになるのか</h2>
+
+<p>出力側のノードが<strong>3Dボリュームを2Dにラスタライズします</strong>。
+<strong>Copernicus は最終的に2Dの画像処理系なので、ここで次元を落とします。</strong></p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>役</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Light Ambient</strong></td>
+        <td>単体では見るものが出ませんが、<strong>ボリュームの色とライティングを調整する</strong>ためのノードです</td></tr>
+    <tr><td><strong>Rasterize Volume</strong></td><td>2D画像になります</td></tr>
+    <tr><td><strong>RGBA to RGB</strong></td>
+        <td>末尾に足すとアルファ抜きで境界が見えて状況が分かりやすくなります
+        （premultiply も切っておくとレンダーアーティファクトが出ません）</td></tr>
+  </tbody>
+</table></div>
+
+<p>Copernicus には<strong>組み込みのカメラオペレータ</strong>があります。
+<strong>フラスタムの先端がレンダリング面</strong>で、3Dを2Dグリッドに潰しているのが図で見えます。</p>
+
+<p><strong>Copernicus には実際のライトが無いので、Ambient Light のノードで擬似的にライティングします。</strong>
+Intensity と Density Scale を触ると内側と外側のコントラストが変わります。</p>
+
+<h2>3. Source Shape — implicit surface</h2>
+
+<p><strong>Pyro Configure</strong> は voxel size などを決め、<strong>リファレンス VDB を出力します</strong>。
+それが Pyro Block Begin の <strong>VDB Reference 入力</strong>に入ります。</p>
+
+<p><strong>Source Shape</strong> は新しい implicit surface ベースで、
+sphere / torus / tube / box から選べます。SOP から持ち込んだ複雑な implicit surface も使えます。</p>
+
+<p class="tx-muted">implicit surface は「SDF を数式で表したもの」です。
+数式で面を記述するので<strong>完全な形状</strong>が得られます。</p>
+
+<p>Source Shape には density / temperature などのソーシング設定と transform、
+さらに <strong>Distortion</strong> があります。
+<strong>Distortion Amplitude を上げるとボリュームの縁が押し引きされ、アニメーションも付きます。</strong></p>
+
+<h2>4. Fire レシピ</h2>
+
+<p>1階層上がって COP Network をもう1つ作り <code>fire</code> と命名。中で <strong>Pyro Configure Fire</strong> を配置します。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Billowy Smoke との違い</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Source Shape</strong>（ノイズを乗せたディスク）と <strong>Collision Shape</strong>（平面＝地面）が付きます</td></tr>
+    <tr><td>入力は <strong>source points</strong> と <strong>collision points</strong></td></tr>
+    <tr><td>各フィールドに <strong>Scale by Noise</strong> があります。形を歪ませるだけでなく<strong>フィールドの値そのものにノイズを乗せられます</strong></td></tr>
+  </tbody>
+</table></div>
+
+<h3>再生すると色が出ない</h3>
+
+<p>ここが SOP の Pyro と違って戸惑うところです。
+<strong>見えているのは density フィールドそのもの</strong>で、
+<strong>Pyro ソルバから出た時点では色として可視化されません</strong>。</p>
+
+<p>temperature や velocity、flame といった<strong>個々のフィールドを切り替えて見ることはできます</strong>が、
+それを色として見るには自分で組む必要があります。</p>
+
+<h3>色を作る</h3>
+
+<ol>
+  <li>2Dラスタライズを見ます</li>
+  <li><strong>Ambient Light</strong> でライティングします</li>
+  <li><strong>Light Scatter</strong> でボリュームの内側に色を散らします
+      （emission scale や density に基づきます）</li>
+  <li><strong>emission には通常 flame の出力</strong>を持ってきます</li>
+  <li>ノード同士は <strong>light 出力 → light 入力</strong>で繋いでいけます</li>
+</ol>
+
+<p class="tx-muted">flame フィールドに少しブラーをかけて、発光が硬くなりすぎないようにしています。</p>
+
+<h2>5. 3Dのまま確認したいとき — VDB Visualize</h2>
+
+<p>ラスタライズする前に「3Dとして狙い通りか」を確かめたいことがあります。
+そのときは <strong>VDB Visualize</strong> を使います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>入力</th><th>繋ぐもの</th></tr></thead>
+  <tbody>
+    <tr><td>density</td><td>density フィールド</td></tr>
+    <tr><td>color</td><td>—</td></tr>
+    <tr><td>emit</td><td><strong>flame フィールド</strong></td></tr>
+    <tr><td>emission color</td><td>下記参照</td></tr>
+  </tbody>
+</table></div>
+
+<p>全部繋ぐ必要はありません。density だけでもラスタライズと同じような見え方になります。</p>
+
+<p>Rasterize Volume に合わせるなら、この例では
+<strong>Density Scale 15 / Emission Scale 45</strong> です。</p>
+
+<img src="img/howto-pyro-in-cops-001240.png" alt="Mono to RGB のパラメータ。temperature を入力にして Compute Range を押し、ランプを黒から炎の色へ設定している。ビューポートには VDB Visualize による3D表示の炎が見える">
+
+<h3>白いままになるとき</h3>
+
+<p>ここまでやると<strong>ボリュームが真っ白</strong>になります。色情報が無いからです。</p>
+
+<p><strong>Mono to RGB</strong> を使います。入れるのは <strong>temperature</strong> です。
+<strong>SOP や DOP の Pyro ワークフローでも、炎の色は temperature で制御します</strong>ので同じ考え方です。</p>
+
+<p><strong>Compute Range</strong> を押して範囲を実測に合わせ、ランプを黒から炎の色に設定します。
+ランプの範囲を決めるときは、<strong>煙が育った後のフレームで Compute Range を押す</strong>ほうが
+実際の値域に合います。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>COP Pyro Block 2.0</strong> では<strong>主要な設定が全部 Block End に載っています</strong>。ブロックの内側にノードを置く必要はありません</li>
+  <li><strong>入力は Begin、設定は End</strong> です。Begin は End へのポインタです</li>
+  <li>Block End の構成（bounds / collisions / sourcing / fields / forces）は <strong>SOP・DOP の Pyro と同じ</strong>です</li>
+  <li><strong>Copernicus は2Dの画像処理系なので、最後に Rasterize Volume で次元を落とします</strong></li>
+  <li><strong>実際のライトが無いので Ambient Light と Light Scatter で擬似的にライティングします</strong></li>
+  <li>Source Shape は <strong>implicit surface</strong>（数式で記述された面）です。<strong>Distortion Amplitude</strong> で縁を押し引きできます</li>
+  <li>各フィールドの <strong>Scale by Noise</strong> は、形ではなく<strong>値そのものにノイズを乗せます</strong></li>
+  <li><strong>色が出ないのは正常です。</strong>見えているのは density フィールドそのものです</li>
+  <li>3Dのまま確認したいときは <strong>VDB Visualize</strong>。density と emit（flame）を繋ぎます</li>
+  <li>白いままなら <strong>Mono to RGB に temperature</strong> を入れます。SOP / DOP と同じで、炎の色は temperature で作ります</li>
+</ul>
+
+<p>同じ Copernicus で地形を作る回が
+<a href="howto-terrains-in-cops.html">Copernicus で地形を作る</a>にあります。
+そちらは Height Field COP Network の話で、canvas の設定が最初から入っているのが差分です。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

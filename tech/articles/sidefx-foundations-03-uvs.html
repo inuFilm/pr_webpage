@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 3 — UV Flatten 2つでパッチを塗り分ける | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Houdini のジオメトリには UV がないので自分で作ります。patches をグループ式で使って暗いパッチと明るいパッチを UV 空間で振り分け、Match Size で 1×1×1 に正規化するまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 3 — UV Flatten 2つでパッチを塗り分ける</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=OVPt4N5SUh4">H22 Foundations | Model Render Animate 3 | Setting up UVs</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第3回 / Houdini 22 / 7:18 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-foundations-02-for-each.html">Ray で真円にして For-Each でパッチごとに押し出す</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/OVPt4N5SUh4"
+          title="H22 Foundations | Model Render Animate 3 | Setting up UVs" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li><strong>Houdini のジオメトリには UV が入っていない</strong>ので、自分で作る必要があること</li>
+  <li>前回作った <code>patches</code> がここでもう一度活きて、<strong>暗いパッチと明るいパッチを UV 空間で振り分ける</strong>のに使えること</li>
+  <li><code>UV Flatten</code> を2つ使い分けるやり方と、ハンドルで UV の島をまとめて動かす操作</li>
+  <li>1枚だけ位置と向きを直したいときの <strong>ピン</strong>と <strong>Repack</strong></li>
+  <li><code>Match Size</code> で 1×1×1 に正規化して、地面の上に載せること。あとのリギングが楽になります</li>
+  <li><strong>Output ノード</strong>を置くと、チェーンのどこに表示フラグがあっても外には最後の結果が出ること</li>
+</ul>
+
+<h2>1. UV Quick Shade でテクスチャを当てて見る</h2>
+
+<p>まず <code>Tab</code> から <strong>UV Quick Shade</strong> を、ループの後ろ・最後の Subdivide より前に置きます。
+テクスチャに <code>soccerball_color</code> を指定すると、ボールに絵が乗ります。</p>
+
+<p>ただ、この時点では<strong>上から投影されているだけ</strong>で、グリッドの流れを見ても狙った貼り方ではありません。
+そしてテクスチャ側は、<strong>暗いパッチが上のほう、明るいパッチが下のほう</strong>にまとめて置かれた作りになっています。
+つまりこちら側も、UV をその配置に合わせてやればいいわけです。</p>
+
+<p class="tx-muted">UV Quick Shade はあくまで確認用です。この回の最後にオフにします。実際のテクスチャ付けは Solaris 側（レッスン5）で行います。</p>
+
+<h2>2. UV Flatten を2つ使って上下に振り分ける</h2>
+
+<p><code>N</code> で全部選んでから <code>Tab</code> → <strong>UV Flatten</strong> を置きます。
+UV Quick Shade を選んだ状態だったので、その直後に入ります。</p>
+
+<p>ここで <strong>Group</strong> にグループ式を書きます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th><code>group</code> — Group</th><th>拾うもの</th></tr></thead>
+  <tbody>
+    <tr><td><code>uvflatten1</code></td><td><code>@patches&gt;19</code></td><td>暗いパッチ</td></tr>
+    <tr><td><code>uvflatten2</code></td><td><code>@patches&lt;20</code></td><td>明るいパッチ</td></tr>
+  </tbody>
+</table></div>
+
+<p>前回 <code>patches</code> を作っておいたので、<strong>グループ式で番号を使って絞り込めます</strong>。
+自分で振った番号がそのまま選択条件になる、というのが気持ちのいいところだと思います。</p>
+
+<p>それぞれのノードで、ビューポートを右クリックして <strong>UV Flatten</strong> を選ぶとハンドルが出ます。
+そのハンドルを掴んで、暗いパッチの島は<strong>上へ</strong>、明るいパッチの島は<strong>下へ</strong>まとめて動かします。
+テクスチャ側の配置とこれで一致します。</p>
+
+<p class="tx-muted">UV を見ながら作業したいときは、ビューポートで <code>スペース</code> + <code>5</code> を押すと UV ビューに切り替わります。
+確認が終わったらテクスチャ表示は右クリックのメニューからオフにできます。</p>
+
+<h2>3. 1枚だけ直す — ピンと Repack</h2>
+
+<p>全体を上下に分けても、1枚だけ位置や向きが合っていないことがあります。
+その場合は<strong>ピン</strong>のアイコンを使ってその島を掴みます。
+<code>Shift</code> を押しながらクリックするとハンドルが付くので、</p>
+
+<ol>
+  <li><code>R</code> で回転して向きを合わせます</li>
+  <li><code>T</code> で移動して位置を詰めます</li>
+</ol>
+
+<p>ここで問題になるのが、<strong>動かした先に他の島が重なっている</strong>ことです。
+そのために <strong>Repack</strong> ボタンがあります。押すと、
+<strong>ピンで留めた島はそのままに、他の島だけを周りに配置し直して</strong>くれます。
+1枚だけ意図通りに置いて、残りは自動に任せる、という分担ができます。</p>
+
+<p class="tx-muted">UV Flatten のパッキングは対話性を優先した実装なので、詰め方をもっと追い込みたい場合は
+公式ヘルプでも後段に <code>UV Layout</code> を足すことが勧められています。このコースではそこまでは行きません。</p>
+
+<h2>4. Match Size で 1×1×1 に正規化する</h2>
+
+<p>UV ができたら、Solaris に持っていく前に大きさと位置を整えます。
+Subdivide の後ろに <code>Tab</code> から <strong>Match Size</strong> を置きます。</p>
+
+<img src="img/sidefx-foundations-03-uvs-000602.png" alt="Match Size ノードのパラメータパネル。Group Type が Primitives、Justify With が Input If Wired、Target Position が 0,0,0、Target Size が 1,1,1、Justify Y だけが Min で X と Z は Center、Scale to Fit と Uniform Scale にチェックが入っている。ビューポートではサッカーボールが青い単位バウンディングボックスにぴったり収まり、ネットワークは fuse1 から subdivide2（Depth: 1）、matchsize1 と繋がっている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>値</th><th>効果</th></tr></thead>
+  <tbody>
+    <tr><td><code>justify_y</code> — Justify Y</td><td><strong>Min</strong></td><td>ボールの下端を基準に合わせるので、<strong>地面の上に載ります</strong></td></tr>
+    <tr><td><code>justify_x</code> / <code>justify_z</code></td><td>Center</td><td>横方向は中央合わせです</td></tr>
+    <tr><td>Target Size</td><td><code>1, 1, 1</code></td><td>単位立方体に収めます</td></tr>
+    <tr><td>Scale to Fit</td><td>オン</td><td>実際に拡縮して合わせます</td></tr>
+    <tr><td>Uniform Scale</td><td>オン</td><td>縦横比を保ちます。オフだと歪みます</td></tr>
+  </tbody>
+</table></div>
+
+<p>ここで大きさを 1×1×1 に決めておくと、<strong>レッスン6のリギングが楽になります</strong>。
+スケールがまちまちなものをリグするのは面倒なので、先に片付けておく、という段取りです。</p>
+
+<p>画面のネットワークを見ると <code>fuse1</code> → <code>subdivide2</code> → <code>matchsize1</code> が直結しています。
+UV の3つはこれより<strong>上流</strong>に入っていて、順番を勘違いしやすいところです。</p>
+
+<h2>5. Output ノードを置く理由</h2>
+
+<p>最後にチェーンの末尾へ <strong>Output</strong> ノードを置き、<code>SOCCERBALL_OUT</code> と名前を付けます。</p>
+
+<p>これが効くのは<strong>1つ上の階層から見たとき</strong>です。
+Output ノードがないと、上の階層に出てくるのは<strong>表示フラグが立っているノードの結果</strong>になります。
+つまり作業中に上流のノードを触っていると、外から見える形もそれになってしまいます。</p>
+
+<p>Output ノードを置いておけば、<strong>表示フラグがどこにあっても外に出るのは常にチェーンの最後</strong>です。
+これから Solaris に持ち込む相手として、これは大事な性質だと思います。</p>
+
+<img src="img/sidefx-foundations-03-uvs-000638.png" alt="パラメータパネルに Output ノード SOCCERBALL_OUT が表示され、Output Index が 0 になっている。ネットワークビューの上流は platonic1 から attribcreate1（patches のラベル付き）、subdivide1（Depth: 2）、ray1 と続き、sphere1 が右から ray1 の第2入力に繋がっている">
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>ノード</td><td><code>SOCCERBALL_OUT</code>（Output SOP）</td></tr>
+    <tr><td>Output Index</td><td><code>0</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>あとは確認用に入れていた UV Quick Shade をオフにして、UV の表示も切ります。
+これでレッスン1〜3の SOP ネットワークは完成です。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>Houdini のジオメトリには UV が入っていないので、テクスチャを貼る前に自分で作ります</li>
+  <li><code>patches</code> は<strong>グループ式でそのまま使えます</strong>。<code>@patches&gt;19</code> と <code>@patches&lt;20</code> で暗いパッチと明るいパッチに分けられます</li>
+  <li>UV Flatten を2つに分けたのは、テクスチャ側で暗いパッチが上・明るいパッチが下に置かれているからです。<strong>絵に合わせて UV を寄せる</strong>という考え方です</li>
+  <li>1枚だけ直したいときは<strong>ピンで留めてから Repack</strong>。留めた島は動かず、他の島だけが再配置されます</li>
+  <li><code>Match Size</code> は <code>justify_y</code> を <strong>Min</strong> にすると地面に載ります。Target Size 1,1,1 + Scale to Fit + Uniform Scale で正規化しておくと、後のリギングが楽です</li>
+  <li><strong>Output ノードを置くと、表示フラグの位置に関係なく外にはチェーンの最後が出ます</strong></li>
+  <li>UV の3ノードは <code>fuse1</code> <strong>より前</strong>に入ります。<code>fuse1</code> と <code>subdivide2</code> は直結です</li>
+</ul>
+
+<p>次の第4回からは場所が変わって、Solaris（LOP）に入ります。
+SOP で作った形はそのままでは Solaris に存在しないので、<code>Scene Import</code> で明示的に持ち込むところから始まります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

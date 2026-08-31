@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summon VFX の地図 — Houdini で素材を作って Unreal で組む | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SideFX 公式 Realtime Summon VFX 全6本（1時間29分）の入口です。シリーズを貫く3つの考え方（パックテクスチャ・UV2・頂点カラー）と全6本の構成、聞き取りで崩れやすいノード名の対応をまとめました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Summon VFX の地図 — Houdini で素材を作って Unreal で組む</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=1Me_kuuHq3w">Summon VFX | Introduction</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/realtime-summon-vfx/">Realtime Summon VFX</a> の Introduction / 講師 Cesar Merchan さん / Houdini 21 + Unreal Engine / 0:17 / 英語）。
+このページは、上記のシリーズ全6本を見ながら自分用にまとめた日本語の学習メモの入口です。SideFX 公式の翻訳ではありません。
+ノード名とパラメータ名は Houdini 22.0.368 の実機で照合しています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/1Me_kuuHq3w"
+          title="Summon VFX | Introduction" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>このシリーズについて</h2>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><th>項目</th><th>内容</th></tr>
+    <tr><td>コース名</td><td>Realtime Summon VFX</td></tr>
+    <tr><td>講師</td><td>Cesar Merchan さん（Beyond-FX / シニア VFX アーティスト）</td></tr>
+    <tr><td>対象バージョン</td><td>Houdini 21 + Unreal Engine</td></tr>
+    <tr><td>難易度</td><td>Intermediate — Houdini と Unreal を一度は触ったことがある人向けです</td></tr>
+    <tr><td>本数 / 総尺</td><td>全6本（Introduction + レッスン5本） / 1時間29分</td></tr>
+    <tr><td>公開</td><td>2026-07-23</td></tr>
+    <tr><td>題材</td><td>キャラクターがポータルから召喚されるリアルタイム VFX を1カット</td></tr>
+  </tbody>
+</table></div>
+
+<p>Houdini でメッシュとテクスチャと布を作り、Unreal に持ち込んで Niagara で組み、
+Sequencer で1カットに仕上げるところまで通します。
+<strong>リアルタイム向けなので、判断の基準がオフラインレンダリングとはっきり違う</strong>のが面白いところだと思います。</p>
+
+<h2>先に押さえておきたい3つの考え方</h2>
+
+<p>このシリーズは6本ばらばらの内容ではなく、同じ発想が繰り返し出てきます。
+先にこれだけ知っておくと、各回で何をしているのか見失いにくいです。</p>
+
+<h3>1. パックテクスチャ — 1枚に3〜4種類を詰める</h3>
+
+<p>テクスチャを用途ごとに1枚ずつ作るのではなく、<strong>グレースケールの情報を R / G / B / A に詰め込んで1枚にします</strong>。
+Copernicus では <code>channeljoin</code>（Channel Join）がその役です。</p>
+
+<p>Unreal 側では Texture Sample から必要なチャンネルだけを取り出して使います。
+テクスチャの枚数＝サンプリング回数なので、リアルタイムではこれが素直に効きます。
+レッスン2で作るテクスチャは、ほぼ全部この形になっています。</p>
+
+<h3>2. UV2 — 1つのメッシュに UV セットを複数持たせる</h3>
+
+<p>メッシュを作るときに <code>uvproject</code>（UV Project）の <strong>UV Attribute を <code>uv2</code></strong> にして、
+標準の <code>uv</code> とは別に2組目を持たせます。
+Unreal 側で「模様用の UV」と「流れ用の UV」を使い分けられるようになります。</p>
+
+<h3>3. 頂点カラー — メッシュ自身にグラデーションを持たせる</h3>
+
+<p><code>attribadjustcolor</code>（Attribute Adjust Color）で、Pattern Type を Radial や Line にして
+<strong>内側から外側へ、あるいは上から下へのグラデーションをメッシュに焼き込みます</strong>。
+テクスチャを1枚増やさずにフェードが作れるので、これもリアルタイム向けの発想です。</p>
+
+<h2>全6本の構成</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>尺</th><th>場所</th><th>やること</th></tr></thead>
+  <tbody>
+    <tr><td>Intro</td><td>0:17</td><td>—</td><td>完成形の提示だけ。17秒です</td></tr>
+    <tr><td>1</td><td>8:37</td><td>Houdini SOP</td><td>エフェクト用のメッシュを8個作って、FBX で書き出します</td></tr>
+    <tr><td>2</td><td>20:48</td><td>Copernicus</td><td>パックテクスチャを6枚と、煙のフリップブック（8×8）を作ります</td></tr>
+    <tr><td>3</td><td>12:58</td><td>Vellum</td><td>キャラクターの布をドレープさせ、ボロボロに破って固定します</td></tr>
+    <tr><td>4</td><td>42:16</td><td>Unreal</td><td>シリーズ最長。マテリアルを組んで Niagara でエフェクトを組み立てます</td></tr>
+    <tr><td>5</td><td>4:10</td><td>Unreal Sequencer</td><td>ライト・ポストプロセス・キャラクターを並べて1カットにします</td></tr>
+  </tbody>
+</table></div>
+
+<p>尺の配分を見ると分かるのですが、<strong>Houdini 側が42分、Unreal 側が46分</strong>でほぼ半々です。
+Houdini のチュートリアルというより「Houdini で素材を作って Unreal で組む」話として読むのが正しいと思います。</p>
+
+<h2>このシリーズの日本語メモ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>メモ</th><th>主な内容</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td><a href="sidefx-summonvfx-01-meshes.html">8個のメッシュを作って FBX で出す</a></td>
+        <td>Labs Disc / Spiral / Sweep / <code>curveu</code> / <code>uv2</code> / Build Hierarchy from Path Attribute</td></tr>
+    <tr><td>2</td><td><a href="sidefx-summonvfx-02-textures.html">Copernicus でパックテクスチャを作る</a></td>
+        <td>SDF Shape / Stamp Points / Channel Join / Flow Block / 8×8 フリップブック</td></tr>
+    <tr><td>3</td><td><a href="sidefx-summonvfx-03-cloth.html">Vellum で布をドレープして破る</a></td>
+        <td>Vellum Drape / Edge Fracture / Attribute Paint でピン留め</td></tr>
+    <tr><td>4</td><td><a href="sidefx-summonvfx-04-unreal.html">Unreal でマテリアルと Niagara を組む</a></td>
+        <td>Channel Mask Parameter / エミッタ構成 / VAT</td></tr>
+    <tr><td>5</td><td><a href="sidefx-summonvfx-05-sequencer.html">Sequencer で1カットに仕上げる</a></td>
+        <td>ライト4灯 / ポストプロセス / Level Sequence</td></tr>
+  </tbody>
+</table></div>
+
+<h2>訳語について</h2>
+
+<p>ノード名やパラメータ名は Houdini / Unreal の UI 表記に合わせて英語のままにしています
+（<code>Labs Disc</code>、<code>Stamp Points</code>、<code>Channel Join</code>、<code>Niagara</code> など）。
+検索したときに公式ドキュメントや動画と突き合わせやすいほうがよいかなと思ってそうしました。</p>
+
+<p class="tx-muted">なお動画の音声だけを追うとノード名を取り違えやすい回があります。
+たとえば Copernicus の <code>sopimport</code>（SOP Import）は「sub import」、
+<code>dilateerode</code>（Dilate Erode）は「delayed erode」、
+<code>worleynoise</code>（Worley Noise）は「whirly noise」のように聞こえます。
+このメモでは画面と Houdini 22.0.368 の実機で照合した名前を書いています。</p>
+
+<h2>おことわり</h2>
+
+<blockquote>このページは個人的な学習メモで、SideFX 公式の翻訳でも、SideFX に承認されたものでもありません。
+内容は元動画が優先ですので、食い違いがあればそちらが正しいと思ってください。
+元のコースはプロジェクトファイルつきで<a href="https://www.sidefx.com/tutorials/realtime-summon-vfx/">SideFX のサイト</a>に公開されていますので、よろしければそちらもあわせてご覧ください。</blockquote>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

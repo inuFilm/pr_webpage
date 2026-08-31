@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Karma でテクスチャをベイクする — 全パラメータ解説 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Karma Texture Baker LOP のパラメータを一つずつ。Trace / UV Match / Single Mesh の使い分け、画像フォーマットが Images タブで決まる罠、Bias と Distance の3モード、そして H22 のケージ機能まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Karma でテクスチャをベイクする — 全パラメータ解説</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=evpCxgNTTU0">Houdini 22 | How to Bake Textures in Karma</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 20:24 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/evpCxgNTTU0"
+          title="Houdini 22 | How to Bake Textures in Karma" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>何をする回か</h2>
+
+<p><strong>Karma Texture Baker LOP の全パラメータ解説</strong>です。用途は3つあります。</p>
+
+<ol>
+  <li>ハイポリのディテールを<strong>同形状のローポリに転写する</strong></li>
+  <li>計算の重い<strong>シェーディング・ライティングをテクスチャに焼き込む</strong></li>
+  <li>上記のための <strong>AOV を出す</strong></li>
+</ol>
+
+<p><strong>14分がパラメータ解説、後半6分が新機能（ケージ）と適用</strong>という構成です。
+パラメータを1つずつ潰していくので、後から参照する用途に向いた回だと思います。</p>
+
+<h2>1. 準備</h2>
+
+<ol>
+  <li>Solaris でライトと <strong>Rubber Toy</strong>（Flippy）を配置。ライトをずらして Intensity を上げ、ハイライトが出る状態にします</li>
+  <li>ハイレゾ側を作ります。名前を <code>flippy_highres</code> に変え、<strong>まず non-instanceable にします</strong></li>
+  <li><strong>SOP Modify</strong> を追加して Unpack。中に入って <code>subdivide</code> で分割数を稼ぎます</li>
+  <li>このままだとベイクしても同じ絵になるので <code>mountain</code> でノイズを足します（控えめに）</li>
+  <li>元の Rubber Toy がローレゾ側（<code>flippy_lowres</code>）になります</li>
+</ol>
+
+<p class="tx-muted">H22 では <code>mountain</code> は <strong>Attribute Noise のプリセット</strong>で、<code>P</code> に効いています。</p>
+
+<h3>置いた直後の警告とエラー</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>状態</th><th>原因</th></tr></thead>
+  <tbody>
+    <tr><td>Karma Texture Baker を置くと<strong>2ノード</strong>が置かれる</td>
+        <td>本体＋<strong>USD Render ROP</strong></td></tr>
+    <tr><td>警告が出る</td><td>high-res / low-res メッシュを要求しています。両方のスロットに繋げば消えます</td></tr>
+    <tr><td>まだエラーが残る</td><td><strong>どちらかが instanceable のままです。</strong>チェックを外します</td></tr>
+  </tbody>
+</table></div>
+
+<h2>2. Baking Mode の使い分け</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>モード</th><th>いつ使うか</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Trace</strong></td>
+        <td>ローレゾから<strong>レイを飛ばして</strong>ハイレゾに当て、当たった位置の情報をローレゾに投影します。
+        <strong>2つのメッシュがほぼ重なっているとき</strong>の基本モードです</td></tr>
+    <tr><td><strong>UV Match</strong></td>
+        <td><strong>2つのメッシュが重なっていないとき。</strong>レイでは情報が取れないので、
+        <strong>UV 座標を使って</strong>情報を渡します。両方に UV セットが必要です</td></tr>
+    <tr><td><strong>Single Mesh</strong></td>
+        <td>メッシュ1つだけ。<strong>そのメッシュ自身に</strong>計算の重いシェーディングを焼き込む用途です</td></tr>
+  </tbody>
+</table></div>
+
+<p>UV Match が必要な理由を、<strong>2枚のグリッドで実演しています</strong>。
+ハイレゾ側に <code>mountain</code>（height 1.5 前後）で山谷を作り、<code>transform</code> でずらします。</p>
+
+<p>この状態で Trace を使うと、<strong>まったく情報が取れない領域</strong>と
+<strong>情報が歪む領域</strong>が出ます。ここが UV Match の出番です。</p>
+
+<h2>3. 出力の設定</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>Dicing Camera</td>
+        <td>dicing はレンダー時にジオメトリを細分化して解像度を稼ぐ処理で、<strong>ベイク時は常に実行されます</strong>。
+        カスタムカメラを指定しなければ内部カメラが自動生成されます</td></tr>
+    <tr><td>Output Picture</td>
+        <td>マップの出力先と名前。hip を保存しておくと render フォルダが自動で作られます。
+        名前は <code>baker_test</code> + <code>_</code> + <strong>UDIM 番号</strong>（既定 1001 ＝業界標準）+ 拡張子</td></tr>
+    <tr><td>Resolution / UV Attribute Name / Default UDIM</td><td>それぞれ設定します</td></tr>
+    <tr><td><strong>Name Separator</strong></td>
+        <td>UDIM 番号の直後、マップ名の前に入る区切り。既定はアンダースコア。
+        AO を焼くと <code>BAKERTEST_1001_OC</code> のようになります</td></tr>
+  </tbody>
+</table></div>
+
+<h3>いちばんの罠</h3>
+
+<p><strong>実際の画像フォーマットは Images タブで決まります。</strong>
+ファイル名が <code>.exr</code> でも、ここが PNG なら PNG で書き出されます。
+EXR にしたければ <code>open.exr</code> を選びます。</p>
+
+<p>拡張子を見て安心してしまうところなので、覚えておくと事故が減ると思います。</p>
+
+<p class="tx-muted">H22 の新機能として <strong>MIP マップテクスチャ</strong>としても保存できます。</p>
+
+<h3>デノイザ</h3>
+
+<p>Intel <strong>OIDN</strong> と NVIDIA <strong>OptiX</strong> が組み込みで、選ぶとどのマップに適用するか指定できます。</p>
+
+<p>ここで大事な仕様があります。<strong>Karma Texture Baker LOP は Karma CPU 専用ですが、
+ambient occlusion や curvature など一部の AOV 生成には GPU を使います。</strong></p>
+
+<h2>4. 焼くマップを選ぶ</h2>
+
+<p>Images タブの中に <strong>texture maps / shader values / lighting</strong> があり、
+焼けるマップが全部並んでいます。チェックを入れたものが焼かれます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>タブ</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>texture maps</td><td>ambient occlusion など。展開すると<strong>名前とサンプル数</strong>が見えます</td></tr>
+    <tr><td></td><td>Alpha は<strong>既定でチェック済み</strong>です</td></tr>
+    <tr><td>shader values</td><td>base color など、よく使うものが揃っています</td></tr>
+    <tr><td>lighting</td><td><strong>lighting を有効にしてから</strong>、beauty / direct diffuse を選べます。
+        <strong>LPE ライトのような追加 AOV を作るならここです</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>サンプル数はテクスチャの品質を上げますが計算コストが増えます。
+講師は<strong>問題を切り分けるとき以外は既定のまま</strong>にしているそうです。</p>
+
+<h2>5. Bias と Distance — レイの飛ばし方</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Bias</strong></td><td>メッシュから<strong>どれだけ離れた位置でレイが発射されるか</strong></td></tr>
+    <tr><td><strong>Distance</strong></td><td>レイが<strong>どこまで進むことを許されるか</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>どちらにも3つのモードがあります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>モード</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Global</strong></td><td>メッシュの全点が<strong>まったく同じ値</strong>を使います</td></tr>
+    <tr><td><strong>Attribute</strong></td><td>アトリビュートで<strong>点ごとに値を決めます</strong>。
+        メッシュが近すぎる問題箇所などを個別に制御できます</td></tr>
+    <tr><td><strong>Texture</strong></td><td>テクスチャを塗って、<strong>どの領域を手厚く扱うか</strong>を決めます</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Trace Skew Texture</h3>
+
+<p><strong>レイをピクセル単位で補正するマップ</strong>で、ハイレゾのディテールを保つのに使います。</p>
+
+<p>使い方が分かりやすいです。焼いてみて<strong>一部の領域だけ結果がおかしい</strong>とき、
+グレースケール画像を作って<strong>正しく出た領域は黒、手当てが必要な領域は灰色〜白</strong>にします。
+白いところだけレイが遠くまで飛びます。</p>
+
+<p>この skew テクスチャは、<strong>H22 の新しい 3D Paint COP を使ってメッシュに直接塗れます</strong>。</p>
+
+<h2>6. その他のパラメータ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>法線が無いとき</td><td><strong>エラーにする / 警告にする / 黙って作る</strong>を選べます</td></tr>
+    <tr><td>Dicing Quality</td><td>ディスプレイスメントや細分化サーフェスを焼くときの LOD を制御します。上げると時間がかかります</td></tr>
+    <tr><td>Displacement Style</td>
+        <td><strong>ディスプレイスメントマップがジオメトリを反転させることがあります。</strong>
+        true displacement のメニューから<strong>ディスプレイスメントをバンプとして扱う</strong>か、
+        ディスプレイスメントシェーダを無効にすると回避できます</td></tr>
+    <tr><td>Trace Sets タブ</td><td>ジオメトリサブセットのように<strong>3つのセットを作れます</strong>。
+        複雑なものを分けて個別に制御できます</td></tr>
+  </tbody>
+</table></div>
+
+<h2>7. H22 の新機能 — ケージ</h2>
+
+<p><strong>Use Cage</strong> は<strong>Trace モードでのみ使えます</strong>
+（UV Match や Single Mesh では出てきません）。
+メッシュ全体を囲むケージを使うことで、品質の制御が細かくできます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>モード</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>Topology Match</td><td>トポロジに沿ってケージを合わせます。<strong>ケージメッシュが必要</strong></td></tr>
+    <tr><td>UV Match</td><td>UV セットを使います。<strong>ケージメッシュが必要</strong></td></tr>
+    <tr><td><strong>Cage Offset</strong></td><td><strong>これだけケージメッシュが不要です。</strong>自動で作ってくれます</td></tr>
+  </tbody>
+</table></div>
+
+<h3>自分でケージを作る</h3>
+
+<ol>
+  <li>ハイレゾ側の2ノードをコピー＆ペーストして、Karma Texture Baker の前に置きます</li>
+  <li><code>L</code> でレイアウトを整えます</li>
+  <li>名前を <code>flippy_cage</code> に、SOP Modify も cage 用に変えます</li>
+  <li>SOP Modify の中で <strong>Bake Pre-Process</strong> を挿します</li>
+</ol>
+
+<img src="img/howto-bake-textures-karma-001650.png" alt="SOP Modify の中に bakepreprocess1 を挿した状態。ビューポートにはキャラクターの周囲を包むオレンジ色のケージが表示されている。パラメータには Ray Start Offset の欄が見える">
+
+<p><strong>Bake Pre-Process を挿すだけでケージ（オレンジ）が出ます。</strong>
+ケージが物体からどれだけ離れるかは <strong>Ray Start Offset</strong> で調整します。
+上げると分厚く、下げるとメッシュに密着します。</p>
+
+<p class="tx-muted">音声だと「bake free process」と聞こえますが、正しくは <strong>Bake Pre-Process</strong> です。</p>
+
+<h3>ケージの中を覗く小技</h3>
+
+<p>ビューポートで <strong><code>K</code> を押すとクリッピング平面</strong>が出ます。
+中ボタンを押しながら左右に動かすと断面が動くので、
+<strong>ケージとメッシュの位置関係を目で確認できます</strong>。もう一度 <code>K</code> で戻ります。</p>
+
+<p>あとは Karma Texture Baker の <strong>Cage Mesh</strong> のスロットに <code>flippy_cage</code> を指定すれば完了です。</p>
+
+<h2>8. 焼いたテクスチャを適用する</h2>
+
+<ol>
+  <li>もう1つ Rubber Toy を持ってきて、<strong>non-instanceable</strong> にします</li>
+  <li>Material Library → <strong>Karma Material Builder</strong> を作ります</li>
+  <li>image ノードを置いて、出力を <strong>base color</strong> に繋ぎ、焼いた色マップを選びます</li>
+  <li><strong>Assign Material</strong> ノードで割り当てます</li>
+</ol>
+
+<p>ここで大事な点があります。<strong>Flippy には既にテクスチャがあるので、
+Assign Material の Binding Strength を「stronger than descendants」に変えます。</strong>
+そうしないと元のマテリアルに負けます。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>用途は3つ。<strong>ハイポリ→ローポリの転写 / 重いシェーディングの焼き込み / AOV 出力</strong></li>
+  <li>エラーが消えないときは<strong>どちらかが instanceable のまま</strong>です</li>
+  <li>Baking Mode は <strong>Trace（ほぼ重なっている）/ UV Match（離れている）/ Single Mesh（1枚に焼く）</strong></li>
+  <li><strong>実際の画像フォーマットは Images タブで決まります。</strong>ファイル名の拡張子は関係ありません</li>
+  <li>Karma Texture Baker は <strong>Karma CPU 専用ですが、AO や curvature の生成には GPU を使います</strong></li>
+  <li><strong>Bias</strong> はレイの発射位置、<strong>Distance</strong> は到達距離。どちらも <strong>Global / Attribute / Texture</strong> の3モード</li>
+  <li><strong>Trace Skew Texture</strong> は「黒＝そのまま、白＝もっと遠くへ」のマップです。<strong>3D Paint COP でメッシュに直接塗れます</strong></li>
+  <li>ディスプレイスメントで<strong>ジオメトリが反転する</strong>ときは、バンプとして扱うかシェーダを無効にします</li>
+  <li><strong>Use Cage は Trace モード限定。</strong>Cage Offset だけケージメッシュが不要です</li>
+  <li>ケージは <strong>SOP Modify の中に Bake Pre-Process を挿すだけ</strong>で作れます。距離は <strong>Ray Start Offset</strong></li>
+  <li>ビューポートで <code>K</code> を押すとクリッピング平面で<strong>ケージの内側を確認できます</strong></li>
+  <li>適用時は <strong>Assign Material の Binding Strength を stronger than descendants</strong> にします</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Motion Mixer に全部投げ込む — HIVE 講演 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="「どこまで手を抜いたアニメーションで済ませて後から盛れるか」が主題です。キーフレームのポーズから抽出できるジョイントリミット、7キーだけのアニメーションでのラグドール、H22 の nested clips。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Motion Mixer に全部投げ込む — HIVE 講演</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=VaUleTuvWgA">H22 - Animation | Motion Mixer | Sasa Budimir | Houdini 22 HIVE</a>
+（SideFX 公式 Houdini 22 HIVE の講演 / 講師 Sasa Budimir さん / Houdini 22 / 20:43 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/VaUleTuvWgA"
+          title="H22 - Animation | Motion Mixer | Sasa Budimir | Houdini 22 HIVE" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この講演の主題</h2>
+
+<p>Motion Mixer の基本ワークフローと、H22 の新機能 <strong>nested clips</strong>、
+そして<strong>ラグドールを使う前に必要な準備</strong>です。</p>
+
+<p>通底しているのは実利的な問いです。</p>
+
+<blockquote>どこまで手を抜いたアニメーションで済ませて、後から盛れるか。</blockquote>
+
+<p>チュートリアルというより<strong>実際にどう作業しているかの話</strong>なので、
+手順を覚える回ではなく判断の仕方を見る回だと思います。</p>
+
+<h2>1. 低コストで作って、後から盛る</h2>
+
+<p>攻撃や回避のモーションについて、<strong>時間を無駄にせずどこまで低コストで作れるか</strong>を探ります。
+そして後から<strong>2種類のノイズ</strong>で盛ります。</p>
+
+<p>面白いのはそのうち1つの用途です。<strong>立っているときに「生きている感じ」を保つため</strong>のノイズ。
+待機状態が完全に静止していると死んで見えるので、それを避けるためのものです。</p>
+
+<p class="tx-muted">プロシージャルな動きをリグに乗せる具体的な手順は
+<a href="howto-deform-rigs.html">リグにプロシージャルな動きを乗せて戻す回</a>にまとまっています。
+あちらを読んでからこの講演を聞くと、何をしているのか掴みやすいと思います。</p>
+
+<h2>2. ジョイントリミット — 「命の恩人」</h2>
+
+<p>ラグドールを使う前の準備として、<strong>ジョイントリミット</strong>の話が出てきます。</p>
+
+<p><strong>キーフレームのポーズからリミットを抽出して設定できます。</strong>
+これがなければ手作業地獄になる、と述べていて、講演者は<strong>「命の恩人」</strong>と表現しています。</p>
+
+<p>検証として、<strong>7キーフレームしかない簡単なアニメーション</strong>にラグドールを適用して見せています。
+「ラグドールを使うには作り込んだアニメーションが必要」ということはなく、
+<strong>粗いポーズでもリミットが正しければ機能する</strong>という話です。</p>
+
+<p>これも「どこまで手を抜けるか」という主題に繋がっています。
+リミットの設定に手間をかけるかわりに、アニメーション側は薄くできる、という交換です。</p>
+
+<h2>3. Nested Clips（H22 の新機能）</h2>
+
+<p>H22 で追加された<strong>入れ子クリップ</strong>です。講演者の用途はこうです。</p>
+
+<blockquote>ノイズモーションとキーフレームを入れ子クリップに入れる。</blockquote>
+
+<p>アニメーションエフェクトやウェイトがある場合にも使えます。</p>
+
+<p>手付けとプロシージャルを<strong>1つのクリップとしてまとめて扱える</strong>ので、
+Motion Mixer のタイムライン上では1ブロックとして動かせる、ということだと思います。
+中身の構成を保ったまま外側で並べ替えられる形です。</p>
+
+<h2>4. シーン構成</h2>
+
+<p><strong>キャラクター・髪・ライトを参照で持ってきて</strong>、ショットごとに少し調整する、という組み方です。</p>
+
+<p>照明については「低予算の子供が作ったような」と自己評価していて、
+<strong>そこに時間をかけていないことを明言しています</strong>。
+講演の主題がアニメーションなので、それ以外は割り切っているわけです。</p>
+
+<p class="tx-muted">最後（16:59 以降）は Q&amp;A と雑談で、手袋だけのモーションキャプチャなど
+やってみたいことの話になっています。</p>
+
+<h2>KineFX の回との関係</h2>
+
+<p>Motion Mixer の操作そのものは、同じ SideFX の
+<a href="sidefx-animate-kinefx-01-basics.html">Animate in KineFX</a> シリーズの後半で
+より詳しく扱われています（クリップ作成 → Motion Mixer → 出力モードを APEX Scene → Fetch → 手付けで修正）。</p>
+
+<p>一方で<strong>この講演で扱う nested clips とジョイントリミットは、そちらには出てきません</strong>。
+補完関係にあるので、操作を知りたいなら KineFX の回、
+実際の判断とH22の新機能を知りたいならこの講演、という読み分けができます。</p>
+
+<h2>この講演から持ち帰るもの</h2>
+<ul>
+  <li>主題は<strong>「どこまで手を抜いたアニメーションで済ませて、後から盛れるか」</strong>です</li>
+  <li>ノイズは2種類使い、うち1つは<strong>待機中に「生きている感じ」を保つため</strong>です</li>
+  <li><strong>ジョイントリミットはキーフレームのポーズから抽出できます。</strong>これがないと手作業地獄です</li>
+  <li><strong>7キーフレームのアニメーションでもラグドールは機能します。</strong>作り込みは前提ではありません</li>
+  <li><strong>Nested Clips</strong> に<strong>ノイズモーションとキーフレームを一緒に入れる</strong>のが講演者の使い方です</li>
+  <li>キャラ・髪・ライトは<strong>参照で持ってきて</strong>ショットごとに調整します</li>
+  <li>主題以外（この場合は照明）に時間をかけないと決めているのも、参考になる姿勢だと思います</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

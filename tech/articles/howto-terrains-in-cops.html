@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Copernicus で地形を作る — Height Field をレイヤーとして扱う | 技術メモ | makeinufilm</title>
+  <meta name="description" content="HF Noise → Terrace → Erode → Strata の積み方から、Terrain のランププリセット、そして色を決める高さだけにノイズを足して色と標高の1:1対応を崩すという Copernicus 版の要点まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Copernicus で地形を作る — Height Field をレイヤーとして扱う</h1>
+        <p class="tech-meta">houdini-cop / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=5v9lmJcIrIw">Houdini 22 | How to Create Terrains in COPs | Utilize Height Fields</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 12:25 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/5v9lmJcIrIw"
+          title="Houdini 22 | How to Create Terrains in COPs | Utilize Height Fields" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>SOP の Height Field と何が違うのか</h2>
+
+<p><strong>考え方はほぼ同じです</strong>（HF Noise → Terrace → Erode → Strata → Visualize）。</p>
+
+<p>Copernicus 版の利点は<strong>個々のレイヤーをもっと細かく制御できる</strong>ことで、
+この回の最後にその威力が出ます — <strong>高さを「色を作る前だけ」いじって、
+色と高さの対応をずらす</strong>という工作です。</p>
+
+<h2>1. 器を作る — Height Field COP Network</h2>
+
+<p><code>/obj</code> で <code>Tab</code> → <code>cop network</code> と打つと<strong>2つ候補が出ます</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>候補</th><th>中身</th></tr></thead>
+  <tbody>
+    <tr><td>COP Network</td><td>全部デフォルト</td></tr>
+    <tr><td><strong>Height Field COP Network</strong></td><td><strong>こちらを使います。</strong>あらかじめ設定が入っています</td></tr>
+  </tbody>
+</table></div>
+
+<p>入っている設定は2つです。</p>
+
+<ul>
+  <li><strong>Border を端でクランプ</strong>するように変更</li>
+  <li><strong>canvas を ZX 平面にし、uniform scale を持たせている</strong></li>
+</ul>
+
+<p><strong>この canvas 設定が一番重要な差分です。</strong>
+地形は上から見下ろす平面なので、canvas の向きが最初から合っている必要があります。</p>
+
+<p>スケールを少し上げて <strong>2km 四方</strong>にします（既定は 1km）。他は既定のままでよいです。</p>
+
+<h3>Layer ノードが height field の実体</h3>
+
+<p>中に入って <code>Layer</code> ノードを置きます。ポイントは
+<strong><code>Type Info</code> が <code>height</code> に設定されている</strong>ことです。
+だからグリッドが変形して見えます。それ以外は普通の Copernicus のレイヤーです。</p>
+
+<h2>2. 地形を積む</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>この例の設定</th></tr></thead>
+  <tbody>
+    <tr><td><strong>HF Noise</strong></td>
+        <td><strong>既定値でそのまま良い地形になります。</strong>触るなら Amplitude /
+        Element Size（地形の特徴の大きさ）/ Roughness / Octaves（上げると細部が増えます）</td></tr>
+    <tr><td><strong>HF Terrace</strong></td>
+        <td>段々を作ります。まず <strong>Compute Range</strong> を押して高さの min/max を出すと、
+        どのレベルに段が来るか見えます。下側を <code>23〜24</code>、上側を <code>36</code> 前後に</td></tr>
+    <tr><td></td><td>段の大きさに変化をつけるには <strong>Random Step を 1</strong> に、Step Seed は <code>56</code>（講師の好み）、Global Seed も振ります</td></tr>
+    <tr><td><strong>HF Erode</strong></td>
+        <td>自然にします。<strong>段差が消えるように思えますが消えません</strong> —
+        侵食後も平らな面として残り、Terrace 無しよりずっと自然になります</td></tr>
+    <tr><td><strong>HF Strata</strong></td>
+        <td>細かい段を戻します。Amplitude <code>10</code>（はっきり出す）、
+        Element Size <code>340〜350</code>（大きめの特徴に）、Strata Size <code>15</code>（尾根の間隔を空ける）</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Terrace → Erode → Strata という順番の意味</strong>が面白いところです。
+段を付けて、侵食で崩して、また細かい段を戻す。
+オン／オフで見比べると、Terrace があったほうが侵食の結果も自然になるのが分かります。</p>
+
+<p>これで「アメリカ南西部の砂漠」的な、侵食＋層状の見た目になります。</p>
+
+<p class="tx-muted">注意: レイヤーは <strong>size reference 入力</strong>に入ります。
+接続が<strong>点線</strong>なのは<strong>参照であってパススルーではない</strong>ということです。
+実質は新しいレイヤーが作られています。</p>
+
+<h2>3. 色を付ける</h2>
+
+<ol>
+  <li><strong>HF Visualize</strong> を置きます。<strong>出力はジオメトリ</strong>で、
+      入力に height / color / mask / layers を持ちます。この時点では色が無いので見た目は変わりません</li>
+  <li>間に <strong>Mono to RGB</strong> を挟みます。高さを入れ、<strong>Compute Range</strong> を押して
+      ランプを実際の高さ範囲にフィットさせ、RGB 出力を HF Visualize の color に繋ぎます</li>
+  <li>既定は白黒なので、ランプの<strong>プリセットのフォルダを開きます</strong></li>
+</ol>
+
+<img src="img/howto-terrains-in-cops-000935.png" alt="Color Ramp Presets のダイアログ。Terrain フォルダの下に Desert / Forest / Mountain / Rocky / Tundra が並んでいる。右は Mono to RGB のパラメータで、Compute Range を押した結果 Input Min/Max に -94.46 と 96.57 が入っている">
+
+<p><strong>Terrain の下に Desert / Forest / Mountain / Rocky / Tundra があります。</strong>
+この回は <strong>Mountain 007</strong> を使っています。</p>
+
+<h2>4. 色と高さの1:1対応を崩す（この回の要点）</h2>
+
+<p>プリセットのままだと<strong>色が高さに完全に張り付いています</strong>。
+横から見ると、同じ標高がぜんぶ同じ色になっていて不自然です。</p>
+
+<p>直し方が Copernicus らしくて良いのです。<strong>Mono to RGB に入る前の高さだけをいじります。</strong></p>
+
+<ol>
+  <li><code>add</code> ノードを挟みます</li>
+  <li><strong>Fractal Noise</strong> を足します。<strong>これはただのレイヤーなので、素直に足せます</strong></li>
+  <li>Amplitude を <code>60</code> くらいまで上げます（実際の高さの差として見える量に）</li>
+  <li>Element Size を <code>0.2</code> に（細かすぎない大きめのノイズに）</li>
+  <li>fractal の種類を <strong>terrain fractal</strong> に変えます（height field の性格に近づけるため）</li>
+</ol>
+
+<img src="img/howto-terrains-in-cops-001140.png" alt="色が高さに1:1で張り付くのを崩すためのネットワーク。Fractal Noise を add ノード（Blend の Add モード）で高さに足し、その結果を Mono to RGB に入れている。ビューポートでは色の境界が標高から少しずれて地形の上を横切っている">
+
+<p>ここで大事なのが<strong>「見えている高さは気にしなくてよい」</strong>という点です。
+この足したノイズが影響するのは<strong>色を決めるための高さ</strong>だけで、
+HF Visualize に渡す実際の高さは別系統です。</p>
+
+<p>結果として<strong>色の境界が標高から少しずれて、地形の上を横切るように動きます</strong>。
+ミュートしてオン／オフを見比べると、
+<strong>1ノード足しただけで自然さが変わる</strong>のが分かります。</p>
+
+<p><strong>「色を決める値と形を決める値を分けられる」</strong>のが Copernicus 版の利点で、
+この回のタイトルにある「レイヤーを活用する」の意味だと思います。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>器は <strong>Height Field COP Network</strong> を使います。<strong>canvas が ZX 平面に設定済み</strong>なのが差分です</li>
+  <li>Layer ノードは <strong><code>Type Info</code> が <code>height</code></strong> になっているだけの普通のレイヤーです</li>
+  <li>積む順番は <strong>HF Noise → Terrace → Erode → Strata</strong>。<strong>Terrace の段は侵食しても消えません</strong></li>
+  <li>Terrace の前に <strong>Compute Range</strong> を押すと、どの高さに段を置くか決められます</li>
+  <li>色は <strong>Mono to RGB → HF Visualize の color</strong>。<strong>Terrain のランププリセット</strong>が用意されています</li>
+  <li><strong>色を決める高さだけにノイズを足せば、色と標高の1:1対応を崩せます。</strong>これがこの回の要点です</li>
+  <li>接続が<strong>点線</strong>なのは参照であってパススルーではありません</li>
+</ul>
+
+<p>作った地形を Solaris でレンダリングする続きは
+<a href="howto-render-terrains.html">COPs の地形を Solaris でレンダリングする回</a>にあります。
+侵食の副産物（debris / sediment / flow）をマスクとして持ち出す話も、そちらに入っています。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

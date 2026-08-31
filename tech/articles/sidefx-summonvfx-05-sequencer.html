@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summon VFX 5 — Sequencer で1カットに仕上げる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="0.4秒のカメラシェイク、FOV 90→96→90、露出を落として戻す、そしてキャラクターは床下から手で動かす。エフェクトを1カットとして成立させるための小さな足し算をまとめました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Summon VFX 5 — Sequencer で1カットに仕上げる</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=m0F2V5Rj6as">Summon VFX | 5 | Configure Sequencer</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/realtime-summon-vfx/">Realtime Summon VFX</a> の第5回・最終回 / 講師 Cesar Merchan さん / Unreal Engine 5.7 / 4:10 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-summonvfx-04-unreal.html">Unreal でマテリアルと Niagara を組む</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/m0F2V5Rj6as"
+          title="Summon VFX | 5 | Configure Sequencer" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>カメラシェイクを<strong>ブループリントで作る</strong>手順。どのクラスから作るかまで</li>
+  <li>画角（FOV）を<strong>ほんの少しだけ</strong>動かして引きを作ること</li>
+  <li>Niagara 2つを<strong>時間差で起動</strong>すること</li>
+  <li>ポストプロセスの<strong>露出補正をアニメート</strong>して、溜めと解放を作ること</li>
+  <li>ライトを開くタイミングで上げること</li>
+  <li>キャラクターを床下から出すという<strong>手作業の割り切り</strong></li>
+</ul>
+
+<p>4分の短い回ですが、<strong>「エフェクトは組めたが1カットとして気持ちよくない」を埋める工程</strong>です。
+やっていることは全部小さな足し算で、それが積み上がって効いています。</p>
+
+<h2>1. カメラシェイクを作る</h2>
+
+<p>Sequencer にカメラアクターを置き、そこにカメラシェイクを付けます。
+カメラシェイクは自分でブループリントを作ります。</p>
+
+<ol>
+  <li>Blueprint Class から <strong>Default Camera Shake Base</strong> を選びます</li>
+  <li>親クラスが Default Camera Shake Base になっていることを確認します</li>
+  <li>シェイクのパターンに <strong>Perlin Noise Camera Shake Pattern</strong> を設定します</li>
+  <li>Location の Amplitude と Frequency に<strong>小さい値</strong>を入れます</li>
+  <li>Duration を <code>0.4</code> にします</li>
+</ol>
+
+<p><strong>Duration 0.4 秒</strong>という短さが大事だと思います。
+これは<strong>ポータルが開く瞬間だけ</strong>のためのもので、ずっと揺れていては目が疲れます。
+「一瞬だけ、ごく小さく」という設計です。</p>
+
+<h2>2. FOV を 90 → 96 → 90</h2>
+
+<p>ポータルが開くところで、画角を <strong>90 から 96 へ動かして戻します</strong>。</p>
+
+<p>6度だけです。動画でも「引き込まれる感じを出すためのごく控えめなもの」と説明されています。
+カメラシェイクと合わせて、<strong>「開いた」という手応えを作るのがこの2つの役</strong>です。</p>
+
+<p class="tx-muted">こういう数値はやりすぎると安っぽくなるので、
+実際に使われた値（0.4秒、6度）が分かるのは参考になります。</p>
+
+<h2>3. Niagara 2つを時間差で起動する</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>システム</th><th>いつ</th></tr></thead>
+  <tbody>
+    <tr><td>召喚エフェクト（<code>NS_SummonVFX</code>）</td><td>最初から</td></tr>
+    <tr><td>登場エフェクト</td><td><strong>ポータルが開いた後</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>Sequencer に Niagara コンポーネントを置き、ライフサイクルのトラックで実行させます。</p>
+
+<p>前回 <strong>Loop Delay</strong> で第1部と第2部を1つのシステム内でずらしましたが、
+<strong>システム同士のタイミングは Sequencer 側で取っています</strong>。
+「1システム内の段構成は Loop Delay、システム間は Sequencer」という分担です。</p>
+
+<h2>4. 露出を落として、戻す</h2>
+
+<p>ポストプロセスボリュームの <strong>Exposure Compensation</strong> をアニメートします。</p>
+
+<p><strong>エネルギーを集めているあいだは露出を下げて、開いたら戻します。</strong>
+暗くしておいてから明るくすることで、同じ明るさの光がより強く見えます。</p>
+
+<p>エフェクト側を明るくするのではなく<strong>画面全体を一度暗くする</strong>というのが、
+カットとして考えたときの手だと思います。</p>
+
+<h2>5. ライトを足す</h2>
+
+<p>スポットライトを追加して、<strong>ポータルが開くときとキャラクターが出てくるときに強めます</strong>。</p>
+
+<p>エフェクトの Emissive だけでは周囲に光が回らないので、
+実際のライトで環境を照らしてやる、という補いです。</p>
+
+<img src="img/sidefx-summonvfx-05-sequencer-000347.png" alt="Unreal の Sequencer 画面。アウトライナには Niagara が2つ、Post Process ボリューム、ライト4つ、VAT のキャラクター、Level Sequence が並んでいる。NS_SummonVFX の User Parameter には Loop Delay 3.0 が設定されている">
+
+<p>アウトライナを見ると、最終的なカットの構成要素が全部並んでいます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>要素</th><th>数</th></tr></thead>
+  <tbody>
+    <tr><td>Niagara システム</td><td>2</td></tr>
+    <tr><td>Post Process ボリューム</td><td>1</td></tr>
+    <tr><td>ライト</td><td>4</td></tr>
+    <tr><td>VAT のキャラクター</td><td>1</td></tr>
+    <tr><td>Level Sequence</td><td>1</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>NS_SummonVFX</code> の User Parameter に <strong>Loop Delay 3.0</strong> が見えます。
+前回説明した「3秒後に第2部」がここで確認できます。
+<strong>Niagara の中の値を Sequencer 側から見られる</strong>ので、タイミングの調整はここでもできます。</p>
+
+<h2>6. キャラクターは手で動かす</h2>
+
+<p>最後にキャラクターです。ここは<strong>手作業で割り切っています</strong>。</p>
+
+<ol>
+  <li>キャラクターを<strong>床の下に置いておきます</strong></li>
+  <li>Sequencer で位置をアニメートして、ポータルから出てくるように動かします</li>
+</ol>
+
+<p>理由は明快で、<strong>Sequencer の中でプレビューするだけだから</strong>です。
+ゲーム中のロジックとして作る必要がないので、手で置いたほうが速い。
+リアルタイム向けの作業でも「ここは作り込まない」と決めるところがある、という例だと思います。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>カメラシェイクは <strong>Default Camera Shake Base</strong> からブループリントを作り、<strong>Perlin Noise Camera Shake Pattern</strong> を設定します</li>
+  <li>Duration は <strong>0.4 秒</strong>。開く瞬間だけのごく短いものです</li>
+  <li>FOV は <strong>90 → 96 → 90</strong>。6度だけ動かします</li>
+  <li>システム内の段構成は <strong>Loop Delay</strong>、システム間のタイミングは <strong>Sequencer</strong> という分担です</li>
+  <li><strong>Exposure Compensation を下げてから戻す</strong>と、同じ光がより強く見えます</li>
+  <li>Emissive だけでは周囲が照らされないので、<strong>実際のライトを足します</strong></li>
+  <li>キャラクターは<strong>床下に置いて手でアニメート</strong>。プレビュー用なので作り込みません</li>
+</ul>
+
+<h2>シリーズを通して</h2>
+
+<p>これで全6本が終わりです。振り返ると、
+<strong>「テクスチャの枚数とサンプリング回数を増やさない」という制約が全部の判断を貫いていた</strong>のが印象的でした。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>制約への答え</th><th>出てきた場所</th></tr></thead>
+  <tbody>
+    <tr><td><strong>パックテクスチャ</strong>（RGBA に4種類詰める）</td><td>第2回で作り、第4回で Channel Mask Parameter が受けます</td></tr>
+    <tr><td><strong>頂点カラー</strong>にグラデーションを焼く</td><td>第1回で焼き、第4回の不透明度と Lerp で使います</td></tr>
+    <tr><td><strong><code>uv2</code></strong> で UV セットを2組持たせる</td><td>第1回で仕込み、Unreal で使い分けます</td></tr>
+    <tr><td><strong>2×2 アトラス</strong>と Sub Image Index</td><td>第2回で作り、第4回で火の粉のばらつきになります</td></tr>
+    <tr><td>フリップブックの<strong>開始フレームをランダム</strong>に</td><td>1枚の 8×8 で違う動きに見せます</td></tr>
+    <tr><td>Scale カーブを <strong>−1</strong> にして回転を反転</td><td>同じ素材で逆回りを作ります</td></tr>
+    <tr><td>同じエミッタで<strong>力だけ差し替え</strong>（Point Attraction ↔ Vortex）</td><td>集める動きと散る動きを作り分けます</td></tr>
+  </tbody>
+</table></div>
+
+<p>どれも「素材を増やさずに見た目の幅を増やす」ための手です。
+オフラインレンダリングなら別々に作ってしまうところを、
+1つの素材から引き出す方向に寄せているのがこのシリーズの一貫した性格だと思います。</p>
+
+<p>シリーズ全体の構成は<a href="sidefx-summonvfx-00-intro.html">第0回のメモ</a>にまとめてあります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

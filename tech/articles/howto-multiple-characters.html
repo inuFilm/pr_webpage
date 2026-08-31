@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APEX に複数キャラを入れる — Scene Add Character を数珠つなぎ | 技術メモ | makeinufilm</title>
+  <meta name="description" content="第1入力にシーン、第2入力にキャラ。これを繰り返すだけです。2分20秒の回ですが、出力を APEX Character にし忘れるという唯一の罠も含めてまとめました。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>APEX に複数キャラを入れる — Scene Add Character を数珠つなぎ</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=qmDIX-GaJoA">Houdini 22 | How to Set Up Multiple Characters</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 2:20 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/qmDIX-GaJoA"
+          title="Houdini 22 | How to Set Up Multiple Characters" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+
+<p>2分20秒しかない回なので、要点も1つです。
+<strong><code>APEX Scene Add Character</code> を数珠つなぎにするだけ</strong>で、
+1つの APEX シーンにキャラクターを何人でも入れられます。</p>
+
+<ul>
+  <li>第1入力に <strong>APEX シーン</strong>、第2入力に<strong>キャラクター</strong></li>
+  <li>これを繰り返すとシーンにキャラが積み上がります</li>
+  <li>唯一の罠は<strong>出力を APEX Character にし忘れること</strong></li>
+</ul>
+
+<h2>手順</h2>
+
+<ol>
+  <li><code>geo</code> ノードを置いて、中に <strong>Electra</strong>（Houdini 付属のテストキャラ）を入れます</li>
+  <li><strong>出力を APEX Character にします。</strong>これをやらないと APEX シーンに追加できません</li>
+  <li><strong>APEX Scene Add Character</strong> を配置します。
+      <strong>キャラは第2入力、第1入力が APEX シーン</strong>です。名前を <code>Electra A</code> にします</li>
+  <li><strong>Scene Animate</strong> を繋げば、もうアニメートできます</li>
+</ol>
+
+<h3>2人目を足す</h3>
+
+<ol>
+  <li><code>geo</code> ノードを<strong>コピー＆ペースト</strong>します</li>
+  <li>区別しやすいようにシェーダを metallic に変えます（木のエレクトラと金属のエレクトラになります）</li>
+  <li>2つ目の <code>APEX Scene Add Character</code> を置き、
+      <strong>1つ目の出力（APEX シーン）を第1入力へ</strong>、2人目を第2入力へ繋ぎます。名前は <code>Electra B</code></li>
+  <li><code>Scene Animate</code> を繋げば、2人まとめてアニメートできます</li>
+</ol>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>入力</th><th>繋ぐもの</th></tr></thead>
+  <tbody>
+    <tr><td>第1入力</td><td><strong>APEX シーン</strong>（前の Scene Add Character の出力、または空）</td></tr>
+    <tr><td>第2入力</td><td><strong>キャラクター</strong>（出力を APEX Character にした <code>geo</code>）</td></tr>
+  </tbody>
+</table></div>
+
+<h2>つまずくところ</h2>
+
+<p><strong>出力を APEX Character にし忘れる</strong>のが唯一の罠です。
+<a href="howto-apex-animate-in-lops.html">Solaris の中で APEX キャラをアニメートする回</a>でも、
+講師が同じミスをして言い直しています。
+読み込まれないときは、まずここを確認するのが早いと思います。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><code>APEX Scene Add Character</code> は<strong>第1入力がシーン、第2入力がキャラ</strong>です</li>
+  <li>数珠つなぎにすればキャラが積み上がります。特別な設定は要りません</li>
+  <li><code>geo</code> の<strong>出力を APEX Character に</strong>しておくことだけ忘れないようにします</li>
+</ul>
+
+<p>同じ <code>Scene Add Character</code> を Solaris の中で使う例が
+<a href="howto-apex-animate-in-lops.html">APEX Animate in LOPs</a> にあります。
+あちらは<strong>ライトやセットが入った本番シーンを見ながら</strong>同じことをやる話なので、
+この回を読んだら続けて見ると理解が繋がると思います。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

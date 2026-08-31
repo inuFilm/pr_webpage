@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Copernicus でベイクする — Bake Pre-Process の作者による解説 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Bake Pre-Process を作った本人の講演です。前リリースのケージメッシュモードの問題、プレビューのライティングが変に見える理由（Unreal 向けの法線）、そして name アトリビュートで自動対応させる Match Pieces by Name。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Copernicus でベイクする — Bake Pre-Process の作者による解説</h1>
+        <p class="tech-meta">houdini-cop / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=orN8H41hNDE">H22 - Baking with Copernicus | Alex Hamer | Houdini 22 HIVE</a>
+（SideFX 公式 Houdini 22 HIVE の講演 / 講演者 Alex Hamer さん（SideFX / image processing TD・Copernicus チーム）/ Houdini 22 / 14:08 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/orN8H41hNDE"
+          title="H22 - Baking with Copernicus | Alex Hamer | Houdini 22 HIVE" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>誰の講演か</h2>
+
+<p>SideFX の image processing TD で <strong>Copernicus チーム所属</strong>です。
+つまり <strong>Bake Pre-Process を作った当事者の解説</strong>になっています。</p>
+
+<p class="tx-muted">タイトルは "Baking Only Fans"。扇風機アセットを使うのでダジャレになっています。</p>
+
+<h2>話の流れ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>時刻</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>03:23</td><td>前リリースの<strong>ケージメッシュモード</strong>の話。cage offset などのカスタマイズがあり、
+        結果もライブ更新されていた。<strong>しかし大きな問題があった</strong>（前リリースのローンチデモの映像で示されます）</td></tr>
+    <tr><td>06:44</td><td><strong>Bake Pre-Process のインターフェース全体</strong>の解説。
+        その後ハイテク扇風機アセットで実演</td></tr>
+    <tr><td>10:04</td><td>全 UDIM にわたってプレビューマテリアルで確認。その後 Unreal に持ち込み</td></tr>
+    <tr><td>13:25</td><td>Q&amp;A: <strong>Match Pieces by Name</strong> について</td></tr>
+  </tbody>
+</table></div>
+
+<h2>ビューポートのライティングがおかしく見える理由</h2>
+
+<p>10:04 あたりで、プレビューマテリアルの見た目が変に見える場面があります。
+これには理由があってこう説明されています。</p>
+
+<blockquote>これは Unreal 向けに作られていて、法線がビューポートや Copernicus の想定と違うから。</blockquote>
+
+<p>つまり<strong>バグではなく、書き出し先に合わせた法線の向き</strong>です。
+Houdini のビューポートで確認するときに戸惑うところですが、
+Unreal に持っていけば正しく見えます。</p>
+
+<p><strong>「どこで見るか」で正しさが変わる</strong>という話なので、
+ゲーム向けにベイクするなら知っておいたほうがよさそうです。</p>
+
+<h2>Match Pieces by Name（Q&amp;A で出てくる要点）</h2>
+
+<p>インターフェースの<strong>最下部</strong>にあります。</p>
+
+<p><strong>low res と high res に一致する <code>name</code> アトリビュートを持たせておけば、自動で対応付けられます。</strong></p>
+
+<p>これは実務でかなり効くと思います。パーツが多いアセットで、
+どのハイポリがどのローポリに対応するかを手で指定するのは面倒です。
+<strong>命名を揃えておくだけで済む</strong>なら、モデリング側の作法として決めておく価値があります。</p>
+
+<p class="tx-muted"><a href="sidefx-summonvfx-03-cloth.html">Summon VFX の第3回</a>でも
+「Vellum Drape のシーム対応は名前で指定するので、命名が雑だと詰む」という話が出ていました。
+Houdini では<strong>命名がそのまま自動化の入口になる</strong>場面が繰り返し出てきます。</p>
+
+<h2>ハウツーとの関係</h2>
+
+<p><a href="howto-bake-textures-karma.html">Karma でテクスチャをベイクする回</a>で
+Bake Pre-Process を実際に使う手順を扱っています。</p>
+
+<p><strong>あちらでは触れられていない Match Pieces by Name がこの講演の Q&amp;A で出てくる</strong>ので、
+両方見る価値があります。手順はハウツー、設計の意図と細かい仕様はこの講演、という読み分けです。</p>
+
+<h2>この講演から持ち帰るもの</h2>
+<ul>
+  <li>講演者は <strong>Bake Pre-Process を作った本人</strong>です。仕様の理由が分かる講演になっています</li>
+  <li>前リリースのケージメッシュモードには<strong>大きな問題があった</strong>という前提から入ります</li>
+  <li>プレビューでライティングが変に見えるのは、<strong>Unreal 向けの法線</strong>だからです。バグではありません</li>
+  <li><strong>Match Pieces by Name</strong>: low res と high res に同じ <code>name</code> アトリビュートを持たせれば自動で対応付けられます</li>
+  <li>Houdini では<strong>命名がそのまま自動化の入口</strong>になる、という一般則の一例です</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

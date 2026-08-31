@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summon VFX 3 — Vellum で布をドレープして破る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Planar Patch from Curves で布を起こし、名前でシームを対応させて Vellum Drape で縫い、Weld Points を破断しきい値0で使ってボロボロにします。VAT で Unreal に渡すところまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Summon VFX 3 — Vellum で布をドレープして破る</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=bh9PRfO-ebk">Summon VFX | 3 | Set the Character &amp; Cloth</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/realtime-summon-vfx/">Realtime Summon VFX</a> の第3回 / 講師 Cesar Merchan さん / Houdini FX 21.0.631 / 12:58 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-summonvfx-02-textures.html">Copernicus でパックテクスチャを作る</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/bh9PRfO-ebk"
+          title="Summon VFX | 3 | Set the Character &amp; Cloth" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>カーブから <code>Planar Patch from Curves</code> で布のパッチを作ること</li>
+  <li><strong>命名がそのまま作業効率になる</strong>こと。Vellum Drape のシーム対応は名前で指定します</li>
+  <li><code>Vellum Drape</code> で縫い合わせて、<strong>Freeze at Frame</strong> で静止形を確定させること</li>
+  <li>ボロボロに破る手順 — <code>Edge Fracture</code> → マスク → グループ反転で<strong>ピン留め点を作る</strong></li>
+  <li><strong>Weld Points をしきい値0で壊す</strong>という使い方。ピンに入っていないピースを確実に落とします</li>
+  <li>ループするシミュレーションを作って、<strong>VAT（Vertex Animation Textures）</strong>で Unreal に渡すこと</li>
+</ul>
+
+<p>13分の中に「作る → 破る → 動かす → 書き出す」が全部入っています。
+1つずつは短いのですが、<strong>ピン留めの作り方が2回出てくる</strong>ので、そこだけ注意して読むと迷いません。</p>
+
+<h2>1. 布のパッチをカーブから作る</h2>
+
+<p>キャラクターは Mixamo のゾンビをそのまま使っています。布は自分で作ります。</p>
+
+<ol>
+  <li>フードの形をカーブで描きます</li>
+  <li><code>resample</code> で点を揃えます（後で繋ぐためです）</li>
+  <li><code>fuse</code> で点をくっつけます</li>
+  <li><strong>Planar Patch from Curves</strong> でメッシュにします。
+      <strong>Interior Edge Length</strong> がメッシュの密度になります</li>
+  <li>ミラーして反対側を作り、もう1つ Planar Patch from Curves を通します</li>
+</ol>
+
+<p>体を覆う布も同じ手順です。カーブをキャラクターのサイズに合わせて描き、
+ミラーして <code>fuse</code> で隙間を埋め、Planar Patch from Curves で前面と背面を作ります。</p>
+
+<h3>ここで命名が効いてくる</h3>
+
+<p>動画がここで念を押しています。<strong>すべてに適切な名前を付けておくこと。</strong>
+理由はこの後の Vellum Drape で、<strong>どのシームをどのシームに縫い合わせるかを名前で指定する</strong>からです。</p>
+
+<p>命名が雑だとここで詰まります。逆に <code>Back_Cloth_seam2</code> → <code>Front_Cloth_seam2</code> のように
+規則的に付けておけば、対応を選ぶだけで済みます。
+<strong>先の工程のために名前を整えておく</strong>という、地味ですが効く話だと思います。</p>
+
+<h2>2. Vellum Drape で縫い合わせる</h2>
+
+<p>まず <code>vellumconstraints</code>（Vellum Constraints）を <strong>Constraint Type = Cloth</strong> で置き、
+Density と Edge Length Scale と Stiffness を少し調整します。</p>
+
+<p>そのうえで <strong>Vellum Drape</strong> です。</p>
+
+<img src="img/sidefx-summonvfx-03-cloth-000332.png" alt="Vellum Drape のパラメータパネル。Freeze at Frame が 50、Weld Additional Seams にチェックが入り、Seams の数が 9。シームの対応表には Back_Cloth_seam2 から Front_Cloth_seam2 のように名前で対応が指定されている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>Weld Additional Seams</td><td>オン</td><td>これをオンにするとシームの対応表が出ます</td></tr>
+    <tr><td>Weld Seams</td><td>9組</td><td><strong>どのシームをどのシームに縫うか</strong>を名前で指定します</td></tr>
+    <tr><td>Freeze at Frame</td><td><code>50</code></td><td>50フレーム目の形で<strong>止めて確定させます</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>シームを1組ずつ有効・無効にすると、どこが繋がるのか目で確認できます。
+全部指定してからシミュレーションすると、各シームに従って布が縫い合わさります。</p>
+
+<p><strong>Freeze at Frame 50</strong> が要点です。ドレープは「落として自然な形にする」工程なので、
+落ち着いたところで止めてしまいます。その結果をキャッシュしてディスクから読み直せば、
+以降はもう計算しなくて済みます。</p>
+
+<p>形を微調整したいところは <code>vellumbrush</code>（Vellum Brush）で直接触っています。</p>
+
+<h2>3. ボロボロに破る</h2>
+
+<p>ここからが面白いところです。手順を分解するとこうなります。</p>
+
+<ol>
+  <li><code>edgefracture</code>（Edge Fracture）で<strong>5000ピース</strong>に割ります</li>
+  <li><code>attribpaint</code> で<strong>マスクを塗ります</strong>。ここが「残したくない場所」の指定です</li>
+  <li>そのマスクを <code>group</code> にします</li>
+  <li><code>groupinvert</code> で反転します。<strong>これが Vellum のピン留め点になります</strong></li>
+</ol>
+
+<p>反転しているのがポイントです。「消したい場所」を塗って、その<strong>裏側を留める</strong>という組み方です。
+留まっていないものは落ちる、という形にすれば、塗った場所だけがボロボロになります。</p>
+
+<img src="img/sidefx-summonvfx-03-cloth-000602.png" alt="ネットワークは edgefracture1 から attribpaint1（mask）、group1、groupinvert1（pin）と繋がっている。ビューポートでは布のピースが色分けされ、青がピン留めされて残る部分、灰色がこれから落ちるピース">
+
+<h3>Weld Points をしきい値0で壊す</h3>
+
+<p>ここで2つの Vellum Constraints を使います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>Constraint Type</th><th>役</th></tr></thead>
+  <tbody>
+    <tr><td>1つ目</td><td>ピン留め</td><td>さきほど作った反転グループを使って、残す部分を留めます</td></tr>
+    <tr><td>2つ目</td><td><strong>Weld Points</strong></td><td><strong>破断のしきい値を 0</strong> にします</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Weld Points はソルバの中で点を論理的に融合させる</strong>ものです（公式ヘルプでも
+「制約というよりも <code>weld</code> アトリビュートを編集して、点を1点として扱わせるもの」と説明されています）。
+そのしきい値を 0 にすると<strong>即座に壊れます</strong>。</p>
+
+<p>つまり「全部いったん融合させておいて、すぐ壊す」という指定です。
+結果として<strong>ピングループに入っていないものは確実に落ちます</strong>。
+残すか落とすかをグループ1つで切り替えられる形になります。</p>
+
+<p class="tx-muted">音声では「vell points」と聞こえますが、正しくは <strong>Weld Points</strong> です。</p>
+
+<h3>後片付け</h3>
+
+<ol>
+  <li><code>fuse</code> で、繋げたままにしたい部分を溶接します</li>
+  <li><code>timeshift</code> でフレーム50の状態を取り出します</li>
+  <li><strong>Labs Delete Small Parts</strong> で、細かすぎる破片をしきい値で消します</li>
+  <li>ピングループと点アトリビュートを整理して消します</li>
+</ol>
+
+<p><strong>破片が細かすぎるものを消す</strong>のは実務的です。
+5000ピースに割ったので、そのままだとゴミのような小片が大量に残ります。</p>
+
+<h2>4. ループする動きを作る</h2>
+
+<p>Unreal に渡すのはループするアニメーションなので、そのための組み方をします。
+ここで<strong>ピン留めをもう一度</strong>作ります（1回目は「破るため」、2回目は「動かすため」です）。</p>
+
+<ol>
+  <li>マスクを<strong>新しく塗り直して</strong>、動かすとき用のピングループを作ります</li>
+  <li><code>vellumconstraints</code>（Cloth）で <strong>Normal Drag</strong>（<code>dragnormal</code>）を入れ、Stiffness を下げます</li>
+  <li><strong>Attach to Geometry</strong> で、そのピン点をキャラクターに取り付けます</li>
+</ol>
+
+<h3>キャラクター側の下準備</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>役</th></tr></thead>
+  <tbody>
+    <tr><td><code>bonedeform</code>（Bone Deform）</td><td>アニメーションを表示させます</td></tr>
+    <tr><td><code>rigpose</code>（Rig Pose）</td><td><strong>腕の動きを手で大げさにします</strong>。布をもっと動かしたいからです</td></tr>
+    <tr><td><code>blendshapes</code></td><td>レストポーズからアニメーションのポーズへ繋ぎます</td></tr>
+    <tr><td><code>makeloop</code></td><td>ループにします</td></tr>
+    <tr><td><code>blendshapes</code>（2つ目）</td><td>T ポーズからループする結果へ繋ぎます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Rig Pose で腕の動きを誇張する</strong>という判断が面白いところです。
+布を揺らしたいのに元のアニメーションでは動きが足りない、なら元を大きくしてしまう、という発想です。</p>
+
+<p>また Vellum に入れるジオメトリは<strong>必要な部分だけに絞っています</strong>。
+体全部を入れる必要はないので、掃除してから渡します。</p>
+
+<h3>ソルバの中に力を入れる</h3>
+
+<p><code>vellumsolver</code> の中に <strong>POP Force</strong> と <strong>POP Wind</strong> を足します。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>POP Force</td><td>Amplitude をアニメートしています</td></tr>
+    <tr><td>POP Wind</td><td>布全体の動きを作ります。Amplitude と Swirl Size を調整</td></tr>
+  </tbody>
+</table></div>
+
+<p>結果は <code>filecache</code> に保存し、もう一度 <code>makeloop</code> を
+<strong>40〜120フレーム</strong>で通します。これが Unreal に渡すループになります。</p>
+
+<h2>5. VAT で Unreal に渡す</h2>
+
+<p>書き出しは <strong>Labs Vertex Animation Textures</strong>（VAT）を<strong>2つ</strong>使います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th></th><th>入力</th><th>設定</th></tr></thead>
+  <tbody>
+    <tr><td>布用</td><td>cloth の Null</td><td>Soft Body Deformation / フレーム 40〜120</td></tr>
+    <tr><td>体用</td><td>body の Null</td><td>同じ Soft Body Deformation / 同じ 40〜120</td></tr>
+  </tbody>
+</table></div>
+
+<p>書き出すと<strong>スタティックメッシュと、それを動かすためのテクスチャ</strong>が出てきます。
+頂点の動きをテクスチャに焼いて、Unreal 側ではマテリアルで頂点を動かす、という仕組みです。
+スケルタルメッシュを使わずに複雑な変形を持ち込めます。</p>
+
+<p class="tx-muted">体側も VAT にしているのが少し意外でした。ボーンで動かすのではなく、
+布と同じ仕組みで扱って揃えています。</p>
+
+<h3>Unreal 側に Labs プラグインが必要です</h3>
+
+<p>VAT を Unreal で再生するには、SideFX Labs の Unreal 用プラグインが要ります。
+Houdini の <strong>Real Time Shaders → Unreal Engine → Content Plugin and Guides</strong> から
+フォルダを開くと、対応バージョンのプラグインが入っています。
+この動画では <strong>Unreal Engine 5.7</strong> 用を使っています。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>布は <strong>Planar Patch from Curves</strong> でカーブから起こします。Interior Edge Length が密度です</li>
+  <li><strong>名前を整えておくことが Vellum Drape の前提です。</strong>シームの対応を名前で指定するので、雑だとここで詰みます</li>
+  <li><strong>Freeze at Frame</strong> でドレープを止めて確定させ、キャッシュして読み直します</li>
+  <li>破るには <strong>Edge Fracture → マスクを塗る → グループ → 反転</strong>。「消したい場所」を塗って裏を留めます</li>
+  <li><strong>Weld Points を破断しきい値 0 で使う</strong>と即座に壊れ、ピングループ外を確実に落とせます</li>
+  <li><strong>Labs Delete Small Parts</strong> で細かすぎる破片を掃除します</li>
+  <li>ピン留めは2回作ります。<strong>1回目は破るため、2回目は動かすため</strong>です</li>
+  <li>布の動きが足りなければ <strong>Rig Pose で元のアニメーションを誇張します</strong></li>
+  <li>ソルバの中に <strong>POP Force と POP Wind</strong> を入れて全体の揺れを作ります</li>
+  <li>書き出しは <strong>Labs Vertex Animation Textures</strong> を布用と体用で2つ。Unreal 側には Labs プラグインが必要です</li>
+</ul>
+
+<p>次の第4回はシリーズ最長の42分で、場所が Unreal に移ります。
+インポート設定から始めて、マテリアルの共通パターンを作り、
+Niagara システム2つでエフェクトを組み立てます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Global AOV で全ジオメトリに一括でパスを出す | 技術メモ | makeinufilm</title>
+  <meta name="description" content="AOV 用のマテリアルを画面の全ジオメトリに当てる H22 の新機能です。cone を 30/60/90 にした AO を RGB に詰める multiband AO を題材に、Render Var が自動で繋がる仕組みと壊し方も。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Global AOV で全ジオメトリに一括でパスを出す</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=hbLvbtzcuvc">Houdini 22 | How to Use Global AOVs</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 4:29 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/hbLvbtzcuvc"
+          title="Houdini 22 | How to Use Global AOVs" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>新機能の狙い</h2>
+
+<p><strong>AOV を出すためのマテリアルを、画面に写っている全ジオメトリに一括で当てる</strong>機能です。</p>
+
+<p>AOV そのものの説明は動画では省略されていて（既知の前提として扱われています）、
+新機能の使い方に絞った4分半の回になっています。</p>
+
+<p>題材は <strong>multiband ambient occlusion</strong> —
+コンポジット側が AO パスを細かく制御できるようにする、業界で一般的な手法です。</p>
+
+<h2>手順</h2>
+
+<h3>1. テストシーンを用意する</h3>
+
+<p>Solaris で <strong>Noise Sampler</strong> を置きます。
+<strong>異なるマテリアル・発光・ライト・カメラが一式入ったテストシーン</strong>が手に入るので、検証に便利です。</p>
+
+<h3>2. マテリアルを作る</h3>
+
+<ol>
+  <li>Material Library → <strong>Karma Material Builder</strong> を作り <code>Global_AOV_Material</code> と命名します</li>
+  <li>中に入って<strong>ディスプレイスメントを削除します</strong>（使いません）</li>
+  <li><strong>MaterialX Surface Unlit</strong> を作って surface に繋ぎ、既定のノードは消します</li>
+  <li><strong>Ambient Occlusion を3つ</strong>作り、cone の値を <code>30</code> / <code>60</code> / <code>90</code> にします（90 が既定値）。
+      ノード名も <code>kma_ao_30</code> / <code>kma_ao_60</code> / <code>kma_ao_90</code> にしておくと分かりやすくなります</li>
+  <li><strong>MaterialX Combine 3</strong>（<strong>Signature = Vector 3</strong>）で3つを1つのベクタにまとめます</li>
+  <li><strong>Karma AOV</strong> ノードを作り <code>multiband_AOV</code> と命名。Combine の出力を繋ぎ、
+      <strong>その出力を MaterialX Surface Unlit の emission へ</strong>、
+      さらに<strong>このマテリアルの AOV としても指定します</strong></li>
+</ol>
+
+<img src="img/howto-global-aovs-000205.png" alt="Karma Material Builder の中身。kma_ao_30 / kma_ao_60 / kma_ao_90 の3つが mtlxcombine3（Signature = Vector 3）でまとめられ、mtlxsurface_unlit1 に繋がっている。ビューポートには Noise Sampler のテストシーンが表示されている">
+
+<p><strong>cone の角度を変えた AO を3本、RGB に詰める</strong>のが multiband の中身です。
+コンポジットでは R だけ、G だけといった具合に取り出して混ぜられます。
+第2回で出てきたパックテクスチャと発想は同じで、<strong>1枚に3種類詰める</strong>形になっています。</p>
+
+<h3>3. 全ジオメトリに当てる</h3>
+
+<ol>
+  <li>Material Library に戻って <strong>Auto-fill Materials</strong>。パスが正しい場所を指しているか確認します</li>
+  <li><strong>Karma Setup</strong> レシピを追加します。警告が出るのは<strong>カメラが未指定</strong>だからなので、カメラを選びます</li>
+  <li><strong>Image Output タブ</strong>を下にたどって <strong>Global AOV Material</strong> の欄に、作ったマテリアルを指定します</li>
+</ol>
+
+<p>これで全ジオメトリに当たります。1つずつ割り当てる必要がありません。</p>
+
+<h2>Render Var の仕組み（ここを知らないと壊す）</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>段階</th><th>何が起きるか</th></tr></thead>
+  <tbody>
+    <tr><td>Karma AOV の <strong>Create Render Var</strong> を有効にする</td>
+        <td>Material Library が<strong>対応するマテリアルの下に render var を作ってくれます</strong></td></tr>
+    <tr><td>さらに</td>
+        <td><strong>標準の場所へ自動で参照が張られます。</strong>標準の場所とは
+        Karma Render Settings の <strong>Render Products and Vars</strong> です</td></tr>
+    <tr><td>下流の Karma Render Settings</td>
+        <td>render var を<strong>自動で検出</strong>してレンダーで使えるようにします</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>この場所を変えると参照が切れます。</strong>自動で繋がっているぶん、動かすと壊れます。
+後からさらに調整したい場合は <strong>Render Var Edit</strong> ノードを使います。</p>
+
+<h2>重要な制約</h2>
+
+<p><strong>この仕組みは Karma 固有の慣習で、USD の標準でも他のレンダーデリゲートの標準でもありません。</strong>
+動画でも明言されています。</p>
+
+<p>Karma 以外では使えないので、他のレンダラも使うパイプラインでは前提にしないほうがよさそうです。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>Global AOV Material</strong> に指定したマテリアルが、<strong>全ジオメトリに一括で当たります</strong></li>
+  <li>Noise Sampler は<strong>マテリアル・発光・ライト・カメラが揃ったテストシーン</strong>なので検証に便利です</li>
+  <li>multiband AO は <strong>cone を 30 / 60 / 90 にした AO を3本、Combine 3（Vector 3）で RGB に詰めます</strong></li>
+  <li>Karma AOV の出力は <strong>emission に繋ぎ、かつマテリアルの AOV としても指定します</strong></li>
+  <li><strong>Create Render Var</strong> が render var を作り、Karma Render Settings の <strong>Render Products and Vars</strong> に参照が張られます。<strong>この場所を動かすと切れます</strong></li>
+  <li>調整は <strong>Render Var Edit</strong> ノードで行います</li>
+  <li><strong>Karma 固有の慣習です。</strong>USD 標準でも他のデリゲートの標準でもありません</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summon VFX 1 — 8個のメッシュを作って FBX で出す | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Labs Disc の新旧バージョンの使い分け、Spiral と Sweep と curveu でのグラデーション、参照コピーで一部だけ変える作り方、そして1つの FBX に3メッシュを階層で詰める方法まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Summon VFX 1 — 8個のメッシュを作って FBX で出す</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=EWRwSK3VwoE">Summon VFX | 1 | Build Effect Meshes</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/realtime-summon-vfx/">Realtime Summon VFX</a> の第1回 / 講師 Cesar Merchan さん / Houdini FX 21.0.631 / 8:37 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+シリーズ全体の構成は<a href="sidefx-summonvfx-00-intro.html">第0回のメモ</a>にまとめています。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/EWRwSK3VwoE"
+          title="Summon VFX | 1 | Build Effect Meshes" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>召喚エフェクトに使う<strong>8個のメッシュ</strong>を、どれも短いチェーンで作ること</li>
+  <li><code>uv2</code> という<strong>2組目の UV セット</strong>を持たせる理由</li>
+  <li><code>attribadjustcolor</code> で<strong>頂点カラーにグラデーションを焼く</strong>こと。テクスチャを増やさずにフェードを作れます</li>
+  <li><code>Labs Disc</code> の<strong>バージョンによる違い</strong>と、旧バージョンを Tab メニューに出す設定</li>
+  <li><code>curveu</code> を使って、カーブに沿った 0〜1 の値でグラデーションを作ること</li>
+  <li>3つのメッシュを<strong>1つの FBX にまとめて</strong>、Unreal 側で別オブジェクトとして受け取る方法</li>
+</ul>
+
+<p>やっていること自体は難しくありません。ただ<strong>「リアルタイムに渡すために何を仕込んでおくか」</strong>が
+どのメッシュにも共通して入っているので、そこを見ると学びが多い回だと思います。</p>
+
+<h2>1. どのメッシュにも共通する4つの工程</h2>
+
+<p>8個それぞれ作り方は違うのですが、最後の仕上げはほぼ同じ形をしています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>工程</th><th>ノード</th><th>なぜ</th></tr></thead>
+  <tbody>
+    <tr><td>2組目の UV を持たせる</td><td><code>uvproject</code>（UV Project）で <strong>UV Attribute を <code>uv2</code></strong></td>
+        <td>1つのメッシュに UV セットを2組持たせられます。Unreal 側で用途ごとに使い分けます</td></tr>
+    <tr><td>頂点カラーを焼く</td><td><code>attribadjustcolor</code>（Attribute Adjust Color）</td>
+        <td>Pattern Type を <strong>Radial</strong> にすれば内→外、<strong>Line</strong> にすれば上→下のグラデーションになります</td></tr>
+    <tr><td>100倍に拡大する</td><td><code>transform</code></td>
+        <td><strong>Unreal に持っていくための単位合わせ</strong>です。Houdini の1単位が Unreal の1cm 相当になります</td></tr>
+    <tr><td>書き出す</td><td><code>rop_fbx</code>（ROP FBX Output）</td>
+        <td>メッシュごとに1つずつ置いています</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>100倍はうっかり忘れると後で全部やり直しになる</strong>ところなので、
+メッシュを作るたびに毎回入れておくのが安全です。</p>
+
+<h2>2. Labs Disc のバージョン違いを使い分ける</h2>
+
+<p>ポータル周りの円盤には <code>Labs Disc</code> を使いますが、この回では<strong>2つのバージョンを使い分けています</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>この回での役</th></tr></thead>
+  <tbody>
+    <tr><td><code>labs::disc_generator</code><br><span class="tx-muted">Labs Disc Generator（旧）</span></td>
+        <td>内外の半径・辺の数・分割数を決めて、<strong>Add UVs</strong> をオンにして UV を持たせます</td></tr>
+    <tr><td><code>labs::disc_generator::1.1</code><br><span class="tx-muted">Labs Disc（新）</span></td>
+        <td>ポータル本体用。こちらには <strong>Vertex Color</strong> のタブがあり、<strong>Add Color</strong> をオンにするとカラーランプでグラデーションを直接作れます</td></tr>
+  </tbody>
+</table></div>
+
+<p>ここで一つ実用的な話が出てきます。<strong>新しいバージョンがあると、Tab メニューには新しいほうしか出ません。</strong>
+旧バージョンを使いたいときは、アセット定義のツールバーで
+<strong>Show Menu When Needed</strong> のような設定をオンにすると選べるようになります。</p>
+
+<p class="tx-muted">「古いノードのほうが欲しい挙動をする」という状況は実際に起きるので、
+出し方を知っておくと詰まりません。</p>
+
+<h2>3. 8個のメッシュ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>用途</th><th>作り方</th></tr></thead>
+  <tbody>
+    <tr><td>ポータル近くのエネルギー</td><td><code>Labs Disc Generator</code>（Add UVs）→ <code>uv2</code> → Attribute Adjust Color（Radial）</td></tr>
+    <tr><td>ポータル本体</td><td><code>Labs Disc</code> 1.1 の Vertex Color（Add Color + ランプ）</td></tr>
+    <tr><td>ポータルが開いたときの光条</td><td><code>Labs Cylinder</code>。UVs をオンにすると UV は付きますが<strong>UV 空間を埋めきらない</strong>ので、<code>uvtransform</code> で Y 方向に拡大します。Attribute Adjust Color は <strong>Line</strong> で上をフェード</td></tr>
+    <tr><td>エネルギーを集める段</td><td><code>Labs Disc</code> をカーブランプで制御 → <code>matchsize</code> の <strong>Justify Y = Min</strong> で位置を揃えます</td></tr>
+    <tr><td>球状のもの</td><td><code>sphere</code> → <code>uvtexture</code>（Texture Type: <strong>Polar</strong>）→ <code>clip</code> で半分に切る → Attribute Adjust Color で上下を塗り分け</td></tr>
+    <tr><td>ソーラークラスタ ×3</td><td>下の節で詳しく</td></tr>
+  </tbody>
+</table></div>
+
+<h3>Polar UV は Fix Boundary Seams を忘れない</h3>
+
+<p>球に <code>uvtexture</code> で Polar の UV を張るとき、
+<strong>Fix Boundary Seams をオンにしないと継ぎ目で妙な結果になります</strong>。
+動画でも「オフだと変な感じになる」と実演しています。
+オンにしても位置が少しずれるので、そこは <code>uvtransform</code> で合わせます。</p>
+
+<h2>4. ソーラークラスタ — Spiral と Sweep と curveu</h2>
+
+<p>ここがこの回でいちばん作り込んでいる部分です。</p>
+
+<ol>
+  <li><code>spiral</code>（Spiral SOP）で螺旋のカーブを作ります。<strong>Height</strong>、<strong>Turns</strong>、
+      <strong>Increase per Turn</strong>（<code>radiusincreaseperturn</code>）、<strong>Radius Scale</strong> で形を決めます</li>
+  <li><code>resample</code> で <strong>Segments</strong> を決め、同時に
+      <strong>Create Curve U Point Attribute</strong>（<code>docurveuattr</code>）をオンにします</li>
+  <li><code>sweep</code> で断面を付けます。<strong>Surface Shape = Ribbon</strong>、Columns と Width を調整し、
+      <strong>Apply Scale Along Curve</strong> で端と根元の太さを変えます</li>
+  <li><code>sweep</code> の <strong>UVs and Attributes</strong> タブで UV を計算し、
+      <strong>Normalize Computed UVs</strong> をオンにして UV 空間に収めます</li>
+  <li>Color 系のノードで <code>curveu</code> を参照して、端と根元にグラデーションを付けます</li>
+</ol>
+
+<h3>curveu とは何か</h3>
+
+<p>動画でも「Curve U って何をしているか気になりませんか」と立ち止まって説明しています。
+<strong><code>curveu</code> はカーブに沿った 0 から 1 の値</strong>です。根元が 0、先端が 1 になります。</p>
+
+<p>これがあると「先端だけ細く」「根元だけ濃く」といった指定が、
+位置の計算をせずに<strong>ランプ1つで書けます</strong>。カーブから作る形では毎回使える考え方だと思います。</p>
+
+<p class="tx-muted">パラメータのラベルは <strong>Curve U</strong>、作られるアトリビュートの名前は <code>curveu</code> です。
+音声だと「Curve UV」と聞こえますが、UV とは別のものです。</p>
+
+<h3>参照コピーで3本に増やす</h3>
+
+<p>1本できたら <code>Ctrl</code> + <code>Alt</code> + <code>Shift</code> + 左クリックで
+<strong>参照コピー</strong>（同じ値を参照するノード）を作れます。</p>
+
+<p>コピーしたほうは <strong>Roll の参照だけを外して 90 度</strong>を入れます。
+これで十字に交差した形になります。
+同じことをもう2回やり、そのときは <code>spiral</code> の値を少しずつ変えて<strong>3本に変化を付けます</strong>。</p>
+
+<p><strong>「共通部分は参照で繋いだまま、変えたいところだけ参照を切る」</strong>という作り方です。
+後から共通の形を直したいときに、参照している側は全部付いてきます。</p>
+
+<h2>5. 3つのメッシュを1つの FBX にまとめる</h2>
+
+<p>ソーラークラスタ3本は Unreal 側でも別オブジェクトとして扱いたいのですが、
+FBX を3つに分けたくはありません。そこでこうします。</p>
+
+<ol>
+  <li><code>name</code> ノードで <code>solarcluster1</code> / <code>2</code> / <code>3</code> と名前を付けます</li>
+  <li><code>rop_fbx</code> で <strong>Build Hierarchy from Path Attribute</strong> をオンにします</li>
+  <li><strong>Path Attribute</strong> に <code>name</code> と入れます</li>
+</ol>
+
+<p>これで<strong>1つの FBX の中に3つのメッシュが階層として入ります</strong>。
+Unreal に読み込むと3つのオブジェクトとして出てきます。
+アトリビュートの値がそのまま書き出し先の階層になる、という分かりやすい仕組みです。</p>
+
+<h2>6. Merge で全部並べて確認する</h2>
+
+<p>最後に <code>merge</code> を1つ置いて、作ったメッシュを全部繋いでプレビューします。
+スケールが揃っているか、位置関係がおかしくないかをここで見ます。</p>
+
+<img src="img/sidefx-summonvfx-01-meshes-000817.png" alt="Houdini FX 21.0.631 のウィンドウ。ビューポートには螺旋状のリボンメッシュが重なり、その下に円盤メッシュが置かれている。ネットワークビューには matchsize6、attribadjustcolor5、transform12、transform13 と続き、末端に rop_fbx6 と rop_fbx7 が並ぶ。下部の Merge ノードには Preview という名前が付き、パラメータパネルの Input Operators に transform7 / transform9 / transform5 / transform1 が Network Dot 経由で、transform12 と transform13 が直接繋がっているのが一覧されている">
+
+<p>ネットワークを見ると、末端に <code>rop_fbx</code> が<strong>メッシュごとに1つずつ</strong>並んでいます。
+確認用の <code>merge</code> は <strong>Preview</strong> という名前で、
+配線を <strong>Network Dot</strong> 経由に通してまとめています。
+書き出しの本線とは別に「見るための枝」を1本持っておく、という整理です。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>どのメッシュも <strong><code>uv2</code> → 頂点カラー → 100倍 → FBX</strong> という同じ仕上げをします</li>
+  <li><strong>100倍のスケールは Unreal 用</strong>です。忘れると後で全部やり直しになります</li>
+  <li><code>Labs Disc</code> は新旧2バージョンあり、<strong>新しいほうにだけ Vertex Color</strong> があります。旧版は Tab メニューに出ないので、アセット定義側の設定で出します</li>
+  <li><code>Labs Cylinder</code> の UV は<strong>UV 空間を埋めきらない</strong>ので <code>uvtransform</code> で拡大します</li>
+  <li>球の Polar UV は <strong>Fix Boundary Seams</strong> をオンにしないと継ぎ目が崩れます</li>
+  <li><strong><code>curveu</code> はカーブに沿った 0〜1 の値</strong>です。先端だけ／根元だけの指定がランプ1つで書けます</li>
+  <li><code>Ctrl</code>+<code>Alt</code>+<code>Shift</code>+クリックの<strong>参照コピー</strong>で、共通部分を繋いだまま一部だけ変えられます</li>
+  <li><code>rop_fbx</code> の <strong>Build Hierarchy from Path Attribute</strong> に <code>name</code> を渡せば、1つの FBX に複数メッシュを階層で入れられます</li>
+</ul>
+
+<p>次の第2回は Copernicus に移って、これらのメッシュに貼るテクスチャを作ります。
+1枚の画像に3〜4種類の情報を詰める<strong>パックテクスチャ</strong>が中心で、
+最後に煙を 8×8 のフリップブックとして書き出します。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

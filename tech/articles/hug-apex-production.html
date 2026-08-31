@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APEX を現場で使う — Paris HUG の講演 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="108万ポイントのシーンで .abc が 27GB、APEX Scene Cache が 35MB。約769倍という数字から始まり、現場ツール3本のアーティストの反応、そして「遅れて入るからこそゼロで作れる」という synthetic approach の主張まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>APEX を現場で使う — Paris HUG の講演</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=fhgP_W-OvUE">APEX in Houdini: Evolving Animation Workflows for Production | Mattéo Martinez | Paris HUG 2026</a>
+（Paris HUG 2026 の講演 / 講演者 Mattéo “DeBrumaire” Martinez さん（Brand Studio Paris / CFX テックリード）/ 41:47 / 英語・一部フランス語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+キャッシュサイズの数値はスライドから直接読み取ったものです。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/fhgP_W-OvUE"
+          title="APEX in Houdini: Evolving Animation Workflows for Production | Paris HUG 2026" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この講演の位置</h2>
+
+<p>SideFX の人ではなく<strong>外部ユーザーの視点</strong>です。
+講演者は Brand Studio Paris の CFX テックリードで、
+<strong>実際の制作現場で APEX を使っている人</strong>の話になっています。</p>
+
+<p>内容は4つに分かれます。</p>
+
+<ol>
+  <li><strong>キャッシュの話</strong>（数字がいちばん衝撃的な部分）</li>
+  <li>APEX / KineFX でのリギングの実際</li>
+  <li>実際に作った現場ツール3つ</li>
+  <li><strong>The Synthetic Approach</strong> — この講演の核心にある主張</li>
+</ol>
+
+<p>Q&amp;A（29:30 以降）の相当部分がフランス語なので、そこは要点のみにしています。</p>
+
+<h2>1. APEX Scene Cache の大きさ</h2>
+
+<p>Houdini では<strong>アニメーションシーンの中で直接ラグドールシミュレーションを回せます</strong>。
+デモではキャラを6体ラグドールで放り込み、
+<strong>キャッシュが重くなるようわざとモデルにサブディビジョンを追加しています</strong>
+（最適化で有利に見えないようにするため）。</p>
+
+<p>そして <strong>APEX Scene Cache はシーンの中身をすべてキャッシュします</strong> —
+アニメーションレイヤー、キー、<strong>ラグドールシミュレーションに使ったパラメータそのもの</strong>、
+そして<strong>コンストレイント</strong>まで。
+<strong>再シミュレーションするとアニメーターが得たのと完全に同じ結果</strong>が出ます。</p>
+
+<img src="img/hug-apex-production-000352.png" alt="講演のスライド。108万ポイント・107万プリミティブのシーンについて、.abc が 27.142 GB、APEX Scene Cache（.bgeo.sc）が 35.280 MB と並べて表示されている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>Points</td><td>1,080,462</td></tr>
+    <tr><td>Primitives</td><td>1,071,006</td></tr>
+    <tr><td>Vertices</td><td>4,284,024</td></tr>
+    <tr><td><code>.abc</code></td><td><strong>27.142 GB</strong></td></tr>
+    <tr><td>APEX Scene Cache（<code>.bgeo.sc</code>）</td><td><strong>35.280 MB</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>講演では口頭で<strong>「745倍小さい」</strong>と述べていますが、
+スライドの数値から計算すると<strong>約769倍</strong>になります。どちらにせよ3桁です。</p>
+
+<p>読み込み速度は ABC キャッシュに近く、<strong>スケルトンも同時に書き出しています</strong>。
+この大きなシーンでは <strong>ABC より速い</strong>とのことです。</p>
+
+<h3>講演者が考えてほしいと言っていること</h3>
+
+<p>単に容量が小さいという話ではなく、この差が何を意味するかです。</p>
+
+<ul>
+  <li>ワークフロー</li>
+  <li>プロジェクトのアーカイブ</li>
+  <li>サーバの容量</li>
+  <li>そして <strong>FX・CFX・アニメーションのアーティストが同じ時間でずっと多くの道具を使えるようになること</strong></li>
+</ul>
+
+<h3>弱点も自分で明言している</h3>
+
+<p><strong>この方式は「制作工程のほぼすべてを Houdini で行う」ワークフロー向けです。</strong>
+そこは講演者自身がはっきり言っています。</p>
+
+<p>ただし「多くのプロダクションが CFX・FX、そして実際にはライティングとレンダリングまで
+Maya から Houdini に移りつつある」という状況認識を添えています。</p>
+
+<h2>2. リギングの実際 — リグはグラフである</h2>
+
+<p><strong>リグはグラフで、各ノードがコントローラです。</strong>
+そしてグラフの作成・変更は<strong>別のグラフが実行する操作</strong>によって行われます。</p>
+
+<p>例として、スケルトンの全ポイントを探して変換を記述するノードを作り、親子付けする、という流れが挙げられています。
+<strong>「リグを作るグラフ」を作る</strong>という二階建ての構造です。</p>
+
+<h3>APEX Script</h3>
+
+<p>大きなリグを手作業で組むのは大変なので、<strong>APEX Script</strong>（APEX で速く書けるよう調整された Python）を使います。</p>
+
+<blockquote>使いこなせるようになると本当に素晴らしい。</blockquote>
+
+<p>200ノードを対応するノードに繋ぐループを書けて、<strong>コードは非常にコンパクト</strong>だそうです。
+講演者は<strong>お気に入りスクリプトの小さなライブラリ</strong>を持っています。</p>
+
+<h3>Auto Rig Component と Auto Rig Builder</h3>
+
+<p>コードで適用するか、<strong>Auto Rig Builder で視覚的に適用</strong>します。
+<strong>Unreal Engine の同機能とよく似ていて</strong>、コンポーネントをビューポートのスケルトンにドラッグするだけです。</p>
+
+<p><strong>非技術系のプロファイルに有用</strong>で、よく使うリグ操作の網羅的なリストが既にあります。</p>
+
+<h3>Fuse component — 手で試作する道具</h3>
+
+<p>数時間のスクリプティングに入る前に<strong>手で試作したい</strong>ときのためのものです。</p>
+
+<ul>
+  <li>単純な IK コンポーネントを作ります（追加ノードはオレンジ表示になります）</li>
+  <li><strong>手作業の変更をミラーできます</strong>（Fuse component が仕組みの理解を代行します）</li>
+  <li><strong>IK を腕など別の場所にリマップできます</strong></li>
+</ul>
+
+<h3>手続き的スキニング</h3>
+
+<p>「スケルトン作成とスキニングには常に人の手が必要」という見方は正しい、と認めた上で、
+<strong>「だが手作業しかできないという意味ではない」</strong>と続けます。</p>
+
+<p>実例として、首に細かいジオメトリのセルがあって難しいモデルが挙げられます。
+高解像度のクラスタでは<strong>スムージングが均質にならず</strong>、
+ベベルのせいで手描きは精度を要求されます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>手順</th></tr></thead>
+  <tbody>
+    <tr><td>1. <strong>Convex Hull</strong> を作る</td></tr>
+    <tr><td>2. リメッシュする</td></tr>
+    <tr><td>3. 複雑なジオメトリの代わりに<strong>ハルをキャプチャ</strong>する</td></tr>
+    <tr><td>4. そのキャプチャを<strong>スムージング</strong>する</td></tr>
+    <tr><td>5. 元のジオメトリに<strong>転送</strong>する</td></tr>
+  </tbody>
+</table></div>
+
+<p>「かなり古典的な手法」だと本人も言っていますが、要点は手法の新しさではなく
+<strong>状況ごとに最適な技法が必ずある</strong>ということです。</p>
+
+<h2>3. 現場で使われているツール3つ</h2>
+
+<p>この部が個人的にいちばん貴重だと思いました。
+<strong>アーティストからの反応まで語られています。</strong></p>
+
+<h3>ツール1 — 服をアートディレクションするクイックリグ</h3>
+
+<p>目的は、CFX アーティストが<strong>ショットの都合に合わせて服をアートディレクションする</strong>ことです。
+<strong>シミュレーション前に結果をバイアスする</strong>のに使います。</p>
+
+<p>将来的にはシミュレーション後の補正にも使い、
+<strong>シミュレーションを最終成果物ではなく作業の出発点にしたい</strong>と述べています。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>入口</td><td>ユーザーステートで<strong>点を作って好きに繋ぐ</strong>だけ</td></tr>
+    <tr><td>変換</td><td>ツール内部の<strong>インタープリタがそのジオメトリを使えるオリエント済みスケルトンに変換します</strong></td></tr>
+    <tr><td>キャプチャ</td><td>KineFX のキャプチャノードのワークフロー（または自作の高速版）を使います</td></tr>
+    <tr><td>解釈</td><td><strong>動的に解釈します。</strong>背骨をメインスケルトンにし、
+        浮いているジョイントはメインリグに含めず<strong>ジオメトリ表面にスナップさせます</strong>
+        → リグの変形の上に<strong>もう一層の変形</strong>が乗り、制御精度が上がります</td></tr>
+    <tr><td>布らしさ</td><td><strong>Wrinkle Deformer コンポーネント</strong>のおかげで布のように振る舞い、キャラクターの肌と衝突します</td></tr>
+    <tr><td>拡張</td><td>Auto Rig Builder と組み合わせて、描いたものに新しい挙動（例: 単純な wave deform）を足せます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>アーティストの反応</strong>: ワークフローに慣れると、使える制御と可能性の量を気に入る。
+ショットごとに適応して最大限の制御を得られる。</p>
+
+<h3>ツール2 — プロキシをアニメートするツール</h3>
+
+<p>対象は<strong>袖・裾・ケープ・ポニーテール</strong>など、アニメーターが既に（部分的に）動かしているものです。
+<strong>問題はジオメトリが「ついてくる」だけでなく「変形する」場合</strong>で、扱いが難しくなります。</p>
+
+<ol>
+  <li>ツールは<strong>レスト位置のジオメトリを取り、レストと変形後を比較して動きを理解します</strong></li>
+  <li>そして<strong>ジオメトリを貫くリグを作り、その変形をスケルトンにベイクします</strong></li>
+  <li>ツールに入ると<strong>アニメーションレイヤーが既に用意されていて</strong>、
+      プロキシの動きから理解した内容が全部そこに入っています</li>
+  <li>そこに独自のロジックを追加できます（例: ポニーテールをもっと制御するために spine の auto rig コンポーネントを足す）</li>
+</ol>
+
+<p>APEX シーンの中で動いているので、<strong>ネイティブの APEX シーンツールがすべて使えます</strong> —
+Full Body IK、そして Ragdoll。</p>
+
+<p><strong>Ragdoll のプロパティをツールの中でシミュレーション前に設定できます。</strong>
+たとえば<strong>プロキシの根元は非常に硬く、先端はずっと滑らかに</strong>（衝突込みで）。</p>
+
+<p><strong>いちばん語る価値のある反応</strong>がここです。</p>
+
+<blockquote>このツールがある前は、アーティストは自分でプロキシをアニメートするのを嫌がっていた
+（それまでは遥かに難しかったので慣れていなかった）。
+慣れると制御の差を実感し、速く結果を出すために頻繁に戻ってくる。</blockquote>
+
+<p>ツールの評価が<strong>「嫌がっていたことを自分からやるようになった」</strong>という形で語られるのは、
+なかなか読めない話だと思います。</p>
+
+<h3>ツール3 — リグ同士を合体させる試作</h3>
+
+<ul>
+  <li>リグのトランスフォームと名前を操作して、<strong>同じリグを複数回マージできます</strong></li>
+  <li><strong>ほぼ基本ノードだけで作られています</strong>（rename、repose、auto rig の fuse graph）</li>
+  <li>用途は<strong>合体・分離するロボットの番組</strong>。
+      <strong>3体しかいないシリーズのために100体分のリグを管理する必要がなくなります</strong> — 合体させればよい</li>
+</ul>
+
+<p>この部から学べることとして、講演者は
+<strong>「APEX / KineFX / Houdini 環境の柔軟性は、キャラクター制作以外にも使え、
+複数の職種が使え、リギングとアニメーション以外の部門でも使える」</strong>とまとめています。</p>
+
+<h2>4. The Synthetic Approach — 講演の核心</h2>
+
+<h3>歴史の整理</h3>
+
+<p>LightWave 3D が1990年、Blender が1994年、Maya が1998年。
+<strong>我々は CGI アニメーション産業のまだ非常に初期にいて、技術があってもどう進めるべきか分かっていない。</strong></p>
+
+<p>CGI 初期の70年代には<strong>コントローラではなくスプレッドシートでアニメートしていた</strong>そうです。
+つまり技術だけでなく<strong>技法そのものが発見されつつある</strong> —
+インターフェース、機能、アニメーションスライダ、キャラクターピッカー。</p>
+
+<p>当時存在した3Dソフトはすべて、<strong>発見された技法をその都度パッケージに足していきました</strong>。
+技術とプラグインの層が重なっていった。
+<strong>Houdini だけが遅れていて</strong>、Houdini でどうしてもやる必要があるプロダクションを止めないための
+<strong>小さなアニメーション／リギングのパッケージだけを提供していた</strong>。</p>
+
+<h3>主張の核心</h3>
+
+<p>他のソフトにとって<strong>この全体を変えるのはリスクが高い</strong> —
+コミュニティが既にその層・ショートカット・論理の上に構築されているから。
+<strong>すべてうまく動いているのに変えるのは、ある意味で不合理に見えます。</strong></p>
+
+<p><strong>だから Houdini は独自の立場にある。</strong>
+アニメーションの30年で上手くいったものすべてから着想を得て、<strong>ゼロから作れる</strong>。
+これを彼は <strong>synthetic approach（統合的アプローチ）</strong>と呼んでいます。</p>
+
+<p>遅れていたことが、そのまま利点になっているという読みです。
+負けている側の言い訳ではなく、<strong>なぜ後から入るほうが有利なのか</strong>を説明する形になっているのが面白いところです。</p>
+
+<h3>統合の実例</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>機能</th><th>内容と着想元</th></tr></thead>
+  <tbody>
+    <tr><td>Motion Mixer</td>
+        <td>クリップをタイムラインでブレンドします。CG ダブルだけでなく
+        <strong>アニマティックの試作・3Dストーリーボード・レイアウトの速いリタイム</strong>にも有用。
+        <strong>「おそらく Motion Builder が着想元。インターフェースが非常によく似ている」</strong></td></tr>
+    <tr><td>フリップブックでリタイム</td>
+        <td>プレイブラスト上で直接リタイムでき、<strong>アニメーションシーンのコントローラも更新されます</strong>。
+        フィードバックに有用。<strong>Shotgun や ftrack と繋げられないか</strong>と考えているそうです</td></tr>
+    <tr><td>animBot 相当が標準に</td>
+        <td>アニメーションスライダなど。<strong>「驚いたことに Maya にはネイティブのものが無い」</strong></td></tr>
+  </tbody>
+</table></div>
+
+<h2>5. スタジオ移行の話（29:30 以降）</h2>
+
+<p>ここはツールの話ではなく<strong>組織の話</strong>なので、内容として独立して価値があります。</p>
+
+<p>Camille Palin さん（Brand の CFX スーパーバイザー）が
+「言われたことは全部本当だ」と支持を表明した後、こういう質問が出ます。</p>
+
+<blockquote>多くの会社がライティング・レンダリング・FX に Houdini を採用している。
+<strong>しかしアニメーションは到達できない城塞のようで</strong>、そこだけ Maya のワークフローが残る。
+移行を促すには何が足りないのか。</blockquote>
+
+<h3>その答え</h3>
+
+<p><strong>「100万ドルの質問」</strong>と前置きした上で、スタジオを回って話した経験からこう答えています。</p>
+
+<p>一番足りないのは<strong>「その技術に触ったことがあり、スタジオを安心させられる技術アーティストが内部にいること」</strong>。
+APEX にまだ足りない機能はあるが、<strong>それは本当のブレーキではない</strong>。</p>
+
+<p><strong>本当のブレーキはスタジオが怖がっていること</strong> —
+Maya は20年そこにあり、大きな変化になる。</p>
+
+<p>機能の不足ではなく<strong>人と心理の問題</strong>だと言い切っているのが印象的でした。</p>
+
+<p class="tx-muted">33:22 以降（フランス語）では、今 Maya に全振りしているスタジオが段階的に APEX へ移るための推奨、
+37:04 ではスタジオを安心させる方法（役割を段階的に分けて、あとは一歩ずつやる）が語られています。
+40:44 で講演者は VoxelFX と共同でフルのトレーニングコースを制作中だと述べています。</p>
+
+<h2>この講演から持ち帰るもの</h2>
+<ul>
+  <li><strong>APEX Scene Cache は 108万ポイントのシーンで 35.280 MB。</strong>同じシーンの <code>.abc</code> は 27.142 GB で、<strong>約769倍</strong>の差です</li>
+  <li>キャッシュには<strong>アニメーションレイヤー・キー・ラグドールのパラメータ・コンストレイント</strong>まで入り、再シミュレーションで<strong>完全に同じ結果</strong>が出ます</li>
+  <li>ただし<strong>「ほぼ全工程を Houdini で行う」ワークフロー向け</strong>だと講演者自身が明言しています</li>
+  <li><strong>リグはグラフで、それを作るのも別のグラフです。</strong>APEX Script でコンパクトに書けます</li>
+  <li><strong>Fuse component</strong> は、スクリプトを書く前に手で試作するための道具です</li>
+  <li>手続き的スキニングの実例: <strong>Convex Hull → リメッシュ → キャプチャ → スムージング → 転送</strong></li>
+  <li>現場ツール3つの評価が<strong>アーティストの反応として語られている</strong>のが貴重です。とくに「嫌がっていた作業を自分からやるようになった」という話</li>
+  <li>核心の主張は <strong>synthetic approach</strong> — <strong>遅れて入るからこそ、30年の成果からゼロで作れる</strong></li>
+  <li>移行の障害は機能ではなく<strong>「安心させられる技術アーティストが内部にいるか」</strong>だという診断</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

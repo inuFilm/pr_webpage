@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 2 — Ray で真円にして For-Each でパッチごとに押し出す | 技術メモ | makeinufilm</title>
+  <meta name="description" content="コースの山場です。Attribute Create を細分化より前に置いて patches を振り、32面の番号が720面に行き渡る仕掛けを作ってから、For-Each でパッチ1枚を単位に押し出します。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 2 — Ray で真円にして For-Each でパッチごとに押し出す</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=kiUQ9k7rDvY">H22 Foundations | Model Render Animate 2 | The For-Each Node</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第2回 / Houdini 22 / 8:43 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-foundations-01-soccerball.html">上流を差し替えてサッカーボールを作る</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/kiUQ9k7rDvY"
+          title="H22 Foundations | Model Render Animate 2 | The For-Each Node" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li><strong>すでに繋いだノードの順番を入れ替える</strong>ことで、結果が変わること</li>
+  <li><code>Ray</code> に完全な球を渡して、細分化で歪んだ形を<strong>真円に直す</strong>やり方</li>
+  <li>アトリビュートを自分で作る。<code>patches</code> に <code>@primnum</code> を入れると<strong>細分化しても元の面の番号が全部に行き渡る</strong>こと</li>
+  <li>作ったアトリビュートを<strong>ビューポートに数字で表示</strong>して目で確かめる方法</li>
+  <li>For-Each ループで<strong>パッチ1枚を単位として</strong>押し出す。これがこのコースの山場です</li>
+  <li>ビューポートの見かけの細分化と、レンダリング時の細分化は別物だということ</li>
+</ul>
+
+<p>前回作ったものは「面を1枚ずつ膨らませたボール」でした。
+本物のサッカーボールは<strong>革のパッチ1枚が1つの塊として</strong>膨らんでいます。
+その差を埋めるのがこの回です。</p>
+
+<h2>1. 細分化を先に持ってくる</h2>
+
+<p>まずノードの順番を変えます。動画では <code>Y</code> を使って Subdivide をチェーンから外し、
+<strong>Platonic Solids のすぐ下</strong>に差し込み直しています。</p>
+
+<p>これで結果がはっきり変わります。前回は「押し出したものを細分化」していましたが、
+今回は「細分化したものを押し出す」順番になります。
+同じノードの組み合わせでも、並び順が結果そのものだという分かりやすい例だと思います。</p>
+
+<p>ただ、細分化した形をよく見ると<strong>完全な球にはなっていません</strong>。
+サッカーボールは五角形と六角形が混ざっているので、面の形が違うぶん細分化の結果も少しずつずれます。</p>
+
+<h2>2. Ray で真円にする</h2>
+
+<p>ここで <code>Ray</code> を使います。<code>Tab</code> から <strong>Ray</strong> を置き、
+別に <strong>Sphere</strong>（radius 1 のプリミティブ球）を作って <code>Ray</code> の<strong>第2入力</strong>に繋ぎます。</p>
+
+<p>Ray は第1入力の点から法線方向にレイを飛ばして、<strong>第2入力の面まで点を移動させる</strong>ノードです。
+飛ばす先が完璧な球なので、歪みが取れてきれいに丸くなります。
+バイパスして前後を見比べると、直線的に寝ていた部分が丸くなるのが分かります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>設定</th></tr></thead>
+  <tbody>
+    <tr><td><code>sphere1</code></td><td>radius 1。<code>ray1</code> の<strong>第2入力</strong>へ繋ぎます</td></tr>
+    <tr><td><code>ray1</code></td><td>Method: <strong>Project Rays</strong> / Entity: <strong>Primitives</strong> / Direction Source: Normal / Direction Type: Forward / Transform Points オン</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">プリミティブ球はただの完全な球なので、こういう「基準の形」として使うのに向いています。</p>
+
+<h2>3. patches アトリビュートを作る</h2>
+
+<p>次に Poly Extrude を<strong>いったん Connected Components に戻します</strong>。
+前回 Individual Elements にしたのは面を1枚ずつ扱うためでしたが、
+これから作るのは「パッチという塊」なので、いま個別にされていると邪魔になります。</p>
+
+<p>そのうえで <code>Tab</code> から <strong>Attribute Create</strong> を、
+Platonic Solids と Subdivide の<strong>あいだ</strong>に差し込みます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>値</th><th>なぜ</th></tr></thead>
+  <tbody>
+    <tr><td>Name</td><td><code>patches</code></td><td>あとで For-Each に渡す名前です</td></tr>
+    <tr><td>Class</td><td><strong>Primitive</strong></td><td>面につける情報なので点ではありません。ここを既定のままにすると後の工程が噛み合いません</td></tr>
+    <tr><td>Value</td><td><code>@primnum</code></td><td>その面自身の番号を、そのまま値として書き込みます</td></tr>
+  </tbody>
+</table></div>
+
+<p>大事なのは<strong>差し込む位置</strong>です。細分化<strong>より前</strong>に置くので、
+このとき番号を振られるのは元の32面です。そのあと Subdivide が面を割っていくと、
+割られた子の面すべてが<strong>親の番号を引き継ぎます</strong>。</p>
+
+<p>ジオメトリスプレッドシートで見ると、Subdivide の前は <strong>32 プリミティブ</strong>、
+後は <strong>720 プリミティブ</strong>になっています。720 個それぞれに、
+元がどのパッチだったかの番号が入っている状態です。これがこの回の仕掛けの全部です。</p>
+
+<h2>4. 目で確かめる — マーカーで番号を出す</h2>
+
+<p>数字がちゃんと行き渡っているかは、ビューポートに表示させて確かめられます。
+シーンビューの表示オプションから <strong>Marker</strong> のビジュアライザを追加します。</p>
+
+<img src="img/sidefx-foundations-02-for-each-000435.png" alt="右上に Ray ノードのパラメータ（Entity: Primitives、Method: Project Rays、Direction Source: Normal、Direction Type: Forward、Transform Points と Show Guide Geometry がオン、Ray Tolerance 0.01）。手前に Edit Visualizer ダイアログが開いていて、Name が Patch_Numbers、Type が Marker、Style が Text、Class が Primitive に設定されている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>Name / Label</td><td><code>Patch_Numbers</code> / Patch Numbers</td></tr>
+    <tr><td>Type</td><td>Marker</td></tr>
+    <tr><td>Style</td><td>Text</td></tr>
+    <tr><td>Class</td><td><strong>Primitive</strong></td></tr>
+    <tr><td>Attribute</td><td><code>patches</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>表示してみると、同じパッチの中の細かい面が<strong>全部同じ番号</strong>になっていて、
+隣のパッチでは番号が変わります。狙い通りです。
+アトリビュートは数字なので想像しにくいのですが、こうして画面に出してしまうのが確実だと思います。</p>
+
+<h2>5. For-Each でパッチ単位に押し出す</h2>
+
+<p>ここが本題です。<code>Tab</code> から <strong>For-Each Named Primitive</strong> を置くと、
+<code>foreach_begin</code> と <code>foreach_end</code> の2つが対で作られます。
+そのあいだに <strong>Poly Extrude を移動</strong>させます。</p>
+
+<p>この状態ではまだ何も変わりません。<code>foreach_end</code> の
+<strong>Piece Attribute</strong> に <code>patches</code> と入れて、はじめてループが仕事を始めます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>パラメータ</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td><code>foreach_end</code><br><span class="tx-muted">block_end</span></td>
+        <td><code>attrib</code> — Piece Attribute</td>
+        <td><code>patches</code>。<span class="tx-muted">同じ値を持つプリミティブが「1ピース」として扱われます</span></td></tr>
+    <tr><td><code>polyextrude1</code></td><td>Distance</td><td><code>0.1</code></td></tr>
+    <tr><td><code>polyextrude1</code></td><td>Inset</td><td><code>-0.02</code>（<strong>マイナス方向</strong>です）</td></tr>
+  </tbody>
+</table></div>
+
+<p>ループは <code>patches</code> の値ごとにジオメトリを切り出して、1つずつ押し出して、最後に全部を合わせます。
+だから<strong>パッチ1枚がひとかたまりとして</strong>膨らみます。
+中に何十枚の面が入っていても関係ありません。</p>
+
+<p class="tx-muted">Inset をマイナスにすると押し出しの先が広がるので、パッチの縁がふくらんで革らしい感じになります。</p>
+
+<h2>6. Fuse して、もう一度細分化する</h2>
+
+<p>ループはピースごとに処理して結果を合わせるので、
+<strong>隣り合うパッチの境目で点が二重になります</strong>。そこで <code>Fuse</code> を足して溶接します。</p>
+
+<p>そのすぐ後に <strong>Subdivide をもう1つ</strong>（Depth 1）足すと、革のボールらしくなってきます。
+1つ目の Subdivide が「パッチを分割するため」、2つ目が「仕上げを滑らかにするため」で、役割が違います。</p>
+
+<h2>7. 見かけの細分化と、レンダリング時の細分化</h2>
+
+<p>もっと滑らかに見たいときは <code>Shift</code> + <code>+</code>（戻すのは <code>Shift</code> + <code>-</code>）が使えます。
+これは<strong>ジオメトリを増やしているのではなく</strong>、オブジェクトレベルの表示設定を切り替えているだけです。</p>
+
+<img src="img/sidefx-foundations-02-for-each-000810.png" alt="オブジェクトレベル box_object1 の Render タブ。Display As が Full Geometry、Render Polygons As Subdivision (Mantra) にチェックが入り、Subdivision Style が Mantra Catmull-Clark。ビューポートには黒と白のパッチが揃った完成形のサッカーボールが表示されている">
+
+<p>レンダリングのときは、オブジェクトレベルの <strong>Render</strong> タブにある
+<strong>Render Polygons As Subdivision</strong> をオンにしておくと結果がきれいになります。
+表示のほうを戻していても、このチェックはレンダリングに効きます。
+ここを混同しやすいので、<strong>見かけと出力は別の設定</strong>と覚えておくとよさそうです。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>ノードは順番そのものが結果です。Subdivide を押し出しの<strong>前</strong>に動かすだけで作るものが変わります</li>
+  <li><code>Ray</code> の第2入力に完全な球を渡すと、細分化で出た歪みを真円に直せます</li>
+  <li><strong>Attribute Create を細分化より前に置く</strong>のが仕掛けの核です。32 面に振った番号が、割られた 720 面すべてに引き継がれます</li>
+  <li>アトリビュートは Marker ビジュアライザ（Type: Marker / Style: Text / Class: Primitive）で画面に出して確認できます</li>
+  <li>For-Each は <code>foreach_end</code> の <strong>Piece Attribute</strong> を入れるまで何もしません。ここが空のまま「動かない」と悩みがちなところです</li>
+  <li>ループの後は点が二重になるので <code>Fuse</code> が要ります</li>
+  <li><code>Shift</code> + <code>+</code> の表示と、Render タブの <strong>Render Polygons As Subdivision</strong> は別物です</li>
+</ul>
+
+<p>次の第3回は UV です。Houdini のジオメトリには UV が入っていないので自分で作ります。
+このとき <code>patches</code> がもう一度活きて、暗いパッチと明るいパッチを UV 空間で分ける役に立ちます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

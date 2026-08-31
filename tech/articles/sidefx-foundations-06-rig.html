@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 6 — APEX でスクワッシュ＆ストレッチを仕込む | 技術メモ | makeinufilm</title>
+  <meta name="description" content="4つのジョイントに役割を振り、APEX Configure Controls で形と可動範囲を決め、Set Driven Key で「前進したら転がる」「上下で潰れて伸びる」を作ります。11459 度の出どころと、リグロジックがジオメトリに付いてくる話も。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 6 — APEX でスクワッシュ＆ストレッチを仕込む</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=0f_dUedL4ng">H22 Foundations | Model Render Animate 6 | Rig the Soccerball</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第6回 / Houdini 22 / 27:03 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-foundations-05-solaris-materials.html">Quick Surface Material でテクスチャを割り当てる</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/0f_dUedL4ng"
+          title="H22 Foundations | Model Render Animate 6 | Rig the Soccerball" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>リグを<strong>別のオブジェクトに切り出す</strong>やり方（Extract と Object Merge）</li>
+  <li>4つのジョイントに<strong>それぞれ役割を持たせた</strong>最小のスケルトンの作り方</li>
+  <li><code>Capture Packed Geometry</code> で <code>name</code> アトリビュートを使ってジオメトリを結びつけること</li>
+  <li><code>APEX Pack Character</code> の <strong>Add FK and Bone Deform Components</strong> で、ジョイントがコントロールになること</li>
+  <li><code>APEX Configure Controls</code> でコントロールの形・色・<strong>可動範囲のリミット</strong>を決めること</li>
+  <li><code>APEX Set Driven Key</code> で「前進したら転がる」「上下でスクワッシュ＆ストレッチ」の2つの関係を作ること。<strong>11459 という数字の出どころ</strong>も含めて</li>
+  <li>いちばん驚くところ — <strong>ジオメトリを書き出すとリグロジックも一緒に付いてくる</strong></li>
+</ul>
+
+<p>27分あってシリーズ最長ですが、やっていることは「4つのジョイントに役割を振って、
+2つの関係式を仕込む」だけです。順番だけ押さえれば追えると思います。</p>
+
+<h2>1. リグを別オブジェクトに切り出す</h2>
+
+<p>まず Karma を切って Vulkan に戻し、Build デスクトップに帰ります。</p>
+
+<p>リグはボールと同じネットワークの中に作ることもできますが、動画では分けています。
+<strong>Modify シェルフの Extract</strong> を使うと、新しいオブジェクトと
+<strong>Object Merge</strong> が作られます。元のオブジェクトからジオメトリを引っぱってくる、
+動画の言い方だと「ワームホール」です。</p>
+
+<p>名前を <code>soccerball_rig</code> にします。これで、モデリングのネットワークを触らずにリグを組めます。</p>
+
+<h3>Name ノードを先に置く</h3>
+
+<p>中に入って、まず <code>Tab</code> から <strong>Name</strong> ノードを置いて <code>soccerball</code> と名前を付けます。
+これは後の<strong>キャプチャで掴む手がかり</strong>になるので、先にやっておきます。</p>
+
+<p class="tx-muted">ビューは <code>スペース</code> + <code>B</code> で右からの正面図にすると、この後の作業がやりやすいです。</p>
+
+<h2>2. 4つのジョイントでスケルトンを作る</h2>
+
+<p>ジオメトリをテンプレート表示にしてから、<code>Tab</code> で <strong>Skeleton</strong> を置きます。
+<strong>グリッドスナップ</strong>をオンにしておきます。</p>
+
+<ol>
+  <li>下と上をクリックして、中クリックで確定します。これで1本の骨ができます</li>
+  <li><code>Shift</code> + <code>Ctrl</code> でクリックすると<strong>半分に割れます</strong>。2回やって、ジョイントを4つにします</li>
+  <li><strong>Modify モード</strong>に切り替えて、下から順に名前を付けます</li>
+</ol>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ジョイント</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td><code>root</code></td><td>ボール全体を動かす。アニメーターが実際に掴むもの</td></tr>
+    <tr><td><code>scale pivot</code></td><td>スケール（スクワッシュ＆ストレッチの実体）</td></tr>
+    <tr><td><code>rotate pivot</code></td><td>回転（転がり）。ジオメトリはここに結びつけます</td></tr>
+    <tr><td><code>squash control</code></td><td>アニメーターが上下に動かして、スクワッシュ量を指示するためのハンドル</td></tr>
+  </tbody>
+</table></div>
+
+<p>4つに分けたのは骨が必要だからではなく、<strong>「どのジョイントが何を担当するか」を分けたい</strong>からです。
+最小のリグでも役割を分けておくと、後の Set Driven Key が素直に書けます。</p>
+
+<h3>scale pivot を root の位置まで下げる</h3>
+
+<p><strong>child compensate</strong> と <strong>tweak mode</strong> をオンにして、
+グリッドスナップのまま <code>scale pivot</code> を <code>root</code> の真上まで下げます。
+child compensate が入っているので、子は付いてきません。</p>
+
+<h3>回転を全部ゼロにする</h3>
+
+<p><code>P</code> を押すと回転が見えるので、<strong>4つ全部の Rotate を 0, 0, 0 にします</strong>。
+簡単なリグなので、すべてワールドと揃っていてほしいからです。
+<strong>Translate はゼロにしなくて構いません</strong>。ここは間違えやすいところだと思います。</p>
+
+<h2>3. 階層を組み替える</h2>
+
+<p>新しいペインで <strong>Animation Rig Tree</strong> を開くと、ジョイントの親子関係が見えます。
+ここで <code>squash control</code> をドラッグして <code>root</code> の子にします。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td><code>root</code></td><td>├ <code>scale pivot</code> → その子に <code>rotate pivot</code></td></tr>
+    <tr><td></td><td>└ <code>squash control</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>squash control</code> だけが別の枝になっているのが要点です。
+これは<strong>指示を出すためのハンドル</strong>なので、スケールの下にあってはいけません。</p>
+
+<h2>4. Capture Packed Geometry で結びつける</h2>
+
+<p><code>Tab</code> から <strong>Capture Packed Geometry</strong> を置いて、ジオメトリとスケルトンを繋ぎます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>Pack Input</td><td>オン。入ってくる途中でジオメトリをパックします</td></tr>
+    <tr><td>Capture by Attribute</td><td><code>name</code> アトリビュートを使います。だから最初に Name ノードを置いておいたわけです</td></tr>
+    <tr><td>手動キャプチャ</td><td><code>soccerball</code> のジオメトリを <strong><code>rotate pivot</code></strong> に割り当てます</td></tr>
+  </tbody>
+</table></div>
+
+<p>結びつける先が <code>rotate pivot</code> なのは、<strong>そのピボットを中心に回ってほしい</strong>からです。
+そして <code>rotate pivot</code> は <code>scale pivot</code> の子なので、
+スケールの影響も自然に受けます。階層をあの形にした理由がここで効いてきます。</p>
+
+<h2>5. APEX Pack Character でリグにする</h2>
+
+<p><code>Tab</code> から <strong>APEX Pack Character</strong> を置きます。
+これが APEX の世界への入口で、アニメーターが使うリグロジックはここから組み立てられていきます。</p>
+
+<img src="img/sidefx-foundations-06-rig-000658.png" alt="APEX Pack Character packcharacter1 のパラメータ。Shape Path が /Base.shp、Skeleton Path が /Base.skel、Rig Path が /Base.rig で、Add FK and Bone Deform Components にチェックが入っている。ネットワークは name1 と skeleton1 が capturepackedgeo1 に入り、その下に packcharacter1 が続く。左のビューポートはアニメートステートで、ボールの下に小さな緑の輪のコントロールが見えている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>Shape Path</td><td><code>/Base.shp</code></td></tr>
+    <tr><td>Skeleton Path</td><td><code>/Base.skel</code></td></tr>
+    <tr><td>Rig Path</td><td><code>/Base.rig</code></td></tr>
+    <tr><td><strong>Add FK and Bone Deform Components</strong></td><td>オン</td></tr>
+  </tbody>
+</table></div>
+
+<p>この <strong>Add FK and Bone Deform Components</strong> が効くと、
+<strong>それぞれのジョイントがコントロールになり</strong>、同時にジオメトリのキャプチャも成立します。
+最初はパラメータが灰色になっていますが、上のトグルを切ると触れるようになります。</p>
+
+<h3>どのジョイントにどのチャンネルを持たせるか</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ジョイント</th><th>持たせるチャンネル</th></tr></thead>
+  <tbody>
+    <tr><td><code>root</code></td><td>Translate</td></tr>
+    <tr><td><code>squash control</code></td><td>Translate</td></tr>
+    <tr><td><code>rotate pivot</code></td><td>Rotate だけ</td></tr>
+    <tr><td><code>scale pivot</code></td><td>Scale だけ</td></tr>
+  </tbody>
+</table></div>
+
+<p>ここまでで動作確認ができます。<code>rotate pivot</code> を回すとボールが回り、
+<code>scale pivot</code> をいじると素朴なスクワッシュ＆ストレッチになります。
+Reset ボタンで戻せます。</p>
+
+<h3>アニメートステートのホットキー</h3>
+
+<p>この状態で <code>Shift</code> + <code>F1</code> を押すとヒント表示を消せますが、
+逆に出しておくと便利な一覧が出ています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>キー</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><code>C</code></td><td>Tool Menu</td></tr>
+    <tr><td><code>G</code> / <code>Ctrl</code>+<code>G</code></td><td>Open Channel Widget / Open Settings</td></tr>
+    <tr><td><code>Shift</code>+<code>V</code> / <code>V</code></td><td>Open Selection Sets</td></tr>
+    <tr><td><code>F</code></td><td>Frame Controls</td></tr>
+    <tr><td><code>Ctrl</code>+<code>Shift</code></td><td>Global Transform Mode</td></tr>
+    <tr><td><code>Ctrl</code></td><td>Enable axis snapping</td></tr>
+    <tr><td><code>H</code> / <code>Ctrl</code>+<code>H</code></td><td>Add Constraints / Remove Constraints</td></tr>
+    <tr><td><code>B</code></td><td>Bake Animation</td></tr>
+    <tr><td><code>N</code></td><td>Reload Scene</td></tr>
+  </tbody>
+</table></div>
+
+<h2>6. Configure Controls で形・色・リミットを決める</h2>
+
+<p><code>Tab</code> から <strong>APEX Configure Controls</strong> を置きます。</p>
+
+<p class="tx-muted">動画がここで挟んでいるコツがあります。<strong>いったん <code>Esc</code> で抜けて入り直す</strong>と、
+前に選んでいたノードの残りが消えて表示がきれいになります。この後も何度か出てきます。</p>
+
+<img src="img/sidefx-foundations-06-rig-001000.png" alt="APEX Configure Controls configurecontrols1 のパラメータ。Control Group が root、Use Shape Override がオンで Shape Override が circle_wires、Use Shapeoffset がオンで Mode が Pre-Multiply、Rotate が 90,0,0、Scale が 5,5,5。ビューポートではボールの足元に白い円のコントロールが床に寝た状態で表示され、ボール上には小さな白い点のコントロールが3つ見える">
+
+<h3>root のコントロール</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>値</th><th>なぜ</th></tr></thead>
+  <tbody>
+    <tr><td>Control Group</td><td><code>root</code></td><td>どのジョイントの見た目を変えるか</td></tr>
+    <tr><td>Shape Override</td><td><code>circle_wires</code></td><td>既定の点だと掴みにくいので円にします</td></tr>
+    <tr><td>Shape Offset の Mode</td><td>Pre-Multiply</td><td></td></tr>
+    <tr><td>Rotate</td><td><code>90, 0, 0</code></td><td><strong>円を床に寝かせる</strong>ための回転です</td></tr>
+    <tr><td>Scale</td><td><code>5, 5, 5</code></td><td>そのままだと小さすぎて見えません</td></tr>
+    <tr><td>色</td><td>赤</td><td>見分けるためです</td></tr>
+  </tbody>
+</table></div>
+
+<h3>リミットで動ける方向を絞る</h3>
+
+<p>ここがリギングらしいところです。<strong>Limits</strong> をオンにして、
+<code>T</code>（Translate）に対して範囲を入れます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>コントロール</th><th>min</th><th>max</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td><code>root</code></td><td><code>0, 0, 0</code></td><td><code>0, 100, 100</code></td>
+        <td><strong>X はコントロールが作られません。</strong>Y は 0〜100、Z は 0〜100 の範囲だけ動きます</td></tr>
+    <tr><td><code>squash control</code></td><td><code>-1</code></td><td><code>1</code></td>
+        <td>Y 方向だけ、−1 から 1 の範囲で動きます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>min と max が同じ値（0 と 0）の軸には、そもそもコントロールが作られません。</strong>
+「使わない軸は触れないようにする」という指定がこれで書けます。
+実際に動かすと、上に行って止まり、下に行って止まるのが確認できます。</p>
+
+<p><code>squash control</code> の形は<strong>ボックス</strong>にして、Shape Offset の Scale を <code>4, 4, 4</code>、色は青にしています。
+形と色で役割が分かるようにしておくのは、後で自分が助かる部分だと思います。</p>
+
+<p class="tx-muted">この時点では <code>squash control</code> を動かしても何も起きません。
+それを繋ぐのが次の Set Driven Key です。</p>
+
+<h2>7. Set Driven Key その1 — 前進したら転がる</h2>
+
+<p><strong>Set Driven Key は「駆動する側（driver）」と「駆動される結果（driven）」の関係を作る仕組み</strong>です。
+<code>Tab</code> から <strong>APEX Set Driven Key</strong> を置くと、
+Null（差し込み位置の目印）と APEX Rig ノードと Set Driven Key ノードがまとめて作られます。</p>
+
+<h3>まず「結果」をアニメーションで作る</h3>
+
+<p>Pose ツールに入ると <strong>Rig Pose</strong> があり、そこに<strong>アニメーションレイヤー</strong>を作れます。</p>
+
+<ol>
+  <li>空のレイヤーを作って <code>roll</code> と名付けます</li>
+  <li><code>rotate pivot</code> を選び、右クリックから <strong>add selected control to layer</strong> を選びます</li>
+  <li>現在フレームを <strong>0</strong> にして <code>K</code> で回転チャンネルにキーを打ちます</li>
+  <li>フレーム <strong>10</strong> に移動して <code>K</code> を押し、Rotate X に <strong>11459</strong> を入れます</li>
+</ol>
+
+<p class="tx-muted"><code>K</code> を押さずに数値を入れるとキーになりません。
+逆に <code>K</code> を先に押しておけば、後から数値を変えても自動で反映されます。</p>
+
+<h3>11459 はどこから来たのか</h3>
+
+<p>いきなり出てくる数字なので戸惑いますが、ちゃんと計算されたものです。
+「1回転で進む距離」から逆算しています。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>半径</td><td><code>r = 0.5</code>（レッスン3で 1×1×1 に正規化したので直径 1、半径 0.5 です）</td></tr>
+    <tr><td>1周の距離</td><td><code>2πr = π ≈ 3.1416</code></td></tr>
+    <tr><td>1単位進むのに必要な回転</td><td><code>360 / 2πr = 360 / π ≈ 114.59</code> 度</td></tr>
+    <tr><td>100 単位ぶん</td><td><code>114.59 × 100 = 11459</code> 度</td></tr>
+  </tbody>
+</table></div>
+
+<p>つまり「Z 方向に 100 進むあいだに 11459 度回れば、滑らずに転がって見える」という値です。
+<strong>レッスン3で大きさを 1×1×1 に決めておいたことが、ここで数字として効いてきます。</strong></p>
+
+<h3>カーブを直線にする</h3>
+
+<p>アニメーションエディタで見ると、キーの間がイーズイン・イーズアウトになっています。
+Set Driven Key の元にするなら<strong>直線のほうが素直</strong>なので、まっすぐにします。
+緩急は後で driver 側をアニメートするときに付ければ足ります。</p>
+
+<p class="tx-muted"><code>Esc</code> で抜けると Rig Pose のアニメーションチャンネルが消えますが、
+これはアニメートステートの中にしか出ないものなので、消えて正常です。</p>
+
+<h3>関係を結ぶ</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>アニメーションレイヤー</td><td><code>roll</code></td></tr>
+    <tr><td>範囲</td><td><code>0</code> 〜 <code>10</code>。<strong>最初のキーを1ではなく0に打った理由がこれです</strong></td></tr>
+    <tr><td>Driver</td><td><code>root.tz</code> — root の Z 移動</td></tr>
+    <tr><td>Fit</td><td><code>0</code> 〜 <code>100</code>。11459 を出すときに使った 100 と同じ値です</td></tr>
+  </tbody>
+</table></div>
+
+<p>これで <code>root</code> を前に動かすとボールが転がります。上下に動かしても回りません。
+狙い通りです。</p>
+
+<h2>8. Set Driven Key その2 — スクワッシュ＆ストレッチ</h2>
+
+<p>同じ手順をもう一度やります。レイヤー名は <code>squash</code> です。</p>
+
+<ol>
+  <li><code>scale pivot</code> をレイヤーに加えます（これが変形する実体です）</li>
+  <li>操作されるコントロールとして <code>squash control</code> を加えます</li>
+  <li>フレーム 10 で <code>K</code>。縦に伸ばして、<strong>2つのボックスのあいだにある小さな四角</strong>を使って横を同時に縮めます</li>
+  <li>フレーム 0 で <code>K</code>。今度は縦に潰して、同じ四角で横を広げます</li>
+</ol>
+
+<p><strong>伸びたら細くなり、潰れたら太くなる</strong>——体積を保つ動きです。
+2軸をまとめて動かせる小さな四角のハンドルが、ここで役に立ちます。</p>
+
+<p>ここでも最後にカーブを直線にします。
+作業中に転がりが邪魔なら、<code>roll</code> のレイヤーを一時的に切っておけます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>アニメーションレイヤー</td><td><code>squash</code></td></tr>
+    <tr><td>範囲</td><td><code>0</code> 〜 <code>10</code></td></tr>
+    <tr><td>Driver</td><td><code>squash control.ty</code></td></tr>
+    <tr><td>Fit</td><td><code>-1</code> 〜 <code>1</code>（Configure Controls で入れたリミットと同じ範囲です）</td></tr>
+  </tbody>
+</table></div>
+
+<p>青いボックスを下げると潰れ、上げると伸びます。
+リミットの −1〜1 と Fit の −1〜1 を揃えているので、<strong>ハンドルの端がちょうど変形の端になります</strong>。
+このあたりの数字の揃え方が、使いやすいリグとそうでないリグの差になるのだと思います。</p>
+
+<h2>9. 使わないコントロールを見えなくする</h2>
+
+<p>Configure Controls に戻って3つ目の設定を足し、
+<code>rotate pivot</code> と <code>scale pivot</code> の Shape Offset の Scale を
+<strong><code>0.01, 0.01, 0.01</code></strong> にします。</p>
+
+<p>これで画面から点が消えます。<strong>消したのは見た目だけで、コントロールとしては残っています</strong>。
+Set Driven Key が動かしている部分なので、アニメーターが誤って掴む必要がありません。
+「触らせたくないものは消す」という整理です。</p>
+
+<h2>10. アニメーターのための入口を作る</h2>
+
+<ol>
+  <li><strong>APEX Scene Add Character</strong> を置いて、キャラクター名を <code>soccerball</code> にします</li>
+  <li><strong>APEX Scene Animate</strong> を置きます。<strong>これがアニメーターが触るノードです</strong>。打ったキーはここに溜まります</li>
+</ol>
+
+<p>表示フラグを立てて Pose に入ると、ボールを転がしたりスクワッシュさせたりできます。
+ここでも表示がおかしくなったら <code>Esc</code> → 選び直し → 入り直しで直ります。</p>
+
+<h2>11. 書き出すとリグロジックも付いてくる</h2>
+
+<p>アニメーターに、ここまでの組み立てを全部見せる必要はありません。そこで書き出します。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>ノード</td><td><strong>ROP Geometry Object</strong>（ROP Geo）</td></tr>
+    <tr><td>入力</td><td>Scene Add Character の出力</td></tr>
+    <tr><td>出力ファイル</td><td><code>ball_rig.bgeo</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>「ジオメトリを保存しただけでは、リグのロジックはどこへ行くのか」と思うところですが、
+ここがこの回でいちばん面白い部分です。</p>
+
+<p>新しいペインで <strong>APEX Network View</strong> を開くと、
+これまで置いてきた APEX のノードたちが<strong>裏側で組み立てていたロジック</strong>が見えます。
+コントロールの設定も Set Driven Key も、全部ここにあります。
+このコースでは触る必要がありませんが、もっと複雑なリグならここを直接いじることになります。</p>
+
+<p><strong>そしてこのネットワークは、他のノードの中に入っているのではなく、ジオメトリと一緒に運ばれます。</strong>
+だから <code>ball_rig.bgeo</code> を保存すると、リグロジックも一緒に保存されます。</p>
+
+<h3>本当に付いてくるか確かめる</h3>
+
+<ol>
+  <li>オブジェクトレベルでリグのオブジェクトを隠します</li>
+  <li>新しいジオメトリオブジェクト <code>soccerball_anim</code> を作ります</li>
+  <li><code>File</code> SOP で <code>ball_rig.bgeo</code> を読み込みます</li>
+  <li>この時点では<strong>ただのジオメトリに見えます</strong></li>
+  <li><strong>Animate ツールをクリックします</strong></li>
+</ol>
+
+<p>すると Houdini が「これには Scene Animate が必要だ」と判断して、
+<strong>リグロジックが現れます</strong>。コントロールの形も色もリミットもそのままです。
+隠れていただけで、ちゃんと付いてきていたわけです。</p>
+
+<p>アニメーターの側からは、ファイルを1つ読み込むだけでリグが使える状態になります。
+受け渡しの形としてかなり気持ちがいいなと思いました。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>リグは <strong>Modify シェルフの Extract</strong> で別オブジェクトに切り出せます。Object Merge が元のジオメトリを引っぱってきます</li>
+  <li>キャプチャで使うので、<strong>Name ノードを先に置きます</strong></li>
+  <li>ジョイントは <code>Shift</code>+<code>Ctrl</code> クリックで半分に割れます。4つに分けて<strong>役割を分担</strong>させます</li>
+  <li>4つとも <strong>Rotate は 0,0,0</strong> に揃えます。Translate はゼロにしなくて構いません</li>
+  <li><code>squash control</code> は <code>root</code> の子にします。<strong>スケールの下に置いてはいけません</strong></li>
+  <li>ジオメトリは <strong><code>rotate pivot</code></strong> にキャプチャします。回ってほしい中心がそこだからです</li>
+  <li><strong>Add FK and Bone Deform Components</strong> をオンにすると、ジョイントがコントロールになります</li>
+  <li>リミットは <strong>min と max が同じ軸にはコントロールが作られません</strong>。使わない軸を塞ぐのに使えます</li>
+  <li><strong>11459 度</strong>は <code>360 / 2πr × 100</code>（r = 0.5）です。レッスン3の正規化がここで効きます</li>
+  <li>Set Driven Key の元にするアニメーションは<strong>カーブを直線に</strong>しておきます。緩急は driver 側で付けます</li>
+  <li>最初のキーを<strong>フレーム 0</strong> に打つのは、Set Driven Key の範囲を 0〜10 にするためです</li>
+  <li>見せたくないコントロールは <strong>Shape Offset の Scale を 0.01</strong> にすれば消えます。機能は残ります</li>
+  <li><strong>APEX のリグロジックはジオメトリと一緒に運ばれます。</strong><code>.bgeo</code> を読んで Animate ツールを押すだけでリグが復活します</li>
+</ul>
+
+<p>次の第7回は、このリグを使って古典的なバウンシングボールをアニメートします。
+キーフレーム、カーブのタンジェント、モーションパスを扱って、最後に USD として書き出します。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

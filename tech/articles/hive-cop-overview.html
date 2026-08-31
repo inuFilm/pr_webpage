@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Copernicus のマテリアル層で塗る — HIVE 講演 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="モバイルゲーム制作者の視点で H22 の新しいマテリアル系ノードを一巡りします。Grunge と Sheets の役、Sheets の閾値をグローに転用する話、そして葉と枝を同じパターンから導けば位置合わせが不要になるという要点。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Copernicus のマテリアル層で塗る — HIVE 講演</h1>
+        <p class="tech-meta">houdini-cop / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=wXsgN9xF9BY">H22 - Copernicus | Nikola Damjanov | Houdini 22 HIVE</a>
+（SideFX 公式 Houdini 22 HIVE の講演 / 講演者 Nikola Damjanov さん / Houdini 22 / 33:46 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/wXsgN9xF9BY"
+          title="H22 - Copernicus | Nikola Damjanov | Houdini 22 HIVE" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>誰の講演か</h2>
+
+<p>普段は<strong>モバイルゲームの仕事をしている人</strong>です。
+<strong>実際に手を動かしている人の視点</strong>で、H22 の新しいマテリアルレイヤー系ノードを
+次々に見せていく33分になっています。</p>
+
+<p>機能紹介というより<strong>「これで何が作れるか」を見せる</strong>構成なので、
+Copernicus で何ができるのか全体像を掴むのに向いた講演だと思います。</p>
+
+<h2>話の流れ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>時刻</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>03:34</td><td><strong>マテリアル層の新ノード群。</strong>錆びた表面や湿りを作ります</td></tr>
+    <tr><td>07:09</td><td>他より深い部分をシミュレートする話。<strong>Sheets の閾値でグロー</strong>を作ります</td></tr>
+    <tr><td>10:48</td><td><strong>Tile Pattern</strong> ノード</td></tr>
+    <tr><td>14:22</td><td>絡み合う葉の間の「枝」を、shape と別の tile pattern で作り <strong>Max ブレンドで合成</strong></td></tr>
+    <tr><td>18:02</td><td>（デモが固まり、口頭で説明する時間帯。ここは飛ばしてよいと思います）</td></tr>
+    <tr><td>21:33</td><td><strong>Mask Combine</strong> ノードの実演</td></tr>
+    <tr><td>25:04</td><td><strong>curvature マスク</strong>から肌の色を作ります</td></tr>
+    <tr><td>28:37</td><td>Q&amp;A: 白黒の値からメッシュを再生成できるか</td></tr>
+    <tr><td>32:12</td><td>Q&amp;A: adjacency ノードについて</td></tr>
+  </tbody>
+</table></div>
+
+<h2>1. マテリアル層の新ノード群</h2>
+
+<p>錆びた表面や湿りを作るためのノードが揃っています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>役</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Grunge</strong></td><td><strong>レイヤー間の鋭い遷移</strong>を扱います</td></tr>
+    <tr><td><strong>Sheets</strong></td><td>同様に遷移を扱います</td></tr>
+    <tr><td>Drips / Small Spots / Streaks / Wipe Trails</td><td><strong>目的別に用意されたもの</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>「汚しを作る」というひとつの目的に対して、
+<strong>現象ごとに別のノードが用意されている</strong>のが H22 のマテリアル系の特徴です。
+ノイズを組み合わせて自分で作る、という段階から一段上がっています。</p>
+
+<h3>Sheets の閾値でグローを作る</h3>
+
+<p>07:09 からは「他より深い部分をシミュレートする」話になり、
+<strong>Sheets の閾値でグロー</strong>を作っています。
+Leaky Streaks と Drips も出てきます。</p>
+
+<p><strong>汚しのノードを発光に転用する</strong>という使い方で、
+「濡れて深く見えるところが光る」という現象を作っています。</p>
+
+<h2>2. Tile Pattern</h2>
+
+<p>10:48 からの Tile Pattern ノードについて、こう言っています。</p>
+
+<blockquote>既に使ったことがあれば、インターフェースの上半分は見覚えがあるはず。</blockquote>
+
+<p>つまり<strong>既存のタイル系ノードの延長</strong>にあるものです。
+新しく覚えるのは下半分だけ、ということになります。</p>
+
+<h3>すべてが同じ元から派生する</h3>
+
+<p>14:22 からが面白い部分です。<strong>絡み合う葉の間の「枝」</strong>を作るのに、
+shape と別の tile pattern を使い、<strong>Max ブレンドで合成</strong>します。</p>
+
+<p>そして重要なのがこの一言です。</p>
+
+<blockquote>すべてが同じ元から派生しているので、ぴったり合う。</blockquote>
+
+<p><strong>葉と枝を別々に作ってから位置を合わせる</strong>のではなく、
+<strong>同じパターンから両方を導く</strong>ので、そもそもずれません。
+手続き的に作ることの本質的な利点が、この一例に出ていると思います。</p>
+
+<h2>3. Mask Combine</h2>
+
+<p>21:33 で <strong>Mask Combine</strong> ノードを実演しています。</p>
+
+<p class="tx-muted">講演時点では最終的な名称を検討中だったそうですが、おそらくこの名前で確定しています。</p>
+
+<h2>4. curvature マスクから肌を作る</h2>
+
+<p>25:04 からは <strong>curvature マスク</strong>から肌の色を作る話です。
+<strong>特に翼のような薄い部分</strong>に効くとのことです。</p>
+
+<p>そして<strong>骨っぽい部分は別のアプローチ</strong>で作っています。</p>
+
+<p>「1つのマスクで全部やる」のではなく、
+<strong>部位の性質ごとに違うマスクの作り方をする</strong>という判断です。
+薄くて張った部分と、骨が浮いている部分では、curvature の出方がそもそも違います。</p>
+
+<h2>5. Q&amp;A</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>質問</th><th>答え</th></tr></thead>
+  <tbody>
+    <tr><td>白黒の値からメッシュを再生成できるか</td>
+        <td><strong>ある程度は可能。</strong>ただし<strong>ニット（編み目）はかなり難しい</strong></td></tr>
+    <tr><td>adjacency ノードについて</td>
+        <td><a href="hive-cop-time-shift.html">Jakub さんの講演</a>が詳しいと案内されます</td></tr>
+  </tbody>
+</table></div>
+
+<p>「ニットは難しい」という具体的な限界が出てくるのが実践者らしくて良いなと思いました。
+高さ情報からジオメトリを起こすのは、糸が交差しているような構造だと成立しません。</p>
+
+<h2>この講演から持ち帰るもの</h2>
+<ul>
+  <li>H22 のマテリアル層は<strong>現象ごとにノードが用意されています</strong>（Grunge / Sheets / Drips / Small Spots / Streaks / Wipe Trails）</li>
+  <li><strong>Grunge と Sheets はレイヤー間の鋭い遷移</strong>を扱うためのものです</li>
+  <li><strong>Sheets の閾値をグローに転用</strong>できます。「深く濡れたところが光る」を作れます</li>
+  <li>Tile Pattern は<strong>既存のタイル系ノードの延長</strong>で、上半分は見覚えのあるインターフェースです</li>
+  <li><strong>葉と枝を同じパターンから導けば、位置合わせが不要になります。</strong>手続き的に作る利点そのものです</li>
+  <li>肌は <strong>curvature マスク</strong>から。ただし<strong>部位の性質ごとに別のアプローチ</strong>を取ります</li>
+  <li>白黒からメッシュ生成は<strong>ある程度可能。ニットは難しい</strong>という具体的な限界</li>
+</ul>
+
+<p class="tx-muted">18:02 あたりはデモが固まって口頭説明になる時間帯なので、
+初見なら飛ばしても内容は追えると思います。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

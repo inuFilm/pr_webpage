@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>手続き的な都市 2 — PCG・USD・ISM の4ルート | 技術メモ | makeinufilm</title>
+  <meta name="description" content="1枚に見えるモジュールが実は3層に分かれている理由から、grammar_resample の実装、Houdini から Unreal へ出す4ルートの比較、USD のパスを二重に書く理由、ISM と HISM の選び分けまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>手続き的な都市 2 — PCG・USD・ISM の4ルート</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=8Y08HmDMt-E">Procedural Cities for Games 2 | Houdini to Unreal with PCG, USD &amp; ISMs</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/build-procedural-cities-for-games/">Build Procedural Cities for Games</a> の第2回 / 講師 Mohamad Salame さん（SideFX）/ Houdini 21 / 難易度 Advanced / 33:33 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-cities-01-assets.html">アセット・パイプライン・最適化</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/8Y08HmDMt-E"
+          title="Procedural Cities for Games 2 | Houdini to Unreal with PCG, USD &amp; ISMs" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>この回の核心 — <strong>1枚に見えるモジュールが、実は上・中・下の3層に分かれている</strong>理由</li>
+  <li>文法の実装の中心 <code>grammar_resample</code> と、<strong>VEX を書かずに同じことをする方法</strong></li>
+  <li>ビューポートをクリックすると対応するノードが選択される<strong>自作ステート</strong></li>
+  <li>Houdini から Unreal へ出す<strong>4つのルート</strong>の比較</li>
+  <li>Unreal が要求する USD のパス構造。<strong>なぜ名前を二重に書くのか</strong></li>
+  <li><strong>ISM と HISM のどちらを選ぶか</strong>、そして per-instance custom data の使い分け</li>
+</ul>
+
+<h2>1. 1枚に見えるモジュールは3つある</h2>
+
+<p>前回の文法を実装側から見ていきます。グラフ全体は<strong>同じ概念の繰り返し</strong>で、
+アトリビュートは <strong>Repeat / Stretch / Cull</strong> の3つ、それを<strong>モジュールごとに持ちます</strong>。</p>
+
+<p>そして最大の発見がこれです。<strong>見た目が1枚のモジュールでも、実は3つのモジュールです。</strong>
+上・中・下に縦に分けられています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>層</th><th>扱い</th></tr></thead>
+  <tbody>
+    <tr><td>上</td><td><strong>繰り返しも伸縮もしません</strong></td></tr>
+    <tr><td>中</td><td>繰り返し・伸縮します</td></tr>
+    <tr><td>下</td><td><strong>繰り返しも伸縮もしません</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>なぜ分けるのか。</strong>アーチの曲線のように<strong>伸ばしてはいけない形</strong>があるからです。
+モジュール全体を1枚として伸ばすと、その曲線が歪みます。
+中央だけを伸ばして上下を固定すれば、階高が変わっても形が崩れません。</p>
+
+<p>そしてこれが効いてくるのは次の一点です。</p>
+
+<blockquote>階高ごとに窓のバリエーションを作り分ける必要がなくなります。
+1つのモジュールを使い回して、パターン側で吸収する。</blockquote>
+
+<p>アセットを増やすのではなくルールで吸収する、という判断で、
+<strong>この回でいちばん実務的な工夫だと思いました。</strong></p>
+
+<p class="tx-muted">構成は3層になっています。<strong>prefabs</strong>（縦に積む）→
+<strong>horizontal strip / facade</strong> → <strong>full building</strong>。
+<code>Enter</code> でビューポート編集して確かめられます。</p>
+
+<h2>2. 階高はスライスの距離から来る</h2>
+
+<p>ブロックアウトを<strong>スライス</strong>し、<strong>スライス間の距離をそのまま階高として各階に格納します</strong>。
+それが各階のモジュール高さを駆動します。</p>
+
+<p>前回「階高をモジュールの高さと一致させる」という話がありましたが、
+実装側では逆で、<strong>スライスの距離が階高を決めています</strong>。
+ブロックアウトの形が変われば階高も自動で付いてくる、ということです。</p>
+
+<h2>3. grammar_resample — 実装の中心</h2>
+
+<p>実装の中心は <code>grammar_resample</code> というノードで、
+<strong>文法パターンに基づいてラインをリサンプルします</strong>。</p>
+
+<p>やっていることはこうです。プリミティブが<strong>測られて</strong>、
+文法が「この部分はこの長さ」と分かるので、大きなパターンに収められます。
+持っているアトリビュートは <code>repeat</code> / <code>stretch</code> / <code>cull</code> /
+<code>name</code> / <code>color</code>（color は目視用）です。</p>
+
+<h3>VEX が書けなくても同じことができる</h3>
+
+<p>ここは親切だと思いました。<strong>VEX が書けなくても <code>attribcreate</code>（Attribute Create）で同じことができます。</strong>
+<code>repeat</code> というアトリビュートを作って値を入れるだけです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th><code>repeat</code> の値</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>0</code></td><td>無限に繰り返す</td></tr>
+    <tr><td><code>N</code></td><td>ちょうど N 回</td></tr>
+    <tr><td><code>-1</code></td><td>隣と交互</td></tr>
+  </tbody>
+</table></div>
+
+<p>前回の記法（<code>:1:0:0</code>）は、結局この3つのアトリビュートを書くための書き方でした。
+<strong>記法を覚えなくてもアトリビュートを直接置けば動く</strong>ので、
+自分のネットワークに組み込むときの入口が広くなっています。</p>
+
+<h3>同じノードを2軸で使い回す</h3>
+
+<p>そして <code>grammar_resample</code> は<strong>横（facade）と縦（prefab）の両方に使い回されています</strong>。
+最後に点を出力して、メッシュを copy to points します。</p>
+
+<p>全体を <strong>prefab として命名して次段で再利用する</strong>形になっているので、
+「1つの仕組みを2方向に適用する」という組み方です。</p>
+
+<h2>4. ビューポートをクリックするとノードが選択される</h2>
+
+<p>レイアウトはいつでも編集できます。
+そのために<strong>ビューポートでジオメトリをクリックすると対応するノードが選択される</strong>
+ステートを自作しています。</p>
+
+<p>これがあると<strong>HDA を作らなくても、素の <code>line</code> や <code>grid</code> を置いて
+ビューポートから直接動かせます</strong>。
+シェルフツール化とホットキー割り当ては開発中で、<code>node select</code> のような名前になる予定だそうです。</p>
+
+<p class="tx-muted">前回の「パーツをダブルクリックしてマルチパームを編集する」と同じ発想で、
+<strong>画面で触ったものとノードグラフを繋ぐ</strong>ことに一貫して投資しているのが分かります。
+規模が大きくなるほどここが効いてくるのだと思います。</p>
+
+<h2>5. 建物を組み上げて出力する</h2>
+
+<p>組み上げは意外なほど簡単です。</p>
+
+<ol>
+  <li>ブロックアウトをカットして、オーバーライドを足します</li>
+  <li>あとは<strong>すでに作った facade と prefabs を <code>objectmerge</code> で参照して繋ぐだけ</strong>です</li>
+</ol>
+
+<h3>モジュールのオーバーライド</h3>
+
+<p>Wrangle を置いて <code>if prefab == railing</code> のような条件を書けば、
+差し替えやバリアントを走らせられます。
+<strong>点が全部揃っているので何でもできる</strong>という状態です。</p>
+
+<p class="tx-muted">屋根と床は別処理です。
+「四角い部分だけをインスタンス化して周囲はジオメトリにする」という実験もしたそうですが、
+結局メッシュ全体をそのまま使っています。<strong>やってみて戻した</strong>という話が入っているのが良いなと思いました。</p>
+
+<h2>6. Unreal への4つのルート</h2>
+
+<p>ここが後半の本題です。4つを実演して比較しています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ルート</th><th>出すもの</th><th>向き / 不向き</th></tr></thead>
+  <tbody>
+    <tr><td><strong>PCG + Alembic</strong></td>
+        <td>メッシュ（バッチ書き出し）と点を<strong>別々に</strong></td>
+        <td><strong>取り込み後も PCG で編集したいとき。</strong>Static Mesh Spawner が
+        <code>unreal_instance</code> アトリビュート（フルパス）を見て spawn します。
+        <strong>Alembic は CSV データテーブル形式より速い</strong>ので 5.7 以降は Alembic 推奨。
+        ただし<strong>パスをハードコードするのでメッシュを移動すると壊れます</strong>
+        → Data Asset 経由にすればエンジン側で差し替えられます</td></tr>
+    <tr><td><strong>ISM / HISM エクスポータ</strong></td>
+        <td>インスタンスを直接シーンに</td>
+        <td>PCG を通さず<strong>最速で置きます</strong>。<strong>Unreal 5.7 限定のプロトタイプ</strong>で、
+        <strong>Window → HISM Import</strong> から。ピボットが原点から離れる場合は
+        <strong>Calculate from Bounds</strong> で中心に寄せます</td></tr>
+    <tr><td><strong>USD</strong></td>
+        <td>ジオメトリとインスタンスを<strong>一緒に</strong></td>
+        <td><strong>唯一まとめて出せるルート</strong>です（他2つはメッシュと点を別々に出す必要があります）。
+        USD Stage Editor で開くだけ。キャッシュも一緒に入ります</td></tr>
+    <tr><td><strong>Houdini Engine</strong></td>
+        <td>HDA そのもの</td>
+        <td>HDA をエンジンに落として<strong>パラメータをその場で変えられます</strong>。
+        Houdini と Unreal を往復しなくて済みます</td></tr>
+  </tbody>
+</table></div>
+
+<h3>PCG ルートは2ノードで済む</h3>
+
+<p>Unreal 側は <strong>Static Mesh Spawner</strong> が <code>unreal_instance</code> を読んで spawn するだけなので、
+<strong>2ノードで済む簡単な構成</strong>です。ただしパスがハードコードになります。</p>
+
+<p>そして<strong>色の正体</strong>がここで明かされます。
+<strong>Instance Data Packer</strong> でスプレッドシートの任意アトリビュート（この例では <code>rest_length</code>）を読み、
+<strong>per-instance custom data</strong> としてマテリアルに渡しています。</p>
+
+<p>だから<strong>1枚に見えるモジュールも実は3モジュールで、それぞれ別の色を持てます。</strong>
+3層に分けたことの副産物です。伸縮のための分割が、そのまま色のバリエーションにも使える形になっています。</p>
+
+<h3>バッチ書き出しは glTF が速い</h3>
+
+<p>メッシュだけを大量にコンテンツブラウザへ入れるなら、
+<strong>glTF は FBX より格段に速く取り込めます</strong>（講師の実測）。
+FBX と glTF の両方のバッチエクスポータがあります。</p>
+
+<h3>USD のパス構造</h3>
+
+<img src="img/sidefx-cities-02-unreal-003035.png" alt="Attribute Wrangle のコードエディタ。Run Over が Primitives になっていて、s@path = &quot;/Assets&quot; + &quot;/&quot; + s@name + &quot;/&quot; + s@name; という1行が書かれている。右側にはその結果できたシーングラフの階層が表示されている">
+
+<p>USD ルートでは、SOP Create に全アセットを入れてインスタンス化し、Save to Disk します。
+Unreal では USD Stage Editor で開くだけです。</p>
+
+<p>ここでパス構造を自分で作る必要があります。
+<code>attribwrangle</code>（Run Over = <strong>Primitives</strong>）にこう書きます。</p>
+
+<pre><code>s@path = "/Assets" + "/" + s@name + "/" + s@name;</code></pre>
+
+<p><strong>なぜ名前を二重に書くのか。</strong>
+<strong>Unreal は「component の下に mesh」という構造を要求します。</strong>
+この書き方にすると component と mesh の階層ができます。</p>
+
+<p>知らないと必ず引っかかるところだと思います。パスが1段だと Unreal 側で認識されません。</p>
+
+<p>インスタンサ側は点を <code>objectmerge</code> で入れてアトリビュートを掃除し、
+<strong><code>Assets</code> 以下の component を全部集めて <code>name</code> でインスタンス化します</strong>。
+保存形式は <strong><code>usda</code>（テキスト）と <code>usdc</code>（バイナリ）</strong>から選べます。</p>
+
+<p class="tx-muted">ISM / HISM ルートでは、床をジオメトリとして出しているぶんは
+<strong>別途更新が必要</strong>です（インスタンス化していないため）。
+1つのルートで全部が済むわけではない、というのは知っておいたほうがよさそうです。</p>
+
+<h2>7. 最適化の実務</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>論点</th><th>判断</th></tr></thead>
+  <tbody>
+    <tr><td>ISM か HISM か</td>
+        <td><strong>Nanite を使うなら ISM のほうが良い。</strong>
+        HISM は UE4 世代、またはインスタンスが遠く離れている場合に向きます</td></tr>
+    <tr><td>マテリアルオーバーライド</td>
+        <td><strong>ISM ではマテリアルオーバーライドが重くなります。</strong>
+        <strong>per-instance custom data</strong> を使うほうが良いです</td></tr>
+    <tr><td>custom data の index 0</td>
+        <td><strong>予約です。</strong><strong>点番号を入れておくと、Unreal から Houdini に戻すときに点の順序を保てます。</strong>
+        色などは index 1 / 2 / 3 に入れます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>index 0 に点番号を入れておく</strong>という話が実務的で良いと思いました。
+一方通行のパイプラインではなく<strong>戻ってくることを前提にしている</strong>設計です。
+エンジンで動かして調整した結果を Houdini に戻すとき、点の対応が取れていないと何もできません。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>1枚に見えるモジュールは上・中・下の3層です。</strong>中央だけ伸縮させ、上下は固定してアーチの曲線を守ります</li>
+  <li>その結果<strong>階高ごとに窓のバリエーションを作らなくて済みます</strong>。1つを使い回してパターン側で吸収します</li>
+  <li>階高は<strong>スライス間の距離</strong>から来ます。ブロックアウトを変えれば追従します</li>
+  <li><code>grammar_resample</code> が実装の中心で、<strong>横と縦の両方に使い回されます</strong></li>
+  <li><strong>VEX が書けなくても <code>attribcreate</code> で <code>repeat</code> を置けば同じことができます</strong>（0 = 無限 / N = N回 / −1 = 交互）</li>
+  <li>ビューポートのクリックでノードを選択するステートを自作していて、<strong>HDA にしなくても素の SOP を画面から動かせます</strong></li>
+  <li>出力は4ルート。<strong>PCG で編集を残すなら Alembic、最速なら ISM/HISM、まとめて出すなら USD、往復を減らすなら Houdini Engine</strong></li>
+  <li>メッシュだけを大量に入れるなら <strong>glTF が FBX より格段に速い</strong>です</li>
+  <li>USD は <code>s@path = "/Assets" + "/" + s@name + "/" + s@name;</code> と<strong>名前を二重に</strong>書きます。Unreal が「component の下に mesh」を要求するためです</li>
+  <li><strong>Nanite を使うなら ISM。</strong>マテリアルオーバーライドは重いので per-instance custom data を使います</li>
+  <li><strong>custom data の index 0 は予約で、点番号を入れます。</strong>Unreal から Houdini に戻すときの対応が取れます</li>
+</ul>
+
+<p>この2本を通して感じたのは、<strong>ほぼすべての判断が「後から直せるか」で決まっている</strong>ことでした。
+文法に Cull があるのも、モジュールを3層に分けるのも、custom data の index 0 に点番号を入れるのも、
+Data Asset を経由するのも、全部「一発で完成させない」ための備えになっています。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

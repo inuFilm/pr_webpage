@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>金属を壊す 2 — 凹ませる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Proxy Only で「シミュレーション用だけ細かく割る」のが核心です。凹みが見えないのは頂点が足りないから、という話と、主破砕の線で裂けつつ二次破砕は曲がるためだけに働かせる parentpiece の使い方。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>金属を壊す 2 — 凹ませる</h1>
+        <p class="tech-meta">houdini-fx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=R4YVz0FcCOw">Houdini 22 | How to Destroy Metal | 2 | Denting</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 15:34 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="howto-destroy-metal-01-tearing.html">引き裂く（Tearing）</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/R4YVz0FcCOw"
+          title="Houdini 22 | How to Destroy Metal | 2 | Denting" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>狙う結果</h2>
+
+<p>金属球が次々にぶつかって<strong>壁がへこみます</strong>。破片は飛ばず、曲がって残ります。</p>
+
+<p>前回との違いは2つです。</p>
+
+<ul>
+  <li><strong>プロキシだけを二次破砕する</strong></li>
+  <li><strong>制約を主破砕の切れ目に限定する</strong></li>
+</ul>
+
+<h2>1. 大砲側のセットアップ（既製）</h2>
+
+<p>球のほうは用意されているものを見ていく形です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>手順</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>形</td><td><code>sphere</code> → <code>polybevel</code> → <code>subdivide</code> → グリッドの上に乗せ、<code>transform</code> で発射位置へ</td></tr>
+    <tr><td>速度</td><td><strong>点速度（<code>v</code> アトリビュート）</strong>を付けます。
+        確認は <code>I</code> を押してビューポートで <code>v</code> を選びます（ビジュアライザをオンに）</td></tr>
+    <tr><td>ばらつき</td><td><strong>Alligator Noise</strong> で速度に倍率をかけ、球ごとに強弱をつけます</td></tr>
+    <tr><td>出るタイミング</td><td><code>delete</code> ノードで <code>$F % 10</code> の式を使い、
+        <strong>10フレームごとに1個</strong>だけ現れるようにします。毎フレーム重なって出るのを防ぎます</td></tr>
+  </tbody>
+</table></div>
+
+<h3>ビューポートの見た目を良くする小技</h3>
+
+<ol>
+  <li>work lights をクリック＆ホールドして <strong>Dome Light</strong> に</li>
+  <li>もう一度クリック＆ホールド → <strong>Properties → File → Houdini HDRI</strong> からガレージの HDRI を選び、露出を上げます</li>
+  <li><strong>ビューポートの AO もオンに</strong></li>
+</ol>
+
+<p>本題ではありませんが、<strong>作業中の見え方が良いと判断が速くなります</strong>。
+金属の凹みは陰影で分かるものなので、ここは実利があります。</p>
+
+<h2>2. 壁を二次破砕する（この回の核心）</h2>
+
+<ol>
+  <li>新しい <strong>RBD Material Fracture</strong>。Material Type を concrete から <strong>Metal</strong> に、Manual モードに</li>
+  <li><strong>Fracture タブ</strong>。主 Density を <code>2</code> に（かなり粗い）。Auto Update に戻して <code>W</code> で確認</li>
+  <li><strong>Secondary Fracture を有効にします。</strong>ところが<strong>破片が見えません</strong></li>
+</ol>
+
+<h3>破片が見えない理由</h3>
+
+<p><strong><code>Proxy Only</code> がオンだから</strong>です。
+プロキシジオメトリの出力（Null を繋いで確認）を見ると、そこには細かい破片があります。</p>
+
+<p><strong>これは意図的で、ここがこのワークフローの面白さです。</strong></p>
+
+<blockquote>プロキシだけを破砕することで、大きな破片が曲がれるようになり、凹みに細かいディテールが出る。</blockquote>
+
+<p>レンダーする側の破片は大きいまま。シミュレーションする側だけが細かい。
+だから<strong>「大きな1枚の板が、なめらかに凹む」</strong>という見え方になります。
+細かく割ってしまうと、凹みではなく粉砕になってしまいます。</p>
+
+<img src="img/howto-destroy-metal-02-denting-000945.png" alt="RBD Material Fracture の Secondary Fracture の設定。Fracture Count が 5、Proxy Only がオン、Refine Geometry が有効、Cluster Attribute が parentpiece。Treat Geometry as は Surface、Scatter は Density 2">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>Scatter</td><td>Density <code>2</code></td></tr>
+    <tr><td>Treat Geometry as</td><td>Surface（薄板）</td></tr>
+    <tr><td>Secondary Fracture の Fracture Count</td><td><code>5</code></td></tr>
+    <tr><td><strong>Proxy Only</strong></td><td>オン</td></tr>
+    <tr><td><strong>Refine Geometry</strong></td><td>有効（下の節を参照）</td></tr>
+    <tr><td><strong>Cluster Attribute</strong></td><td><code>parentpiece</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>Constraints は <strong>Glue を 500</strong>、そして <strong>Dampening を上げます</strong>
+（前回学んだ安定化です）。</p>
+
+<h2>3. 球と壁を合流させる</h2>
+
+<ol>
+  <li>球側に <strong>RBD Configure</strong>。<strong><code>rbd_emit</code> アトリビュートで放出させ</strong>、
+      Type を Metal → <strong>Steel</strong>（球なので重く）</li>
+  <li>壁側は前回の RBD Configure をコピペ。ただし<strong>放出アトリビュートを有効にして値を 0 に</strong></li>
+</ol>
+
+<p><strong>なぜ壁にも 0 を入れるのか。</strong>
+ソルバの <strong>Emit RBDs</strong> をオンにすると、
+<strong>両方のオブジェクトに明示的な emit アトリビュートが必要</strong>になるからです。</p>
+
+<p class="tx-muted">グループで分ける方法もありますが、講師は<strong>こちらの方が見て分かりやすい</strong>としています。</p>
+
+<ol start="3">
+  <li><strong>RBD Pack</strong> で2つを結合 → <code>merge</code> → <strong>RBD Unpack</strong>
+      （<strong>Transfer Attributes と Transfer Groups を念のためオン</strong>に）→ <strong>RBD Bullet Solver</strong></li>
+  <li>再生しても何も出ない → <strong>Emit RBDs をオンに</strong>すると球からだけ放出されます（壁は 0 なので放出されません）</li>
+</ol>
+
+<h2>4. 凹みが見えない問題を直す</h2>
+
+<p>高解像度メッシュが消え、球は床を抜けます。プロキシは正しく存在しています。
+<strong>RBD Deform Pieces</strong> を入れると、変形は出るのですが<strong>ごく僅か</strong>です。</p>
+
+<p>理由がはっきり述べられています。</p>
+
+<blockquote>破片はより曲がれるようになっているのに、変形を支えるディテールが無いので、曲がりの結果が見えていない。</blockquote>
+
+<h3>Refine Geometry で頂点を足す</h3>
+
+<p>壁の RBD Material Fracture に戻って <strong>Refine Geometry をオンにします</strong>。</p>
+
+<p><code>W</code> で見ると、<strong>プロキシ側の細かい変形を支えるものが高解像度側に何も無い</strong>のが分かります。
+そこで細分化を足します。</p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>方式</td><td><strong>Bricker</strong> が一番良い、と講師は言っています</td></tr>
+    <tr><td>調整</td><td>初期の細分化が入るので、<strong>size パラメータ</strong>で量を調整します</td></tr>
+    <tr><td>結果</td><td><strong>プロキシのクラスタ化された破片の変形を支えるポリゴンが増えます</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>点の数を増やすと結果がなめらかになるので、そこで凹みの質感を決められます。
+<strong>「曲げる力」と「曲がるための頂点」は別物</strong>という、この回でいちばん実用的な学びだと思います。</p>
+
+<h2>5. 壁だけを取り出して見る</h2>
+
+<p>最初の出力を <code>blast</code> にして<strong>金属ドアだけ</strong>を取り出し、
+球側の出力と <code>merge</code> します。</p>
+
+<p>球には法線が必要で、<strong>unpack も必要</strong>です。
+色を暗めにしておくと見分けやすくなります。</p>
+
+<h2>6. 凹みながら主破砕の線で裂ける</h2>
+
+<p>最後にもう一段あります。<strong>凹んだ部分を、主破砕の切れ目に沿って裂かせられます。</strong></p>
+
+<p>仕組みはこうです。破砕を見ると<strong>主破砕の切れ目</strong>があり、
+<strong>二次破砕はすべてその破片に親子付けされています</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Fracture ID</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><code>metal fracture</code></td><td>主破砕</td></tr>
+    <tr><td><code>metal fracture 2</code></td><td>二次破砕</td></tr>
+  </tbody>
+</table></div>
+
+<ol>
+  <li><strong>RBD Bullet Solver の Constraints</strong> で
+      <strong><code>metal fracture</code> だけを指定します</strong></li>
+  <li>これで<strong>主破砕の切れ目に沿ってのみ制約が削除されます</strong>。二次破砕はそのまま残ります</li>
+  <li><strong>距離はかなり高く保ちます</strong>（破片が離れないように）</li>
+  <li><code>W</code> でモードを抜けて再生すると凹みが見えます</li>
+  <li>Ground Plane を有効にして、球が床を抜けないようにします</li>
+</ol>
+
+<p class="tx-muted">制約の選択が見えないときは、タイムラインを少しスクラブすると出てきます。</p>
+
+<h3>Boundary Connection をもう一度</h3>
+
+<p>そして <strong>RBD Deform Pieces の Boundary Connection</strong> です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td>Cluster Attribute が見つからない</td><td>破片が<strong>全部繋がったまま</strong>になります</td></tr>
+    <tr><td><strong><code>parentpiece</code> を指定する</strong></td>
+        <td><strong>主破砕の線に沿って裂けつつ、二次破砕は曲がるためだけに働きます</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>parentpiece</code> は<strong>二次破砕に設定されているのと同じアトリビュート</strong>です。
+これを指定することで、<strong>「裂ける単位は主破砕、曲がる単位は二次破砕」</strong>という
+役割分担ができます。</p>
+
+<img src="img/howto-destroy-metal-02-denting-001445.png" alt="凹みの結果。金属球が当たった箇所だけが内側にへこみ、破片は飛ばずに残っている">
+
+<p>結果として、金属球が当たった箇所だけが内側にへこみ、破片は飛ばずに残ります。
+主破砕の線では裂けているので、単なる凹みより情報量のある壊れ方になります。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>Proxy Only で「シミュレーション用だけ細かく割る」</strong>のがこの回の核心です。だから大きな破片がなめらかに凹みます</li>
+  <li>球は <code>$F % 10</code> で<strong>10フレームごとに1個</strong>だけ出します</li>
+  <li><strong>Emit RBDs をオンにすると、全オブジェクトに明示的な emit アトリビュートが必要</strong>です。壁には 0 を入れます</li>
+  <li>RBD Unpack では <strong>Transfer Attributes と Transfer Groups</strong> をオンにしておきます</li>
+  <li><strong>凹みが見えないのは頂点が足りないからです。</strong><strong>Refine Geometry</strong>（Bricker）で細分化を足します</li>
+  <li>「曲げる力」と「曲がるための頂点」は別物です</li>
+  <li><strong>ソルバの Constraints で <code>metal fracture</code> だけを指定</strong>すると、主破砕の線でのみ裂けます</li>
+  <li><strong>Boundary Connection に <code>parentpiece</code></strong> を指定すると、
+      裂ける単位は主破砕・曲がる単位は二次破砕、という分担になります</li>
+  <li>破片を飛ばしたくないので、<strong>離れられる距離は高く保ちます</strong>（前回と逆です）</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

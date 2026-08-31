@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Summon VFX 2 — Copernicus でパックテクスチャを作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="グレースケールを RGBA に詰めてサンプリング回数を減らす作り方。SOP Import・Stamp Points・SDF Shape・Flow Block のライブシミュレーションから、煙を 8×8 フリップブック（8192×8192）にするところまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Summon VFX 2 — Copernicus でパックテクスチャを作る</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=h8XffhrSW7M">Summon VFX | 2 | Create Textures</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/realtime-summon-vfx/">Realtime Summon VFX</a> の第2回 / 講師 Cesar Merchan さん / Houdini FX 21.0.631 / 20:48 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-summonvfx-01-meshes.html">8個のメッシュを作って FBX で出す</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/h8XffhrSW7M"
+          title="Summon VFX | 2 | Create Textures" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li><strong>パックテクスチャ</strong> — グレースケールを R / G / B / A に詰めて1枚にする作り方</li>
+  <li><code>sopimport</code> で <strong>SOP のジオメトリを Copernicus に持ち込む</strong>こと。模様の元は SOP で作ります</li>
+  <li><code>stamppoint</code>（Stamp Points）で、<strong>点の上に形をばらまく</strong>やり方</li>
+  <li>SDF で形を作って <code>sdftomono</code> でグレースケールにする、という定番の流れ</li>
+  <li><code>flow_block_begin</code> の <strong>ライブシミュレーション</strong>で、流れる模様を対話的に作ること</li>
+  <li>煙を Pyro で作って <strong>8×8 のフリップブック</strong>（64コマ）として書き出すこと</li>
+</ul>
+
+<p>20分で6枚のパックテクスチャと1つのフリップブックを作るので、ノードの数はかなり多いです。
+ただ<strong>使っている手は数種類の繰り返し</strong>なので、そこを掴めば追えると思います。</p>
+
+<h2>1. まず「パックテクスチャ」という発想</h2>
+
+<p>この回で作るテクスチャは、ほぼ全部が最後に <code>channeljoin</code>（Channel Join）に入ります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>チャンネル</th><th>入れるもの（円の模様の場合）</th></tr></thead>
+  <tbody>
+    <tr><td>R</td><td>文字と外側のリング</td></tr>
+    <tr><td>G</td><td>中間の三角と円のパターン</td></tr>
+    <tr><td>B</td><td>中心の模様</td></tr>
+  </tbody>
+</table></div>
+
+<p>3種類の模様を別々のテクスチャにすると、Unreal でのサンプリングが3回になります。
+1枚に詰めておけば1回です。<strong>リアルタイムでの判断基準がここにはっきり出ています。</strong></p>
+
+<p>Unreal 側では Texture Sample から必要なチャンネルだけを取り出します（第4回で出てきます）。
+だから<strong>グレースケールの情報しか詰められません</strong>。色は Unreal 側で付けます。</p>
+
+<h2>2. 円の召喚模様 — SOP で作って COP に持ち込む</h2>
+
+<p>Copernicus の中だけで完結させるのではなく、<strong>形の元は SOP で作って
+<code>sopimport</code>（SOP Import）で持ち込みます</strong>。この回では何度もこの形が出てきます。</p>
+
+<h3>文字のリング</h3>
+<ol>
+  <li>SOP 側で <code>font</code> ノードに文字を並べ、書体を決めます</li>
+  <li><code>transform</code> で位置を合わせます</li>
+  <li><code>pathdeform</code>（Path Deform）で<strong>円のカーブに沿って文字を曲げます</strong>。パラメータは既定のままです</li>
+  <li>COP 側でラスタライズしてグレースケールにします</li>
+</ol>
+
+<p>外側の二重リングは <code>sdfshape</code>（SDF Shape）で作って <code>sdftomono</code> でグレースケールに落とし、
+少しずらしたものと <code>blend</code> で重ねて二重にします。</p>
+
+<h3>三角と円をばらまく — Stamp Points</h3>
+
+<p>中間の帯はこうやって作ります。</p>
+
+<ol>
+  <li>SOP で <code>circle</code> を作り、<code>attribwrangle</code>（Attribute Wrangle）で
+      <strong>法線を外向きに、そして up ベクトルも設定します</strong></li>
+  <li>それを <code>sopimport</code> で持ち込み、<code>stamppoint</code>（Stamp Points）に渡します</li>
+  <li>ばらまく形として <code>sdfshape</code> の三角を用意し、<code>sdftomono</code> でグレースケールにします</li>
+  <li>同じ形を少し縮めたものを<strong>引き算</strong>して、輪郭だけの三角にします</li>
+</ol>
+
+<p><strong>法線と up ベクトルを整えておくのが要点です。</strong>
+Stamp Points は点の向きに従って形を置くので、向きが揃っていないとばらばらになります。</p>
+
+<p>小さい円も同じ作り方で足します。中心の模様は <code>spiral</code>（Spiral Count 3）に
+<code>sweep</code>（Surface Shape: Round Tube、Apply Scale Along Curve で細く）をかけたものを
+ラスタライズしてスタンプします。
+さらに <code>attribrandomize</code> で <code>pscale</code> をばらつかせた点を作り、大きさに変化を付けています。</p>
+
+<p>最後に全部を <code>blend</code>（Add）で重ね、マスクで優先順位を調整して、<code>channeljoin</code> に入れます。</p>
+
+<img src="img/sidefx-summonvfx-02-textures-000447.png" alt="Copernicus で作られた円形の召喚模様。文字のリング、三角のパターン、中心の渦が重なっている。ネットワークの末端は channeljoin1 で RGB に詰められ、T_FX_SummonCirclePacked という名前で $HIPNAME.$OS.$F4.png のパスに書き出される設定になっている">
+
+<p>書き出し名は <code>T_FX_SummonCirclePacked</code>、パスは <code>$HIPNAME.$OS.$F4.png</code> です。
+<strong><code>$OS</code>（ノード名）を使っているので、ノード名がそのままテクスチャ名になります。</strong>
+Unreal 側の命名規則（<code>T_</code> 始まり）に合わせたノード名を付けておく、というやり方です。</p>
+
+<h2>3. ソーラークラスタの流れるテクスチャ</h2>
+
+<p>ここは<strong>ノイズを歪めて重ねる</strong>作業の連続です。手順としては次の繰り返しです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>役</th></tr></thead>
+  <tbody>
+    <tr><td><code>fractalnoise</code>（Fractal Noise）</td><td>Element Scale を 10 にして<strong>縦に伸びた縞</strong>を作ります</td></tr>
+    <tr><td><code>remap</code></td><td>値の範囲を作り直します</td></tr>
+    <tr><td><code>blur</code></td><td>ぼかします</td></tr>
+    <tr><td><code>distort</code></td><td>別の結果を歪ませる元として使います。<strong>Slope Direction に角度を与えて</strong>歪む向きを決めます</td></tr>
+    <tr><td><code>dilateerode</code>（Dilate Erode）</td><td>形を太らせる／細らせる</td></tr>
+    <tr><td><code>equalize</code></td><td>値を伸ばしてコントラストを立てます</td></tr>
+    <tr><td><code>blend</code></td><td>Soft Light など。モードを変えて重ね方を選びます</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted"><code>dilateerode</code> は音声だと「delayed erode」と聞こえますが、
+正しくは <strong>Dilate Erode</strong> です。ここは実機で確認しました。</p>
+
+<p>3つのチャンネルには、<strong>同じ流れから少しずつ違う結果</strong>を入れます。
+R は基本形、G は Dilate Erode の値を変えて別のノイズで歪ませたもの、
+B は Equalize の結果をランプで掛けたもの、という具合です。
+どのチャンネルにも最後にランプを掛けて<strong>上下をフェード</strong>させています。</p>
+
+<img src="img/sidefx-summonvfx-02-textures-000742.png" alt="Copernicus のビューに2枚のテクスチャ。左がソーラークラスタ用の縦に流れる模様、右は ramp30 / ramp31 / ramp32 を channeljoin8 で RGB に詰めた T_FX_Ramps という名前のグラデーション集">
+
+<p>もう1枚、<strong>グラデーションだけを3本詰めたテクスチャ</strong>（<code>T_FX_Ramps</code>）も作っています。
+ランプを3つ <code>channeljoin</code> で RGB に詰めるだけのものですが、
+Unreal 側でフェードに使う素材をまとめて持っておく、という考え方です。</p>
+
+<h2>4. スパーク — 2×2 のアトラス</h2>
+
+<p>スパークは1枚に4パターン入れます。</p>
+
+<ol>
+  <li><code>sdfshape</code> → <code>sdftomono</code> で基本の形を作ります</li>
+  <li><strong>Contact Sheet</strong> で <strong>1行あたり2枚</strong>にして 2×2 のアトラスにします</li>
+  <li>タイルパターンの円を、ジッター・オフセット・スケールを変えて配置します</li>
+  <li>それを<strong>引き算</strong>して形を抜きます</li>
+  <li><code>worleynoise</code>（Worley Noise）を Remap して掛け、<strong>黒い斑点を消します</strong></li>
+  <li><code>fractalnoise</code> と <code>blend</code> して<strong>縁を侵食させます</strong></li>
+</ol>
+
+<img src="img/sidefx-summonvfx-02-textures-000957.png" alt="スパーク用の 2×2 アトラステクスチャ。4つのマスにそれぞれ違う散り方のスパークが入っている。ネットワークは worleynoise3 から remap2 を経て blend の Multiply で斑点を消し、別系統の blend の Minimum で違うバリエーションを作っている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>チャンネル</th><th>入れるもの</th></tr></thead>
+  <tbody>
+    <tr><td>R</td><td>基本のスパーク</td></tr>
+    <tr><td>G</td><td>別の重ね方をしたもの</td></tr>
+    <tr><td>B</td><td><code>blend</code> の <strong>Minimum</strong> で作った別バリエーション</td></tr>
+    <tr><td>A</td><td>さらに別の1種</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>1枚で4種類 × 4マス</strong>持てるので、Unreal 側でランダムに引くだけで見た目に幅が出ます。
+これもテクスチャ枚数を増やさないための工作です。</p>
+
+<h2>5. ポータルが開くときの形</h2>
+
+<p><code>sdfshape</code> をグレースケールにして、<code>ramp</code> の <strong>Type = Concentric</strong>
+（同心円のグラデーション）を掛けます。そこに <code>fractalnoise</code> を
+<strong>Slope Direction の角度 90 度</strong>で歪ませると、渦を巻いた形になります。</p>
+
+<p class="tx-muted">渦にしたいときは角度に 90 を入れる、という指定が動画で明示されています。
+この後の別のテクスチャでも同じ 90 度が出てくるので、覚えておくと使えます。</p>
+
+<p>RGB には同じ形の3バリエーション（元のもの / Remap して歪ませて明るくしたもの / 強くぼかしたもの）を入れます。</p>
+
+<h2>6. 表面のディテールと法線 — Flow Block のライブシミュレーション</h2>
+
+<p>ここで面白いノードが出てきます。<code>bubblenoise</code>（Bubble Noise）を
+<code>flow_block_begin</code> / <code>flow_block_end</code>（<strong>Flow Block</strong>）に入れ、
+UV 入力に <code>fractalnoise</code>（Slope Direction 90 度）を渡します。</p>
+
+<p>Flow Block は<strong>ライブシミュレーションとして回せます</strong>。
+脳のアイコンの近くにあるボタンでライブシミュレーションを有効にすると、
+<strong>模様が育っていく様子を見ながら好きなところで止められます</strong>。
+数値で追い込むのではなく、見て決める作り方です。</p>
+
+<p>止めたら <code>mono</code> でグレースケールにして、パックテクスチャに詰めます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>チャンネル</th><th>入れるもの</th></tr></thead>
+  <tbody>
+    <tr><td>R</td><td>Flow Block の結果</td></tr>
+    <tr><td>G</td><td><code>heighttoambientocclusion</code>（Height to Ambient Occlusion）の結果</td></tr>
+    <tr><td>B</td><td><code>worleynoise</code> を反転して歪ませ、ぼかしたもの</td></tr>
+  </tbody>
+</table></div>
+
+<p>そして<strong>この結果から法線マップを作ります</strong>（<code>heighttonormal</code> — Height to Normal）。
+高さ情報が1枚あれば AO も法線もそこから作れる、という流れになっています。</p>
+
+<h2>7. 汎用ノイズも1枚にまとめる</h2>
+
+<p>歪ませ用・不透明度用など、あとで何にでも使えるノイズも1枚に詰めておきます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>チャンネル</th><th>入れるもの</th></tr></thead>
+  <tbody>
+    <tr><td>R</td><td><code>grunge_layerednoise</code>（Grunge Layered Noise）に <code>fractalnoise</code>（Noise Type: <strong>Perlin</strong>）を掛けてぼかしたもの</td></tr>
+    <tr><td>G</td><td><code>fractalnoise</code>（Perlin）を Element Size と Amplitude を調整してごく薄くぼかしたもの</td></tr>
+    <tr><td>B</td><td>高周波のノイズと低周波のノイズを組み合わせたもの</td></tr>
+  </tbody>
+</table></div>
+
+<p>「とりあえず持っておくと便利」というノイズ袋です。
+<strong>用途が決まっていないものまで1枚に詰めておく</strong>のは、実務的だなと思いました。</p>
+
+<h2>8. 煙を 8×8 のフリップブックにする</h2>
+
+<p>最後は煙です。ここだけ Copernicus ではなく Pyro で作ります。</p>
+
+<h3>発生源と解く</h3>
+
+<ol>
+  <li><code>sphere</code> に <code>pyrosource</code> を付け、<strong>Initialize から Smoke のプリセット</strong>を選びます。
+      これで <code>density</code> と <code>temperature</code> が付きます</li>
+  <li>Particle Separation を下げて解像度を上げます</li>
+  <li><code>attribnoise</code> を <strong><code>P</code>（位置）に</strong>かけて、形にばらつきを出します</li>
+  <li><code>volumerasterizeattributes</code> で <code>density</code> と <code>temperature</code> を保ったままボリュームにします</li>
+</ol>
+
+<p>ここで実用的な工夫が出てきます。<strong>ラスタライズの Voxel Size を、
+Pyro Solver の Voxel Size から参照させます。</strong>
+片方を変えたときにもう片方が付いてくるので、解像度がずれません。</p>
+
+<h3>ソルバの設定</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>タブ</th><th>設定</th><th>狙い</th></tr></thead>
+  <tbody>
+    <tr><td>Bounds</td><td>領域を調整</td><td>—</td></tr>
+    <tr><td>Sourcing</td><td><code>density</code> と <code>temperature</code></td><td>—</td></tr>
+    <tr><td>Fields</td><td>Dissipation を<strong>高め</strong>に</td><td>煙を長く残したくないので早く消します</td></tr>
+    <tr><td>Shape</td><td>Buoyancy を<strong>切る</strong></td><td>上に立ち上らせず、その場に留めたいので</td></tr>
+    <tr><td>Wind</td><td>Y 方向に少しだけ</td><td>—</td></tr>
+    <tr><td></td><td>Disturbance と Turbulence を少し</td><td>—</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Buoyancy を切るという判断</strong>が分かりやすいです。
+煙といえば上に立ち上るものですが、ここで欲しいのは「その場に漂うもの」なので浮力を消します。
+目的から逆算してパラメータを切る、という例だと思います。</p>
+
+<h3>ループさせて書き出す</h3>
+
+<ol>
+  <li>結果を <code>filecache</code> に保存します</li>
+  <li><code>makeloop</code> で <strong>20〜84 フレーム</strong>をループにします。
+      これは <strong>8×8 = 64 コマ</strong>ぶんです</li>
+  <li><code>pyrobakevolume</code> で見た目を作ります</li>
+  <li>カメラを置いて解像度を決めます（1コマ 1K）</li>
+</ol>
+
+<img src="img/sidefx-summonvfx-02-textures-001932.png" alt="Labs Flipbook Textures ノードのパラメータパネル。Start / End が 20 と 84、Columns / Rows が 8 と 8、1コマが 1024 なので Total Resolution が 8192×8192 と表示されている。Color Space は ACES sRGB (Best for Pyro) が選ばれている">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>Start / End</td><td><code>20</code> 〜 <code>84</code>（64コマ）</td></tr>
+    <tr><td>Columns / Rows</td><td><code>8</code> × <code>8</code></td></tr>
+    <tr><td>1コマの解像度</td><td>1024</td></tr>
+    <tr><td>Total Resolution</td><td><strong>8192 × 8192</strong></td></tr>
+    <tr><td>Color Space</td><td><strong>ACES sRGB (Best for Pyro)</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>書き出しの手順に注意点があります。<strong>まず Render を押して全パスをレンダリングしてから、
+テクスチャを書き出します。</strong>順番を逆にすると出ません。</p>
+
+<p class="tx-muted">Color Space に Pyro 用の選択肢が用意されているのは親切だなと思います。
+迷ったらこれ、という指針があるだけで助かります。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>パックテクスチャ</strong>が全体を貫く発想です。グレースケールを R/G/B/A に詰めて、サンプリング回数を減らします</li>
+  <li>色は詰められません。<strong>Unreal 側で色を付ける</strong>前提の作りです</li>
+  <li>形の元は <strong>SOP で作って <code>sopimport</code> で持ち込みます</strong>。Copernicus だけで完結させません</li>
+  <li><code>stamppoint</code> は点の<strong>法線と up ベクトル</strong>に従うので、SOP 側で向きを整えておきます</li>
+  <li><strong>SDF Shape → SDF to Mono</strong> が形作りの定番です。同じ形を縮めて引くと輪郭になります</li>
+  <li><code>distort</code> の <strong>Slope Direction を 90 度</strong>にすると渦が作れます</li>
+  <li><code>flow_block_begin</code> は<strong>ライブシミュレーションで回せます</strong>。見て気に入ったところで止める作り方です</li>
+  <li>高さ情報が1枚あれば、<strong>AO も法線もそこから作れます</strong>（Height to Ambient Occlusion / Height to Normal）</li>
+  <li>ボクセルサイズは<strong>ラスタライズ側からソルバ側を参照</strong>させると、ずれません</li>
+  <li>煙は <strong>Buoyancy を切って</strong>その場に漂わせます。目的から逆算した設定です</li>
+  <li>フリップブックは <strong>8×8 = 64コマ、1コマ 1K で 8192×8192</strong>。<strong>Render を先に押してから書き出します</strong></li>
+</ul>
+
+<p>次の第3回は Vellum です。ポータルから出てくるキャラクターの布を、
+Vellum Drape でドレープさせてから破って、ピン留めして固定します。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

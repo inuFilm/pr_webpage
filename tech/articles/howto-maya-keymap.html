@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Maya のキー配置に変える — APEX Traditional Animation キーマップ | 技術メモ | makeinufilm</title>
+  <meta name="description" content="W で移動しようとしてワイヤーフレームが切り替わる事故を、公式キーマップ1つで解消します。Edit → Hotkeys から切り替える手順と、変わるキーの対応表つき。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Maya のキー配置に変える — APEX Traditional Animation キーマップ</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=wPanAyG4LJk">Houdini 22 | How to Set Maya Animation Keymap</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 4:10 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/wPanAyG4LJk"
+          title="Houdini 22 | How to Set Maya Animation Keymap" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>何が問題なのか</h2>
+
+<p>Houdini の既定は <code>T</code> = 移動 / <code>R</code> = 回転 / <code>E</code> = スケール / <code>K</code> = キーです。</p>
+
+<p>Maya や Blender から来ると <code>W</code> で移動モードに入ろうとして、
+<strong>ワイヤーフレーム表示が切り替わるだけ</strong>という事故が起きます。
+手が覚えているキーが全部別のことをするので、慣れるまでかなり辛いところです。</p>
+
+<p><strong>H22 にはこれを Maya 流に置き換える公式キーマップが入っています。</strong>
+自分でホットキーを1つずつ設定する必要はありません。</p>
+
+<h2>手順</h2>
+
+<h3>1. 検証用のキャラを置く</h3>
+
+<ol>
+  <li><code>Tab</code> → <strong>Test Geometry: Electra</strong> を配置します。
+      Houdini に付属する<strong>完成済みのリグ付きキャラ</strong>なので検証に便利です</li>
+  <li>ダブルクリックで中に入り、<strong>出力を Skin Surface から APEX Scene に変更します</strong>。
+      これをやらないとアニメートできません</li>
+  <li><code>Tab</code> → <strong>APEX Animate</strong>（Scene Animate）を配置し、
+      第1出力を入力に繋いでディスプレイフラグを Scene Animate に立てます</li>
+  <li>Scene Animate を選んだ状態でビューポートで <code>Enter</code>（または Animate アイコン）を押すと、
+      コントロールと設定の UI が出ます</li>
+</ol>
+
+<h3>2. キーマップを切り替える</h3>
+
+<ol>
+  <li><strong>Edit → Hotkeys</strong> を開きます</li>
+  <li><strong>Key Map</strong> の <strong>Houdini</strong> の下にある
+      <strong>APEX Traditional Animation</strong> を選びます</li>
+  <li>OK → Accept</li>
+  <li><strong>「Keymap APEX-Traditional-Animation loaded.」</strong>と出れば適用完了です</li>
+</ol>
+
+<img src="img/howto-maya-keymap-000248.png" alt="Edit → Hotkeys のダイアログ。Key Map の Houdini の下に APEX Traditional Animation が選ばれていて、下部に「Keymap APEX-Traditional-Animation loaded.」と表示されている。左側のビューポートには Pose Tools のホットキー一覧が出ている">
+
+<h2>キー配置の変化</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>操作</th><th>既定（Houdini）</th><th>APEX Traditional</th></tr></thead>
+  <tbody>
+    <tr><td>移動</td><td><code>T</code></td><td><strong><code>W</code></strong></td></tr>
+    <tr><td>回転</td><td><code>R</code></td><td><strong><code>E</code></strong></td></tr>
+    <tr><td>スケール</td><td><code>E</code></td><td><strong><code>R</code></strong></td></tr>
+    <tr><td>キーを打つ</td><td><code>K</code></td><td><strong><code>S</code></strong></td></tr>
+  </tbody>
+</table></div>
+
+<h3>動作確認</h3>
+
+<ol>
+  <li>メインコントロールを選び <code>W</code> で移動モード → <code>S</code> でキー</li>
+  <li>フレーム48へ移動して Electra を前に出し <code>S</code></li>
+  <li><code>E</code> で回転モード。数値入力で <code>180</code> と打ってから <code>S</code></li>
+</ol>
+
+<h2>ついでに読める情報</h2>
+
+<p>スクリーンショットの左側に <strong>Pose Tools のヒント一覧</strong>が出ています。
+<strong>キーマップを変えてもこちらは有効</strong>なので、あわせて覚えておくと速くなります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>キー</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><code>C</code></td><td>ツールメニュー</td></tr>
+    <tr><td><code>G</code></td><td>チャンネルウィジェット</td></tr>
+    <tr><td><code>F</code></td><td>フレーム</td></tr>
+    <tr><td><code>H</code></td><td>コンストレイント追加</td></tr>
+    <tr><td><code>B</code></td><td>ベイク</td></tr>
+    <tr><td><code>N</code></td><td>シーン再読み込み</td></tr>
+  </tbody>
+</table></div>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>Edit → Hotkeys → Key Map → Houdini → APEX Traditional Animation</strong> で切り替わります</li>
+  <li><code>W</code> 移動 / <code>E</code> 回転 / <code>R</code> スケール / <code>S</code> キー になります</li>
+  <li>検証には <strong>Test Geometry: Electra</strong> が便利です。ただし<strong>出力を APEX Scene に変える</strong>のを忘れないようにします</li>
+  <li>Pose Tools のホットキー（<code>C</code> / <code>G</code> / <code>F</code> / <code>H</code> / <code>B</code> / <code>N</code>）はキーマップを変えても有効です</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

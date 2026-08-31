@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 8 — 1つのネットワークに2ショット置いてレンダリングする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="枝分かれで2つ目のショットを作り、プリム名を揃えるだけでマテリアルを当て、カメラを増やさず Camera Edit でショットごとに使い分けます。Karma XPU で120フレームを1プロセスで回すところまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 8 — 1つのネットワークに2ショット置いてレンダリングする</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=DVqJr_NZtq0">H22 Foundations | Model Render Animate 8 | Lights, Camera, Action!</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第8回・最終回 / Houdini 22 / 10:26 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-foundations-07-bouncing-ball.html">バウンシングボールをアニメートする</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/DVqJr_NZtq0"
+          title="H22 Foundations | Model Render Animate 8 | Lights, Camera, Action!" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li><strong>1つの Solaris ネットワークに2つのショットを共存させる</strong>組み方</li>
+  <li>書き出した USD を <code>Reference</code> で読み込むこと</li>
+  <li>この回いちばんの勘所 — <strong>プリム名を揃えるだけでマテリアルが当たる</strong></li>
+  <li>要らない静止ボールを <code>Prune</code> で消すこと。その前に「どう選ぶか」</li>
+  <li><strong>同じ <code>camera1</code> を、ショットごとに編集して使い分ける</strong>こと</li>
+  <li>ショット別のライティングを <code>Light Mixer</code> でもう1つ作ること</li>
+  <li>Karma XPU で120フレームを<strong>1プロセスでまとめて</strong>レンダリングすること</li>
+</ul>
+
+<h2>1. ショット1に名前を付けて区切る</h2>
+
+<p>Solaris デスクトップに戻ると、レッスン5までのシーンがそのまま残っています。</p>
+
+<p>まずレッスン5で作ったボールの回転（Edit ノード）を外に出して、
+<strong>Null</strong> ノードを置いて <code>shot_1</code> と名付けます。
+ここまでが静止画のショットです。バイパスすれば、あの回転が何をしていたか確認できます。</p>
+
+<p>Null を置くだけですが、<strong>「ここでショット1は完成」という区切りが目に見える</strong>のが大事です。
+このあと同じネットワークにショット2を足していくので、区切りがないと混乱します。</p>
+
+<h2>2. 枝分かれさせてショット2を作る</h2>
+
+<p>ショット2は<strong>背景のところから枝分かれ</strong>させます。
+<code>Reference</code> ノードを置いて、そこから下に伸ばします。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>File Pattern</td><td>前回書き出した <code>soccerball_anim</code> の USD</td></tr>
+    <tr><td>プリムパス</td><td><code>/geo/</code> の下に置きます</td></tr>
+  </tbody>
+</table></div>
+
+<p>読み込むと、<strong>ボールが2つになります</strong>。レッスン4で持ち込んだ静止したボールと、
+いま読み込んだアニメーション付きのボールです。</p>
+
+<h2>3. プリム名を揃えるとマテリアルが当たる</h2>
+
+<p>読み込んだアニメーションのボールには<strong>テクスチャが乗っていません</strong>。
+マテリアルの割り当ては<strong>プリムのパスに対して</strong>されているので、名前が違えば当たらないわけです。</p>
+
+<p>直し方はとても素直です。<strong>読み込むプリムの名前を <code>soccerball_geo</code> にします。</strong>
+既定ではファイル名などから作られる名前が入っているので、そこを書き換えます。
+すると<strong>その瞬間にテクスチャが乗ります</strong>。</p>
+
+<p>理由は動画の言葉がそのまま分かりやすいです。
+<strong>「<code>soccerball_geo</code> という名前のものが2つではなく1つになったから」</strong>。
+レッスン5で <code>soccerball_geo</code> に対して割り当てたマテリアルが、
+アニメーションのボールにもそのまま効くようになります。</p>
+
+<p class="tx-muted">USD で作業するときに<strong>プリムの名前がそのまま接続点になる</strong>ことがよく分かる場面だと思います。
+レッスン4でオブジェクト名を <code>box_object1</code> から <code>soccerball_geo</code> に直しておいたのが、ここまで効いてきます。</p>
+
+<h2>4. 静止したボールを消す</h2>
+
+<p>静止したボールはショット2には要らないので消します。
+面白いのは<strong>その前に「どう選ぶか」を見せている</strong>ところです。</p>
+
+<ol>
+  <li>何も選択していない状態で、選択の種類を <strong>leaf primitive</strong> にします</li>
+  <li>これで目的のメッシュだけを掴めます</li>
+  <li><code>Tab</code> から <strong>Prune</strong> を置きます</li>
+</ol>
+
+<p>Prune は「これは要らない」と宣言するノードです。
+消したのは静止したほうだけで、アニメーションのボールは残ります。</p>
+
+<p class="tx-muted">アニメーションのボールのほうは構造が複雑なので、選択の種類を <strong>component</strong> に変えると
+まとまり全体を掴めます。<strong>選択の粒度を切り替えられる</strong>と作業が速くなります。</p>
+
+<h2>5. 位置をずらして画面外から入れる</h2>
+
+<p><code>Tab</code> から <strong>Transform</strong> を置いて、アニメーションのボールを手前に引き戻します。
+これでボールが画面の外から入ってくるようになります。</p>
+
+<p>どのくらい引くかはカメラを見ながら決めます。動画でも一度決めた後にもう少し引き直しています。</p>
+
+<h2>6. 同じカメラを、ショットごとに編集する</h2>
+
+<p>ここがこの回でいちばん面白い考え方です。<code>Tab</code> から <strong>Camera Edit</strong> を置きます。</p>
+
+<p>置いた直後はどのカメラを扱うか分からないのでエラーが出ます。
+<code>camera1</code> をドラッグして入れると解決します。</p>
+
+<p>そのうえで<strong>カメラをビューにロックして</strong>、レッスン4と同じ操作で画角を決めます。
+ボールが入ってくる方向と抜けていく方向を見ながら、少し回して詰めます。</p>
+
+<p>大事なのはこの一点です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ショット</th><th>カメラ</th></tr></thead>
+  <tbody>
+    <tr><td>ショット1</td><td><code>camera1</code>（レッスン4で決めたまま）</td></tr>
+    <tr><td>ショット2</td><td><code>camera1</code> を <strong>Camera Edit で編集したもの</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>カメラを増やしていません。</strong>同じ <code>camera1</code> を、
+枝ごとに違う内容に編集しているだけです。
+ショット1の枝に戻れば元のカメラのまま、ショット2の枝ではこのショット用のカメラになります。</p>
+
+<p>LOP がレイヤーを重ねる仕組みだからこうなります。
+「編集はその枝の中だけに書かれる」ので、同じ名前のものをショットごとに違う状態で持てます。
+カメラを <code>camera1</code> <code>camera2</code> <code>camera3</code> と増やしていく作り方とは考え方が違います。</p>
+
+<h2>7. ショット別のライティング</h2>
+
+<p>ライティングもショット2用に作り直します。Karma XPU で見ながら、
+<strong>もう1つ <code>Light Mixer</code> を置きます</strong>。</p>
+
+<p>今回は <code>light1</code> に <strong>Specular</strong> モードを使って、
+ハイライトを出したい場所をクリックして決めています。ポイントライトも同様です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>調整</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>主となる方向のライト</td><td>Intensity を <code>600</code> まで上げます</td></tr>
+    <tr><td>もう一方</td><td><code>200</code>、さらに落として <code>100</code> くらい</td></tr>
+    <tr><td>ドームライト</td><td>スライダーでさらに下げます</td></tr>
+  </tbody>
+</table></div>
+
+<p>ここでも<strong>ソロ表示</strong>が効きます。1灯ずつ寄与を見て、
+「こちら側が強すぎる」「こちらは足りない」と判断していけます。</p>
+
+<p>そして<strong>アニメーションの複数の時点で確認します</strong>。
+静止画なら1枚見れば済みますが、動くものは「入ってくるとき」「跳ねているとき」
+「抜けるとき」で見え方が変わるので、何点か確認する必要があります。</p>
+
+<h2>8. 連番でレンダリングする</h2>
+
+<p><code>Tab</code> から Karma を選ぶと<strong>3つのノード</strong>が置かれます。
+真ん中のものは今回使いません。</p>
+
+<h3>Karma Render Settings</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>レンダラ</td><td><strong>XPU</strong></td></tr>
+    <tr><td>Image Output Filters</td><td>組み込みのものから <strong>OptiX デノイザ</strong>を選びます</td></tr>
+    <tr><td>出力パス</td><td><code>render/ball_anim.$F2</code></td></tr>
+    <tr><td>カメラ</td><td><code>camera1</code></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>$F2</code> は<strong>2桁パディングのフレーム番号</strong>です。
+これで <code>ball_anim.01</code>, <code>ball_anim.02</code>, … という連番になります。
+レッスン1で出てきた変数の3つ目が、最後にここで使われます。</p>
+
+<h3>ROP の設定</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>ノード名</td><td><code>shot_2</code></td></tr>
+    <tr><td>フレーム範囲</td><td>Render Specific Frame Range で <code>1</code> 〜 <code>120</code></td></tr>
+    <tr><td>プロセス</td><td><strong>Render All Frames With A Single Process</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>最後の項目が効きます。既定だと<strong>1フレームごとにプロセスを立ち上げ直す</strong>ので、
+起動のコストが120回かかります。まとめて1プロセスで回すほうが速く終わります。
+シーンの読み込みが1回で済むぶんの差です。</p>
+
+<p>hip を保存してから Render to Disk します。
+終わったら <strong>Render &gt; Play &gt; Load Disk Files</strong> で連番を読み込んで確認できます。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>1つの Solaris ネットワークに複数のショットを置けます。</strong>枝分かれさせて、Null で区切りを付けます</li>
+  <li>読み込んだプリムの<strong>名前を <code>soccerball_geo</code> に揃えるだけでマテリアルが当たります</strong>。USD では名前が接続点です</li>
+  <li>要らないものは <code>Prune</code> で消します。その前に <strong>leaf primitive</strong> / <strong>component</strong> と選択の粒度を切り替えます</li>
+  <li><strong>カメラを増やさず、同じ <code>camera1</code> を Camera Edit でショットごとに編集します。</strong>枝の中だけに編集が書かれるからできることです</li>
+  <li>ライティングもショットごとに <code>Light Mixer</code> を置けます。動くものは<strong>複数の時点で</strong>確認します</li>
+  <li><code>$F2</code> で2桁パディングの連番になります</li>
+  <li><strong>Render All Frames With A Single Process</strong> にすると、フレームごとの起動コストがなくなって速く終わります</li>
+</ul>
+
+<h2>シリーズを通して</h2>
+
+<p>これで9本が終わりです。1時間半で、モデリング・UV・ルックデブ・リギング・アニメーション・
+レンダリングを1つのショットとして通したことになります。</p>
+
+<p>振り返ると、<strong>後の回で効いてくる仕込みが前の回に置かれている</strong>のがよくできているなと思います。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>仕込んだ場所</th><th>効いた場所</th></tr></thead>
+  <tbody>
+    <tr><td>レッスン1で <strong>Set Project</strong></td><td>レッスン5で <code>$HIP/tex/…</code> と書ける</td></tr>
+    <tr><td>レッスン2で <code>patches</code> を作る</td><td>レッスン3で <code>@patches&gt;19</code> と絞り込める</td></tr>
+    <tr><td>レッスン3で <strong>1×1×1 に正規化</strong></td><td>レッスン6で半径 0.5 として <code>11459</code> 度が出る</td></tr>
+    <tr><td>レッスン4で <code>soccerball_geo</code> にリネーム</td><td>レッスン8でマテリアルがそのまま当たる</td></tr>
+    <tr><td>レッスン3で <strong>Output ノード</strong></td><td>表示フラグの位置に関係なく Solaris に正しい形が出る</td></tr>
+    <tr><td>レッスン6で<strong>リミット</strong>を入れる</td><td>レッスン7で余計な軸を気にせずアニメートできる</td></tr>
+  </tbody>
+</table></div>
+
+<p>シリーズ全体の地図は<a href="sidefx-foundations-00-intro.html">第0回のメモ</a>にまとめてあります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solaris の中で APEX キャラをアニメートする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="ライトもセットも入った本番シーンを見ながらアニメーションを付けられます。持ち込んだ直後の妙な見た目が APEX リグそのものである理由と、画面を散らかさない Output ノードの小技も。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Solaris の中で APEX キャラをアニメートする</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=-7aIsTQc6kg">Houdini 22 | How to APEX Animate in LOPs</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 8:40 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/-7aIsTQc6kg"
+          title="Houdini 22 | How to APEX Animate in LOPs" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>何が嬉しいのか</h2>
+
+<p><strong>ライトもセットも入った本番のシーンを見ながらアニメーションを付けられる</strong>ことです。
+SOP で付けて Solaris で確認、という往復が要らなくなります。</p>
+
+<p>この回では2つの流儀を両方やります。</p>
+
+<ul>
+  <li>Solaris で直接付ける</li>
+  <li>SOP で付けて Solaris に持ち込む</li>
+</ul>
+
+<p class="tx-muted">関連ノードはまだ beta 表示ですが動きます。</p>
+
+<h2>1. Solaris で直接アニメートする</h2>
+
+<ol>
+  <li><code>/stage</code> に <strong>SOP Create</strong> を置きます</li>
+  <li>中に <strong>Electra</strong>（Asset Browser のキャラ）を置き、
+      <strong>出力を APEX Character に設定します</strong>。Solaris はこれを明示的に要求します</li>
+  <li><code>U</code> で Solaris に戻って SOP Create にフラグを立てると、<strong>妙な見た目のもの</strong>が表示されます</li>
+</ol>
+
+<img src="img/howto-apex-animate-in-lops-000102.png" alt="Solaris のビューポートに、キャラクターのジオメトリとスケルトンとリグロジックが全部重なって描画されている状態。人物の形の周りに大量の線とハンドルが散らばって見える">
+
+<p>これは <strong>APEX リグそのもの</strong>です。
+リグロジックは点に書かれていて、Solaris は「ジオメトリ・スケルトン・リグ」を全部そのまま描いてしまいます。</p>
+
+<p><strong>Solaris は APEX リグの扱い方を知らない</strong>ので、明示的に指示する必要があります。
+この画面は、その状態がそのまま見えているものです。</p>
+
+<h3>画面を散らかさない小技</h3>
+
+<p><strong>SOP Create の中に Box を置いて Output ノードに繋ぎます。</strong>
+外から見た出力が常に box になるので画面が散らかりません。
+Output ノードなのでフラグの位置は関係ありません。</p>
+
+<p class="tx-muted"><a href="sidefx-foundations-03-uvs.html">Foundations のレッスン3</a>で出てきた
+「Output ノードを置くと表示フラグの位置に関係なく最後が出る」性質を、
+こういう使い方に転用しているのが面白いところです。</p>
+
+<h3>持ち込む</h3>
+
+<ol>
+  <li>キャラを Null に繋いで <code>Electra</code> と命名します（必須ではありませんが整理のためです）</li>
+  <li>Solaris に戻って <strong>APEX Character Import</strong> を置き、
+      <strong>さきほどの Null をコピーして SOP Path に貼ります</strong></li>
+  <li><code>merge</code> でキャラとシーンを合流させます</li>
+  <li><strong>Animate ノードを置けばもうアニメートできます</strong></li>
+</ol>
+
+<h3>2人目を足す</h3>
+
+<ol>
+  <li>SOP Create に戻ってもう1つ Electra を置き、<code>Electra B</code> と命名します</li>
+  <li>Null をコピーして APEX Character Import に貼ります</li>
+  <li>チェーンに差せば2人がシーンに並びます</li>
+</ol>
+
+<p><strong>出力を APEX Character にし忘れると読めません。</strong>
+講師もここで一度失敗して言い直しています。</p>
+
+<p>以降は普通のシーン構築と同じで、ライト・オブジェクト・キャラをいくらでも足せます。</p>
+
+<h2>2. SOP で付けて Solaris に持ち込む</h2>
+
+<p>逆の流儀です。<strong>シーンを SOP Create の入力に流し込みます。</strong>
+すると SOP の中にシーンの簡易表現が入ります。</p>
+
+<ol>
+  <li>不要になった前のノードは削除しておきます（混乱の元になります）</li>
+  <li>SOP Create の中で <strong>APEX Add Character</strong> を使います。
+      <strong>Electra は第2入力</strong>に差し、<code>Electra A</code> と命名。もう1つ作って <code>Electra B</code></li>
+  <li>ここでアニメートします</li>
+  <li>結果を Null に繋いで <code>apex_scene_out</code> と命名し、パスを確定させます</li>
+</ol>
+
+<p><strong>どちらを選ぶか</strong>ですが、<strong>SOP のほうが動作が軽快</strong>だったり、
+単に SOP に慣れているならこちらでよいと説明されています。
+本番のライティングを見ながら付けたいなら Solaris 側、という分け方になりそうです。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>ライトとセットが入った本番シーンを見ながらアニメートできる</strong>のがこの機能の価値です</li>
+  <li><strong>出力を APEX Character にする</strong>のが必須です。忘れると読み込まれません</li>
+  <li>Solaris に持ち込んだ直後の妙な見た目は<strong>APEX リグそのもの</strong>が描画されている状態です。Solaris は APEX の扱い方を知りません</li>
+  <li>画面を散らかさないために、<strong>SOP Create の中に Box を置いて Output に繋ぐ</strong>という小技があります</li>
+  <li><strong>APEX Character Import</strong> の SOP Path には Null のパスをコピペします</li>
+  <li>SOP 側で付ける流儀もあります。<strong>SOP のほうが軽快</strong>です</li>
+</ul>
+
+<p>同じ <code>Scene Add Character</code> を SOP だけで使う最小の例が
+<a href="howto-multiple-characters.html">複数キャラを入れる回</a>にあります。2分20秒で読めます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

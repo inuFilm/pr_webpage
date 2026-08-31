@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 4 — Solaris に持ち込んでカメラとライトを置く | 技術メモ | makeinufilm</title>
+  <meta name="description" content="SOP で作った形は Solaris に存在しません。Scene Import で持ち込み、Merge せずに繋いで背景を積み、影やハイライトを出したい場所をクリックしてライトを置き、Light Mixer で非破壊に比べます。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 4 — Solaris に持ち込んでカメラとライトを置く</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=T7owKajDKeg">H22 Foundations | Model Render Animate 4 | Solaris: Objects, Cameras and Lights</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第4回 / Houdini 22 / 12:34 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-foundations-03-uvs.html">UV Flatten 2つでパッチを塗り分ける</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/T7owKajDKeg"
+          title="H22 Foundations | Model Render Animate 4 | Solaris: Objects, Cameras and Lights" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>SOP で作った形は<strong>そのままでは Solaris に存在しない</strong>こと。<code>Scene Import</code> で明示的に持ち込みます</li>
+  <li>LOP では <strong>Merge しなくても縦に繋ぐだけでシーンが積み上がる</strong>こと</li>
+  <li>背景を <code>Grid</code> + <code>Subdivide</code> + <code>Bend</code> で作る手順と、Bend のクセ</li>
+  <li>カメラをビューに追従させて決め、決まったら<strong>ロックして壊さない</strong>やり方</li>
+  <li>ライトの位置を数値で決めずに、<strong>影の落ちてほしい場所</strong>や<strong>ハイライトを出したい場所</strong>をクリックして決める操作</li>
+  <li><code>Light Mixer</code> で非破壊にライトを比べる。ソロ表示で1灯ずつの寄与を見られます</li>
+</ul>
+
+<h2>1. Solaris デスクトップに移る</h2>
+
+<p>デスクトップメニューから <strong>Solaris</strong> を選ぶと、<code>/stage</code> を扱う画面に切り替わります。
+ここで大事なのは、<strong>この世界にはまだ何も無い</strong>ということです。
+SOP で作ったサッカーボールも、持ち込むまでは存在しません。</p>
+
+<p class="tx-muted">ビューポートで <code>D</code> を押すと表示オプションが開きます。動画では背景をダークにしています。</p>
+
+<h2>2. Scene Import でボールを持ち込む</h2>
+
+<p><code>Tab</code> から <strong>Scene Import</strong> を置き、ノード名を <code>soccerball</code> にします。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>この回の値</th><th>補足</th></tr></thead>
+  <tbody>
+    <tr><td>Destination Path<br><span class="tx-muted">objdestpath</span></td><td><code>/geo</code></td><td>持ち込んだものが置かれるシーングラフ上の場所です</td></tr>
+    <tr><td>Objects<br><span class="tx-muted">objects</span></td><td>取り込む対象</td><td><strong>ここが空だと何も取り込まれません。</strong>これが既定なので、置いただけでは何も起きません</td></tr>
+    <tr><td>Force Objects<br><span class="tx-muted">forceobjects</span></td><td>ボールのオブジェクト</td><td>オブジェクトレベルで非表示になっていても<strong>必ず取り込んで可視扱いにする</strong>指定です</td></tr>
+  </tbody>
+</table></div>
+
+<p>動画が <strong>Force Objects</strong> を使っているのは、後の作業でオブジェクトを隠してしまっても
+シーンから消えないようにするためです。公式ヘルプの説明もそのまま
+「オブジェクトレベルの状態にかかわらず常に取り込んで可視にする」となっています。</p>
+
+<p>ここでオブジェクトレベルに戻って、名前を <code>box_object1</code> から <code>soccerball_geo</code> に変えます。
+シーングラフ上のパスもこれに追従して <code>/geo/soccerball_geo</code> になります。
+<strong>オブジェクトの名前がそのまま USD のプリム名になる</strong>ので、
+箱由来の名前を引きずらないうちに直しておくのが良さそうです。</p>
+
+<h2>3. 背景を作る — 繋ぐだけで積み上がる</h2>
+
+<p><code>Tab</code> から <strong>Grid</strong> を置いて、パスを <code>/geo/backdrop</code> にします。
+ここで面白いのが繋ぎ方です。<strong>Merge を使わず、backdrop をボールのノードに縦に繋ぐだけ</strong>で、
+シーングラフには <code>/geo/backdrop</code> と <code>/geo/soccerball_geo</code> の両方が並びます。</p>
+
+<p>SOP だと繋いだら片方が入力として消費されますが、LOP は<strong>レイヤーを重ねていく</strong>作りなので、
+繋ぐことがそのまま「シーンに足す」ことになります。ここは頭の切り替えが要るところだと思います。</p>
+
+<h3>グリッドを曲げて背景にする</h3>
+
+<p>背景がまっすぐな板だとライティングが面白くならないので、奥を立ち上げます。
+Grid の中に入って組みます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>パラメータ</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td><code>grid</code></td><td>Size</td><td><code>80</code></td></tr>
+    <tr><td><code>grid</code></td><td>Center</td><td><code>0, 0, -20</code>（後でアニメーションするボールのために奥へずらしています）</td></tr>
+    <tr><td><code>subdivide</code></td><td>Depth</td><td><code>2</code>。曲げるための分割を稼ぎます</td></tr>
+    <tr><td><code>bend</code></td><td>Bend（曲げ角）</td><td><code>75</code></td></tr>
+    <tr><td><code>bend</code></td><td><code>origin</code> — Capture Origin</td><td><code>0, 0, -30</code></td></tr>
+    <tr><td><code>bend</code></td><td><code>dir</code> — Capture Direction</td><td><code>0, 0, -1</code>（既定は <code>0, 0, 1</code> なので反転させています）</td></tr>
+    <tr><td><code>bend</code></td><td><code>length</code> — Capture Length</td><td><code>8</code>。この長さぶんが曲がりの遷移になります</td></tr>
+  </tbody>
+</table></div>
+
+<p>Bend は「2枚の平行な平面で挟んだ範囲」を曲げるノードです。
+範囲の外は変形しないので、手前の床は平らなまま奥だけが立ち上がります。</p>
+
+<p>数値を全部手で入れているのには理由があります。公式ヘルプに明記されていて、
+<strong>Tab メニューから作った Bend は、シェルフツールと違って範囲を入力形状に合わせてくれません</strong>。
+だから置いただけでは何も起きず、Capture の3つを自分で決める必要があります。</p>
+
+<p class="tx-muted">上の階層に戻るのは <code>U</code> です。</p>
+
+<h2>4. カメラを決めて、ロックする</h2>
+
+<p>カメラの置き方は3通り紹介されています。</p>
+
+<ol>
+  <li>カメラを追加してハンドルで動かす</li>
+  <li><code>camera1</code> を覗いた状態でハンドルを調整する</li>
+  <li><strong>カメラをビューに追従させて</strong>、<code>スペース</code> + 左／中／右ドラッグの普段どおりの操作で画角を決める</li>
+</ol>
+
+<p>3番目が一番速いです。普段のビュー操作でそのままカメラが決まります。
+そして決まったら、ビューポートで右クリックして <strong>Lock Camera</strong> を選びます。
+これでタンブルしてもカメラから外れなくなるので、<strong>決めた画角を壊さずに</strong>続きの作業ができます。</p>
+
+<p class="tx-muted">動画では言い間違いで "light" と言っていますが、操作しているのはカメラです。
+直後に「lock camera」と言っているので、そこで分かります。</p>
+
+<h2>5. ライティングは画面をクリックして決める</h2>
+
+<p>まずシェルフから <strong>Environment Light</strong> を置いて、Intensity を <code>0.5</code> にします。
+ここで表示を <strong>Karma XPU</strong> に切り替えると、シーンビューの中でそのままレンダリングが回り、
+見ながら判断できる状態になります。</p>
+
+<p>そのうえで <strong>Point Light</strong> を足します。ここがこの回で一番面白いところです。
+ライトを空間の中で動かして影を探すのではなく、<strong>影を落としたい場所をクリックして決めます</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>操作</th><th>効果</th></tr></thead>
+  <tbody>
+    <tr><td><code>Shift</code> + <code>F1</code></td><td>画面の情報表示を消して見やすくします</td></tr>
+    <tr><td><strong>Shadow モード</strong>で場所をクリック → <code>Shift</code></td><td>そこに影が落ちるようにライトが配置されます</td></tr>
+    <tr><td><strong>Specular モード</strong>でクリック</td><td>そこにハイライトが出るようにライトが配置されます</td></tr>
+    <tr><td><code>Ctrl</code> + ドラッグ</td><td>ライトの<strong>距離</strong>を変えます</td></tr>
+    <tr><td><code>Ctrl</code> + <code>Shift</code> + ドラッグ</td><td>ライトの<strong>強さ</strong>を変えます</td></tr>
+  </tbody>
+</table></div>
+
+<p>動画では1灯目を Shadow モードで、2灯目を Specular モードで置いています。
+2灯目でハイライトの位置を動かすと、それに連れて影の位置も変わります。
+「ハイライトをここに出したい」という決め方がそのままライティングの決定になる、というのが面白いところだと思います。</p>
+
+<p>Intensity は 300 くらいまで上げて、それでも足りないぶんは Exposure で足しています。
+環境光が強すぎて影が見えないときは、まず環境光を落とすほうが早いようです。</p>
+
+<p><strong>この作業を全部カメラから見た画面で行っている</strong>のが要点です。
+空間の外側からライトの位置を想像するのではなく、最終的に見える絵の上で決めています。</p>
+
+<h2>6. Light Mixer で比べる</h2>
+
+<p>置いたライトを詰めていく段では、ビューポートで右クリックして <strong>Light Mixer</strong> を置きます。</p>
+
+<img src="img/sidefx-foundations-04-solaris-objects-001140.png" alt="Solaris デスクトップ。左のビューポートは Karma XPU で /cameras/camera1 を覗いていて、サッカーボールと背景に2方向の影が落ちている。右の Light Mixer パネルには domelight1、light1、pointlight1 の3列がスライダーとして並び、light1 に赤い印が付いている。下のシーングラフには /geo/backdrop、/geo/soccerball_geo、/lights の下に domelight1、light1、pointlight1 が見える">
+
+<p>Light Mixer は<strong>入ってきたライトそのものを変えません</strong>。
+このノードの中で強さや色を触って、そのショット向けの調整だけを重ねる形になります。
+だから思い切って振ってみて、気に入らなければノードをバイパスすれば元の状態に戻ります。</p>
+
+<p>便利なのが<strong>ソロ表示</strong>です。1灯ずつ寄与を確認できるので、
+「この影はどのライトが作っているのか」がすぐ分かります。
+3灯を個別に見て、それから合わせた絵を見る、という進め方ができます。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>SOP と Solaris は別の世界です。</strong><code>Scene Import</code> で持ち込むまで、Solaris 側にボールは存在しません</li>
+  <li>Scene Import の <strong>Objects が空だと何も取り込まれません</strong>。これが既定値なので、置いただけで悩みがちなところです</li>
+  <li><strong>Force Objects</strong> を使うと、オブジェクトレベルで非表示にしても取り込まれ続けます</li>
+  <li>オブジェクトの名前がそのまま USD のプリム名になります。<code>box_object1</code> のままにしないほうが後で読みやすいです</li>
+  <li>LOP は <strong>Merge しなくても縦に繋ぐだけでシーンが積み上がります</strong>。SOP との一番大きな感覚の差だと思います</li>
+  <li>Tab から置いた <code>bend</code> は<strong>範囲を自動で合わせてくれません</strong>。<code>origin</code> / <code>dir</code> / <code>length</code> を自分で決める必要があります</li>
+  <li>カメラは<strong>ビューに追従させて決めてから Lock Camera</strong>。決めた画角が壊れなくなります</li>
+  <li>ライトは<strong>影やハイライトを出したい場所をクリックして</strong>置けます。<code>Ctrl</code> で距離、<code>Ctrl</code>+<code>Shift</code> で強さです</li>
+  <li><code>Light Mixer</code> は非破壊です。ソロ表示で1灯ずつの寄与を確認できます</li>
+</ul>
+
+<p>次の第5回は同じ Solaris の中で、Quick Surface Material と Material Linker を使って
+テクスチャ4枚（color / reflect / roughness / normal）を割り当てていきます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

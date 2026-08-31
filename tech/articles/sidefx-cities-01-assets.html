@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>手続き的な都市 1 — アセット・パイプライン・最適化 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="大規模ワールドの3つの問題という枠組みから、建物が生成される5段の流れ、取り込む前に検証できる Unreal の Scatter ツール、100点で 7KB に収まるネスティング、そして Repeat:Stretch:Cull という建物の文法まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>手続き的な都市 1 — アセット・パイプライン・最適化</h1>
+        <p class="tech-meta">realtime-vfx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=M4eUd2tOXX8">Procedural Cities for Games 1 | Assets, Pipeline and Optimization</a>
+（SideFX 公式チュートリアル <a href="https://www.sidefx.com/tutorials/build-procedural-cities-for-games/">Build Procedural Cities for Games</a> の第1回 / 講師 Mohamad Salame さん（SideFX）/ Houdini 21 / 難易度 Advanced / 39:37 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/M4eUd2tOXX8"
+          title="Procedural Cities for Games 1 | Assets, Pipeline and Optimization" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>大規模ワールドを作るときに立ちはだかる<strong>3つの問題</strong>という枠組み</li>
+  <li>建物が生成される<strong>5段の流れ</strong></li>
+  <li>Houdini の HDA を <strong>Python States でビューポートから直接編集する</strong>という作り方</li>
+  <li>開発中の Unreal 側 <strong>Scatter ツール</strong>。取り込む<strong>前</strong>に問題を検出できます</li>
+  <li><strong>ネスティング</strong>で、書き出すデータ量を増やさずに街の規模を稼ぐこと</li>
+  <li>この2本でいちばん持ち帰る価値がある<strong>建物の文法（grammar）</strong>の記法</li>
+</ul>
+
+<p>ツールそのものはまだ開発中のものが多いのですが、
+<strong>設計の考え方は自分の環境でも使える</strong>話が多い回だと思います。</p>
+
+<h2>1. まず問題を3つに整理する</h2>
+
+<p>動画の出発点がこの整理で、これ自体が有用でした。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>問題</th><th>中身</th></tr></thead>
+  <tbody>
+    <tr><td><strong>パイプライン</strong></td>
+        <td>Blender や Maya で作ったアセットをどうエンジンに入れるか。FBX・OBJ・USD・PCG と手段は多いのですが、
+        <strong>チームで反復できる形はどれか</strong>が問題になります</td></tr>
+    <tr><td><strong>アセット</strong></td>
+        <td>大量のアーティストを雇う / AI で生成する（法的な問題があります）/
+        <strong>手続き的に作る</strong> — Houdini でルールを書いて生成する</td></tr>
+    <tr><td><strong>最適化</strong></td>
+        <td>マテリアルとテクスチャの使い方、<strong>ドローコールを抑えるためのバンドル</strong>、
+        データのストリーミング、60fps 以上の維持</td></tr>
+  </tbody>
+</table></div>
+
+<p>3つ目が効いてきます。「見た目を作る」話ではなく<strong>「動かせる形で出す」話</strong>として
+全体が組まれているので、後半の出力ルートの比較まで一本の筋が通っています。</p>
+
+<h2>2. 建物ができる5段の流れ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>段</th><th>やること</th></tr></thead>
+  <tbody>
+    <tr><td>1. Block out</td><td>大まかな塊を作ります</td></tr>
+    <tr><td>2. Divide floors</td><td>塊を階ごとにスライスします</td></tr>
+    <tr><td>3. Create patterns</td><td>各階に文法でパターンを作ります</td></tr>
+    <tr><td>4. Extract points</td><td>パターンから点を取り出します</td></tr>
+    <tr><td>5. Swap modules</td><td>点に最終モジュールを差し替えます</td></tr>
+  </tbody>
+</table></div>
+
+<p>最後に出てくるのは<strong>点とメッシュ名</strong>です。これがそのまま Unreal の ISM になります。
+「建物のジオメトリを作る」のではなく<strong>「どこに何を置くかを決める」</strong>のがこのツールの仕事だと分かります。</p>
+
+<h2>3. モジュールライブラリを組む</h2>
+
+<p>アセットは<strong>どこで作ってもよい</strong>とはっきり言っています（Blender でも Maya でも）。
+Houdini に持ち込んで、<strong>Unreal 側のメッシュ名で命名します</strong>（<code>SM_floor</code> のように）。</p>
+
+<p>そこからバルコニーやドアといった別々のパーツを整列させて組み合わせ、モジュールを作っていきます。</p>
+
+<h3>Python States でビューポートから編集する</h3>
+
+<p>この HDA は <strong>Python States</strong> を使っていて、<strong>ビューポートで直接編集できます</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>操作</th><th>できること</th></tr></thead>
+  <tbody>
+    <tr><td>パーツをダブルクリック</td><td><strong>対応するマルチパームのエントリを直接編集できます</strong></td></tr>
+    <tr><td>ダブルクリック → reset transform</td><td>位置を戻せます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>これが実務的に大きいです。</strong>モジュールが増えるとパラメータの一覧は長くなり、
+「いま画面で見ているこのパーツはリストのどれか」を探すのが手間になります。
+画面で触ったものがそのままパラメータに繋がるなら、その探す時間がなくなります。</p>
+
+<h2>4. Unreal に入れる — Scatter ツール</h2>
+
+<p>Houdini 側で Export し、Import で自己テストしてから Unreal に渡します。
+Unreal 側は開発中の Labs プラグインの <strong>Scatter ツール</strong>を使います。</p>
+
+<img src="img/sidefx-cities-01-assets-001100.png" alt="Unreal の Scatter ツールのウィンドウ。ディスク上のファイルを指定し、Preview Scatter を実行した結果が緑で表示されている。Flow セクションには何がいくつ spawn されるかの一覧が出ている">
+
+<p>いちばん良いと思ったのが <strong>Preview the scatter</strong> です。
+<strong>取り込む前に問題を検出できます</strong>（緑なら OK）。
+Flow セクションに何がいくつ spawn されるかが出るので、
+「入れてみたら何も出なかった」を避けられます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>機能</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>spawn の形式</td><td><strong>PCG グラフ / ISM / HISM</strong> から選べます（Nanite assembly もあります）</td></tr>
+    <tr><td>スプレッドシート</td><td>spawn するメッシュ一覧を確認できます。ドラッグ＆ドロップで差し替えられますが、
+        <strong>manual override として問題フラグが立ちます</strong>。戻すには削除します</td></tr>
+    <tr><td>プレフィックス／サフィックス</td><td>追加・除去ができます。<strong>Houdini 側に <code>SM_</code> が付いていてエンジン側に無い</strong>、
+        といった食い違いをここで吸収できます</td></tr>
+    <tr><td>マッピング</td><td><strong>Data Asset の名前で</strong>、または <strong>full recursive folder</strong> でフォルダ内を再帰検索</td></tr>
+    <tr><td>Data Layers</td><td>インポート時に割り当てられます。ランタイムにブループリントで<strong>ロード／アンロード</strong>しやすくなります</td></tr>
+    <tr><td>カーブ</td><td>スプラインやカーブ（ベジエ・NURBS）も取り込めます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>プレフィックスの吸収</strong>は地味ですが効きます。
+命名規則の食い違いは実際によく起きるので、
+どちらかを直すのではなくインポート時に変換できるほうが現実的です。</p>
+
+<h2>5. ネスティング — 書き出さずに規模を稼ぐ</h2>
+
+<p>街全体を何度もコピーしたいけれど、<strong>全インスタンスをエンジンに書き出したくない</strong>。
+これに対する答えが<strong>入れ子</strong>です。</p>
+
+<ol>
+  <li>1つ目のエクスポータを <code>my_scatter</code> という名前にします</li>
+  <li>2つ目のエクスポータ（<code>city_scatter</code>）が、<strong>そのファイルを点の上に spawn する</strong>ように名前で参照させます</li>
+  <li>Unreal 側では <code>city_scatter</code> を spawn します</li>
+</ol>
+
+<p>Preview の Flow に「<strong><code>city_scatter</code> が <code>my_scatter</code> を9回 spawn する</strong>」と出ます。
+これを <strong>100 placements</strong> まで増やしても高速に取り込めます。</p>
+
+<h3>データ量の実測</h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>100点の配置情報</td><td><strong>7 KB</strong></td></tr>
+    <tr><td>インスタンス1ブロック</td><td><strong>1.7 MB</strong></td></tr>
+    <tr><td>都市全体（ワールドパーティション・データレイヤーと併用）</td><td><strong>20〜50 MB</strong> の想定</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>配置情報が 7 KB で済むというのがネスティングの意味です。</strong>
+実体は1ブロックぶんだけ持って、あとは「そこに置く」という情報だけを増やしていきます。</p>
+
+<h2>6. 建物の文法（grammar）</h2>
+
+<p>ここがこの2本でいちばん持ち帰る価値がある部分だと思います。
+ツールが完成していなくても、設計の考え方は他でも使えます。</p>
+
+<h3>なぜ独自の記法にしたのか</h3>
+
+<p>従来のシェイプグラマー（Matrix Awakens デモなどで使われるもの）は
+<code>*</code> や <code>^</code> といった<strong>記号を使い切ってしまい、それ以上拡張できなくなります</strong>。</p>
+
+<p>そこでコロンと数字を並べる形にしました。<strong>コロンを1つ足せば新しい意味を追加できる</strong>ので、
+上限が来ません。設計判断としてすっきりしていて、なるほどと思いました。</p>
+
+<img src="img/sidefx-cities-01-assets-002415.png" alt="講師が用意した文法の解説図。Name、Vertical（階高は角括弧、続いて :repeat:stretch:cull）、Horizontal（重みは波括弧、? は Random per Face、?? は Random per element、モジュール名の間の記号が Alternate）が図示されている。右上に Labs の vertical_grammar HDA のノードが見える">
+
+<h3>記法</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>種類</th><th>例</th></tr></thead>
+  <tbody>
+    <tr><td>Vertical</td><td><code>test_front [4] :1:0:0</code></td></tr>
+    <tr><td>Horizontal</td><td><code>D1 {5} ??B1{1}?C1{2}-B1{1}:0:0:1</code></td></tr>
+  </tbody>
+</table></div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>記号</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td><code>[4]</code> 角括弧</td>
+        <td><strong>階高（Floor height）</strong>。<strong>モジュールの高さと一致させます</strong>。
+        8 にすると床が離れ、2 にすると重なります</td></tr>
+    <tr><td><code>{5}</code> 波括弧</td>
+        <td><strong>ランダムの重み</strong>。<code>m1{5}</code> と <code>m2{1}</code> なら <code>m1</code> が 5:1 で選ばれやすくなります</td></tr>
+    <tr><td><code>?</code></td>
+        <td><strong>Random per Face</strong> — 面ごとに1つ選んで、その面全体を埋めます</td></tr>
+    <tr><td><code>??</code></td>
+        <td><strong>Random per element</strong> — パターン内の要素ごとにランダム化します</td></tr>
+    <tr><td>名前の間の <code>-</code></td>
+        <td><strong>Alternate（交互配置）</strong>。<code>A-B</code> で A と B が交互になります</td></tr>
+  </tbody>
+</table></div>
+
+<h3>末尾の3つの数字</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>位置</th><th>意味</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>1番目</td><td><strong>Repeat</strong></td>
+        <td><code>0</code> = 無限に繰り返す / <code>N</code> = ちょうど N 回 / <code>-1</code> = 隣と交互（両方 <code>-1</code> にします）</td></tr>
+    <tr><td>2番目</td><td><strong>Stretch</strong></td>
+        <td><code>0</code> = 伸ばさない / <code>1</code> = 伸ばす。
+        <strong>Repeat 0 で Stretch 0 だと隙間が埋まりません</strong></td></tr>
+    <tr><td>3番目</td><td><strong>Cull</strong>（呼び出し優先度）</td>
+        <td>入る面がパターンより小さいとき、<strong>Cull の値が大きいものから間引かれます</strong>。
+        これでパターンが枠を超えません</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Cull があるのが賢いと思います。</strong>
+手続き的に生成すると「入りきらない」が必ず起きます。
+そのときに何を捨てるかを<strong>あらかじめ順位として書いておける</strong>ので、
+枠を超えて壊れることがありません。</p>
+
+<h3>モジュールのエイリアスと型</h3>
+
+<p><code>m1</code> / <code>m2</code> / <code>m8</code> は<strong>実際のメッシュ名に付けた短い別名</strong>です
+（ダブルクリックで変更できます）。</p>
+
+<p>さらに各モジュールに<strong>型（type）</strong>を付けられます。名前は任意で、
+講師は例として "banana" と入力して見せています。この型でルールが書けます。</p>
+
+<p>実例として<strong>「屋根や床の上に来たバルコニーを自動で窓に差し替える」</strong>というルールを作っています。
+床のジオメトリを入力に与えて、型を見て置換します。
+<strong>「置いてはいけない場所に置かれたものを後から直す」</strong>という発想で、
+生成物の破綻をルールで吸収できます。</p>
+
+<h3>触ってみるときの注意</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>症状</th><th>まず見るところ</th></tr></thead>
+  <tbody>
+    <tr><td>床が離れる / 重なる</td><td>階高（角括弧の値）が<strong>モジュールの高さと一致しているか</strong></td></tr>
+    <tr><td>1回だけ配置されて終わる</td><td>末尾に数字を付けていないと1回だけになります</td></tr>
+    <tr><td>隙間が埋まらない</td><td><strong>Repeat 0 で Stretch 0</strong> になっていないか。Stretch を 1 にします</td></tr>
+    <tr><td>交互配置が不自然</td><td>交互配置は <strong>Repeat 0（無限）</strong>にするほうが自然になります</td></tr>
+    <tr><td>ピボットがずれる</td><td>ISM で spawn するとき、<strong>Calculate from Bounds</strong> で中心に寄せられます</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">この文法ツールは<strong>モジュラー設計</strong>になっていて、
+初期のブロックアウト部分・床のポリライン分割・文法部分をそれぞれ
+<strong>自分の実装に差し替えられます</strong>。全部を受け入れる必要はありません。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>問題は<strong>パイプライン・アセット・最適化</strong>の3つ。最適化が最後まで判断の軸になります</li>
+  <li>建物は <strong>ブロックアウト → 階に分割 → 文法でパターン → 点を取り出す → モジュールを差し替え</strong> の5段です</li>
+  <li>出てくるのは<strong>点とメッシュ名</strong>で、そのまま ISM になります</li>
+  <li>アセットはどこで作ってもよく、<strong>Unreal 側のメッシュ名で命名</strong>しておきます</li>
+  <li><strong>Python States</strong> でビューポートのパーツをダブルクリックすると、対応するマルチパームを直接編集できます</li>
+  <li>Unreal の Scatter ツールは<strong>取り込む前に Preview で検証できます</strong>。プレフィックスの食い違いもここで吸収します</li>
+  <li><strong>ネスティング</strong>で規模を稼げます。100点の配置情報が <strong>7 KB</strong>、都市全体で <strong>20〜50 MB</strong> の想定です</li>
+  <li>文法は<strong>コロンと数字</strong>にすることで、記号を使い切って拡張できなくなる問題を回避しています</li>
+  <li>末尾の3つは <strong>Repeat : Stretch : Cull</strong>。<strong>Cull</strong> があるので、入りきらないときに何を捨てるかを先に決められます</li>
+  <li>モジュールに<strong>型</strong>を付けると、「屋根の上のバルコニーを窓にする」のような後付けのルールが書けます</li>
+</ul>
+
+<p>次の第2回では、この文法の<strong>実装の中身</strong>を開けます。
+1枚に見えるモジュールが実は3層に分かれている理由と、
+Houdini から Unreal へ出す<strong>4つのルート</strong>の比較が中心です。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

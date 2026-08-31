@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solaris でインスタンスを散布する — Scatter Instances | 技術メモ | makeinufilm</title>
+  <meta name="description" content="点群を用意せずプリムを指定するだけで散らせます。ビューポートに出ないのは既定が Deferred だから、という話から、Up Axis Direction での傾斜制限、Prototype Groups での比率調整まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Solaris でインスタンスを散布する — Scatter Instances</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=m7LtBzrIsho">Houdini 22 | How to Scatter Instances in Solaris</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 16:48 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/m7LtBzrIsho"
+          title="Houdini 22 | How to Scatter Instances in Solaris" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>Paint Instances との違い</h2>
+
+<p><strong>Scatter Instances LOP</strong> は USD の Hydra をベースにした
+<strong>新しい種類のレンダープロシージャル</strong>を作ります。</p>
+
+<p><a href="howto-paint-instances.html">Paint Instances</a> との決定的な違いは、
+<strong>散布先の点群を用意しないこと</strong>です。プリムを指定するだけで、その上に自動で散らします。</p>
+
+<p><strong>手で置くのが Paint Instances、自動で大量に散らすのが Scatter Instances</strong> という分担になります。</p>
+
+<h2>1. アセットを参照する</h2>
+
+<ol>
+  <li><code>reference</code> ノードで <strong>multiple references</strong> にし、USD アセットを引き込みます</li>
+  <li><strong>ワイルドカードを使います。</strong><code>barrel_cactus*</code> のように末尾に <code>*</code> を付けると、
+      その名前で始まるバリアント全部が入ります（<code>shrub1</code>〜<code>shrub10</code> なども一括）</li>
+  <li>ビューは <strong>Solaris デスクトップ</strong>に切り替えます（シーングラフツリーが必要です）</li>
+  <li>まとめて <code>plant_references</code> と命名します。この例では計 <strong>17 プロトタイプ</strong>になります</li>
+</ol>
+
+<h2>2. Scatter Instances を繋ぐ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>入力</th><th>繋ぐもの</th></tr></thead>
+  <tbody>
+    <tr><td>第1入力</td><td><strong>ステージ</strong>（それまでに組んだシーン全部）</td></tr>
+    <tr><td>第2入力</td><td><strong>プロトタイプ</strong>（<code>plant_references</code>）</td></tr>
+  </tbody>
+</table></div>
+
+<ol>
+  <li><strong>Source Geometry</strong> を設定します。<code>Ctrl</code> + クリックでジオメトリを開き、terrain の mesh を選びます</li>
+  <li><strong>Primitive Path</strong> を設定します。<code>/World/Geometry</code> をドラッグして <code>/$OS</code> を足します。
+      ノード名を <code>plant_instances</code> にすればパスもそれに従います</li>
+</ol>
+
+<h2>3. ビューポートに何も出ない — Deferred と Immediate</h2>
+
+<p>ここがこの回でいちばん大事な話です。<strong>ビューポートに出ないのはバグではなく、
+既定が Deferred モードだからです。</strong></p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>モード</th><th>挙動</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Deferred</strong>（既定）</td>
+        <td>プロシージャルを<strong>レンダー時にだけ実行します</strong>。
+        USD ステージとレンダーの間にある <strong>Hydra のレイヤー</strong>にデータが載ります。
+        <strong>ディスク上のファイルが小さく、重いプロトタイプでもビューポートが軽い</strong>のが利点です</td></tr>
+    <tr><td><strong>Immediate</strong></td>
+        <td>USD に <strong>point instance を直接オーサリングします</strong>。ビューポートにそのまま出ます。
+        <strong>USD データなのでそのままディスクに書き出せます</strong>し、レンダー開始が速いです。ファイルは大きくなります</td></tr>
+  </tbody>
+</table></div>
+
+<p>Deferred のままでも <strong>Karma CPU をオンにすると出てきます</strong>。
+また表示オプション（眼鏡アイコン）の <strong>Hydra Generative Procedurals</strong> をオンにすれば
+ビューポートにも描画できますが、遅くなります。</p>
+
+<h3>使い分け</h3>
+
+<p><strong>凝ったプロシージャルが要らず「プリムの上に散らすだけ」なら Immediate で十分</strong>です。
+重いアセットを大量に扱ってビューポートを軽く保ちたいなら Deferred。
+動画ではこの後 Immediate で進めています。</p>
+
+<h2>4. どこに散らすか（Scattering タブ）</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>Number of Instances</td><td>この例では <strong>75,000</strong></td></tr>
+    <tr><td>Texture Map / Prim Var</td><td>散布範囲の制御に使えます</td></tr>
+    <tr><td>この例の primvar</td>
+        <td>terrain のメッシュに <code>mask</code> という primvar が仕込まれています
+        （Copernicus ネットワークで作って stash 済み）。オンにして <code>mask</code> と指定すると、
+        <strong>Houdini ロゴの渦の形に散布されます</strong></td></tr>
+    <tr><td><strong>Up Axis Direction マスク</strong></td>
+        <td><strong>実務で一番効きます。</strong>組み込みで、<strong>Max Angle で地形の傾きに応じて散布を制限できます</strong>。
+        5 にすると最も平らな部分だけ、この例では 20。<strong>急斜面にサボテンが生えなくなります</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p>Texture Map でも同じことができます（画像を直接指定します）。</p>
+
+<h2>5. 向きと回転（Transforms タブ）</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>この例の値</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>Orient to Surface の <strong>Surface Blend</strong></td><td><code>0.1</code></td>
+        <td><strong>面の法線にどれだけ沿わせるか。</strong>下げると直立に近づきます。この例はほぼ直立です</td></tr>
+    <tr><td>同 variation</td><td><code>0.25</code></td>
+        <td>少しだけ傾きをばらします。<strong>全部完璧に直立だと CG くさくなる</strong>ためです</td></tr>
+    <tr><td><strong>Spin</strong> の variation</td><td><code>360</code></td>
+        <td>上軸まわりの回転を完全にランダムにします</td></tr>
+  </tbody>
+</table></div>
+
+<p>Spin は<strong>刻みを付けることもできます</strong>。<code>90</code> にすれば
+0 / 90 / 180 / 270 の4方向のいずれかにしか回りません。
+prim var やマップで駆動することもできるので、ここは触りどころが多い部分です。</p>
+
+<p class="tx-muted">「全部完璧に直立だと CG くさくなる」という理由がはっきり語られているのが良いなと思いました。
+ばらつきを入れるのは自然に見せるための手当てです。</p>
+
+<h2>6. 種類の比率を決める（Prototypes タブ）</h2>
+
+<p>散らしてみると<strong>サグアロサボテンが多すぎて低木が足りない</strong>という状態になります。
+これを直すのが <strong>Prototype Groups</strong> です。</p>
+
+<img src="img/howto-scatter-instances-001320.png" alt="Prototypes タブの Prim Pattern の欄。1つ目に saguaro でワイルドカードを付けたパターン、2つ目に barrel cactus、3つ目に shrub のパターンが並び、それぞれに Scattering Weight が設定されている">
+
+<ol>
+  <li>プロトタイプをグループにまとめられます。<strong>Prim Pattern</strong> を作ります</li>
+  <li>サグアロをドラッグして貼り、末尾に <code>*</code> を付けます → サグアロ全部が1グループ</li>
+  <li>同様に barrel cactus、shrub のグループを作ります</li>
+  <li><strong>Scattering Weight</strong> で比率を決めます</li>
+</ol>
+
+<p>重みを触ると<strong>サグアロの数が劇的に減ります</strong>。
+動画で使っている値はサグアロが <code>0.02</code> で、
+残りは低木と barrel cactus がおおよそ半々になる配分です。</p>
+
+<p><strong>「主役は少なく、脇役を多く」</strong>という比率を数値で書ける形になっているので、
+見た目を見ながら調整できます。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>散布先の点群を作りません。</strong>プリムを指定するだけで自動で散らします</li>
+  <li>アセットの取り込みは<strong>ワイルドカード</strong>で一括できます（<code>barrel_cactus*</code>）</li>
+  <li>入力は<strong>第1がステージ、第2がプロトタイプ</strong>です</li>
+  <li><strong>ビューポートに出ないのは既定が Deferred だから</strong>です。バグではありません</li>
+  <li><strong>Deferred はファイルが小さくビューポートが軽い、Immediate は USD に直接書くのでそのまま書き出せる</strong>。凝ったことをしないなら Immediate で十分です</li>
+  <li>散布範囲は <strong>primvar / テクスチャ / Up Axis Direction</strong> で制御します</li>
+  <li><strong>Up Axis Direction の Max Angle が実務で一番効きます。</strong>急斜面に生えなくなります</li>
+  <li><strong>Surface Blend を下げると直立に近づきます。</strong>variation で少しばらすと CG くささが消えます</li>
+  <li><strong>Prototype Groups と Scattering Weight</strong> で種類の比率を決められます</li>
+</ul>
+
+<p>手で置きたい場合は<a href="howto-paint-instances.html">Paint Instances の回</a>が対応します。
+ブラシで1つずつ置いたり、範囲を囲んで散らしたりできます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>金属を壊す 1 — 引き裂く | 技術メモ | makeinufilm</title>
+  <meta name="description" content="金属が「割れる」ではなく「曲がる」ように見えるのは Glue と Soft の2段構えのおかげです。Boundary Connection が引き裂きと凹みの分かれ目になる話、ぷるぷるを止める Dampening の設定、そして厚板では Glue を1桁下げるところまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>金属を壊す 1 — 引き裂く</h1>
+        <p class="tech-meta">houdini-fx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=x-N5I4XS7Q4">Houdini 22 | How to Destroy Metal | 1 | Tearing</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 15:54 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/x-N5I4XS7Q4"
+          title="Houdini 22 | How to Destroy Metal | 1 | Tearing" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>2本を貫く1つの考え方</h2>
+
+<p>個別のパラメータを追う前にこれを掴んでおくと、両方の回が繋がります。
+<strong>金属破壊が「割れる」ではなく「曲がる」ように見えるのは、この構造のおかげ</strong>です。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>要素</th><th>役</th></tr></thead>
+  <tbody>
+    <tr><td><strong>2種類の制約</strong></td>
+        <td><strong>Glue</strong>（初期の接着）と <strong>Soft</strong>（Glue が切れた後の<strong>金属の曲がり</strong>を模す）。
+        この2段構えが金属らしさの正体です。既定値は高すぎるので下げるのが定石です</td></tr>
+    <tr><td><strong>プロキシだけ細かく割る</strong></td>
+        <td>Secondary Fracture の <strong>Proxy Only</strong>。
+        シミュレーション用のプロキシは細かく、レンダー用の高解像度は大きいままにすると、
+        <strong>大きな破片が細かく曲がります</strong>。これが凹みのディテールを生みます
+        （<a href="howto-destroy-metal-02-denting.html">第2回</a>の核心です）</td></tr>
+    <tr><td><strong>曲がるための頂点</strong></td>
+        <td>高解像度側にポリゴンが足りないと、プロキシが曲がっても<strong>形に反映されません</strong>。
+        <strong>Refine Geometry</strong> で細分化を足して初めて凹みが見えます</td></tr>
+    <tr><td><strong>薄板と厚板</strong></td>
+        <td><strong>Treat Geometry as</strong> が <strong>Surface</strong>（薄板）と <strong>Solid</strong>（厚板）の切り替えです</td></tr>
+    <tr><td><strong>引き裂き vs 凹み</strong></td>
+        <td>RBD Deform Pieces の <strong>Boundary Connection</strong> と、ソルバの<strong>破片が離れる距離</strong>。
+        距離を小さくすれば飛び、大きくすれば曲がって残ります</td></tr>
+    <tr><td><strong>物性</strong></td>
+        <td>RBD Configure の <strong>Physical Attribute</strong>。Metal にして種類（Aluminum / Steel）を選ぶと
+        <strong>密度が変わり、重さと曲がりやすさの見え方が実際に変わります</strong></td></tr>
+  </tbody>
+</table></div>
+
+<h2>1. 破砕する</h2>
+
+<p>付属の <code>rbd_metal_start01</code> を開くと、ジオメトリコンテナにガレージのジオメトリと、
+シャッターに合うように transform と retime を済ませた<strong>アニメーション付きの Crag</strong>（ハンマー役）が入っています。</p>
+
+<ol>
+  <li><code>Tab</code> → <strong>Split</strong>。ガレージのグループから <code>metal_door</code> を選んで分離します</li>
+  <li><code>Tab</code> → <strong>RBD Material Fracture</strong> を Split の後に置きます。
+      <strong>まず Manual モードにして</strong>（毎回再計算されると待たされます）、<strong>Material Type を Metal</strong> に</li>
+  <li><strong>Fracture タブ</strong>。既定は 100 点を散布するので <code>50</code> に下げます。
+      ディスプレイフラグを立てて Auto Update に戻し、<code>W</code> で破片を確認します</li>
+  <li><strong>Detail タブ</strong>で縁のディテールを詰めます。Detail Size を下げて細分化を増やし、
+      Noise Height を上げ、Element Size を <code>215</code> に</li>
+</ol>
+
+<p class="tx-muted">効率的な進め方: <strong>Manual に切り替えてから値を入れ、最後に Auto Update に戻します。</strong>
+破砕は重いので、値を1つ触るたびに再計算されると作業になりません。</p>
+
+<h3>2種類の制約を確認する</h3>
+
+<p><strong>Constraints タブ</strong>に <strong>Glue</strong> と <strong>Soft</strong> があります。
+既定値は高すぎるので <strong>Glue Strength を 1000 前後</strong>に下げます。</p>
+
+<h2>2. アクティブ範囲と物性</h2>
+
+<ol>
+  <li><code>Tab</code> → <strong>RBD Configure</strong>。<strong>3入力すべて</strong>を繋ぎます</li>
+  <li>全体をアクティブにしたくない（上と両側は固定したい）ので、
+      <strong>Active Attribute をオンにして Use Bounds</strong></li>
+</ol>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>範囲の指定方法</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><code>bound</code> ノード</td><td>最後の入力に繋ぎます</td></tr>
+    <tr><td><strong>組み込みの Bounds → Bounding Box</strong></td>
+        <td><strong>ビューポートに赤い箱が出て対話的に調整できます。</strong>この例の値は 2.77 / 1.35 / 4.72</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Physical Attribute</strong> を <strong>Metal</strong> にし、種類を <strong>Aluminum</strong> に。
+密度が変わり、金属の重さと曲がりやすさの見え方が実際に変わります。</p>
+
+<h2>3. シミュレーションする</h2>
+
+<ol>
+  <li><code>Tab</code> → <strong>RBD Bullet Solver</strong>。<strong>高解像度 / 制約 / プロキシジオメトリ</strong>を繋ぎます</li>
+  <li>上を固定したので何も動きません。<strong>Collision タブ → Ground Plane をオン</strong>に（無限床）</li>
+  <li><strong>Crag を Collision Geometry 入力に繋ぎます。</strong>これでハンマーが当たります</li>
+</ol>
+
+<h3>破片が壊れるけれど飛んでいかない</h3>
+
+<p>Constraints タブの<strong>破片が離れられる距離</strong>が高すぎるためです。
+<strong><code>0.1</code> に下げます。</strong></p>
+
+<p>これで破片が外れて面白い形になります。ただしまだ最終形ではありません。</p>
+
+<h2>4. 引き裂きの形にする — RBD Deform Pieces</h2>
+
+<p><code>Tab</code> → <strong>RBD Deform Pieces</strong>。3入力を繋ぎます。</p>
+
+<p><strong>既定では破片を全部くっつけたままにしようとします。</strong>
+<strong>純粋な凹みだけならこれで良い</strong>のですが、引き裂きにするには変更します。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Boundary Connection</th><th>結果</th></tr></thead>
+  <tbody>
+    <tr><td>Cluster Attribute（既定）</td><td>破片が全部くっついたまま = <strong>凹み</strong></td></tr>
+    <tr><td><strong>Constraints</strong></td><td><strong>引き裂き</strong>の形になります</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">プレビューは <code>Ctrl</code> + <code>Shift</code> でテンプレートフラグを立てると Crag が見えます。
+<strong>フリップブック用のカメラが用意されている</strong>ので、Flipbook with New Settings で確認できます。</p>
+
+<h2>5. 挙動を安定させる（ここが仕上げ）</h2>
+
+<p>結果が<strong>ぷるぷるしてバネっぽく</strong>なります。
+RBD Material Fracture の Constraints プロパティで直します。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>操作</th><th>狙い</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Dampening Ratio</strong></td><td><strong>上げる（4000倍）</strong></td><td>揺れを止めます</td></tr>
+    <tr><td><strong>Angular Dampening</strong></td><td>下げる</td><td><strong>もっと外側に曲がるように</strong></td></tr>
+    <tr><td><strong>Angular Stiffness</strong></td><td>下げる</td><td>同様に曲がりやすくします</td></tr>
+  </tbody>
+</table></div>
+
+<p>狙いは講演者の言葉どおり<strong>「もっと曲がってほしいが、挙動は安定していてほしい」</strong>。
+結果として<strong>素早く外へ曲がって、そこで固まります</strong>。</p>
+
+<p><strong>Glue Strength を下げると、より多くの破片が外れたり内側に凹んだりします</strong>ので、
+形が足りないときはここも触れます。</p>
+
+<img src="img/howto-destroy-metal-01-tearing-000952.png" alt="引き裂きの結果。金属シャッターが破れ、破片が外側に曲がった状態で固まっている">
+
+<p>安定化の前後を比べると、<strong>形がはっきり良くなります</strong>。
+「揺れているうちは形が決まらない」ので、この工程は飛ばさないほうがよさそうです。</p>
+
+<h2>6. 厚板にする</h2>
+
+<p>ここまでは<strong>完全に薄い面</strong>で扱っていました。厚い金属壁にしたい場合の手順です。</p>
+
+<ol>
+  <li><code>Tab</code> → <strong>Poly Extrude</strong>。薄いドアの出力に繋ぎます</li>
+  <li><strong>Transform Extruded Front</strong> を <code>-0.01</code> に</li>
+  <li><strong>Output Back をオン</strong>にします</li>
+  <li>頂点法線があることを確認し、<strong>Reverse</strong> で向きを反転します</li>
+  <li>必要なら <code>normal</code> ノードをもう1つ足して見た目を整えます</li>
+</ol>
+
+<p>そのうえで <strong>2つ目の RBD Material Fracture</strong> を置きます
+（1つ目をコピペするのが早いです。Manual モードにしてからコピーします）。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Treat Geometry as</strong></td><td><strong>Solid</strong></td><td>これが薄板／厚板の切り替えです</td></tr>
+    <tr><td>破片数</td><td><code>50</code> → <code>10</code></td><td>厚いぶん重いので減らします</td></tr>
+    <tr><td>Detail Size</td><td>下げてもよい</td><td><strong>厚い面に追加のディテールを乗せるので遅くなります</strong></td></tr>
+  </tbody>
+</table></div>
+
+<p><code>W</code> で確認し、exploded view にすると<strong>厚みのある金属の破片</strong>になっているのが分かります。</p>
+
+<img src="img/howto-destroy-metal-01-tearing-001238.png" alt="厚板版の破片。Treat Geometry as が Solid になり、exploded view で見ると厚みのある金属の破片が並んでいる">
+
+<h3>厚板は硬い — Glue を下げる</h3>
+
+<p>あとは1つ目のセットアップ（RBD Configure 以降）をコピペして繋ぎます。物性は Aluminum のままです。</p>
+
+<p>フリップブックで見ると、<strong>破片が硬めで、全部が同じように壊れてはくれません</strong>。
+そこで <strong>Glue を 1000 から 100 に下げます</strong>。</p>
+
+<p>これで<strong>より多くの破片が内側にも外側にも曲がり、縁に良いディテールが出ます</strong>。</p>
+
+<p><strong>薄板と厚板で Glue の適正値が1桁違う</strong>というのは、覚えておくと調整が速くなると思います。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>金属らしさは <strong>Glue（接着）と Soft（曲がり）の2段構え</strong>から来ます。既定値は高すぎます</li>
+  <li>破砕は重いので <strong>Manual モードで値を入れて、最後に Auto Update</strong> に戻します</li>
+  <li>RBD Configure は<strong>3入力すべて</strong>を繋ぎます。固定範囲は <strong>Bounding Box</strong> で対話的に決められます</li>
+  <li><strong>Physical Attribute の金属種類（Aluminum / Steel）で密度が変わり、見え方が変わります</strong></li>
+  <li>破片が飛ばないのは<strong>「離れられる距離」が高すぎる</strong>だけです（この例では <code>0.1</code>）</li>
+  <li><strong>Boundary Connection が引き裂きと凹みの分かれ目</strong>です。Constraints = 引き裂き、Cluster Attribute = 凹み</li>
+  <li>ぷるぷるするのは <strong>Dampening Ratio を上げ、Angular Dampening と Angular Stiffness を下げて</strong>直します。「素早く曲がって固まる」を作ります</li>
+  <li>厚板は <strong>Poly Extrude（Transform Extruded Front −0.01 / Output Back オン / Reverse）→ Treat Geometry as = Solid</strong></li>
+  <li><strong>厚板は硬いので Glue を1桁下げます</strong>（1000 → 100）</li>
+</ul>
+
+<p>次の<a href="howto-destroy-metal-02-denting.html">第2回（凹ませる）</a>では、
+<strong>プロキシだけを二次破砕する</strong>という別の作り方に入ります。
+破片を飛ばさず、曲がって残す方向です。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>アニメーション済みのシーンにスカルプトを足す — Shot Sculpt | 技術メモ | makeinufilm</title>
+  <meta name="description" content="リグでは出せない誇張を、特定のフレームだけメッシュを引っぱって足します。スカルプトがトラックとして積まれ、効くタイミングを後から動かせるという仕組みが要点です。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>アニメーション済みのシーンにスカルプトを足す — Shot Sculpt</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=i3mQ2iVjAQA">Houdini 22 | How to Sculpt on Animated Scene</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 3:39 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/i3mQ2iVjAQA"
+          title="Houdini 22 | How to Sculpt on Animated Scene" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>何のための機能か</h2>
+
+<p><strong>リグでは出せない誇張を、特定のフレームだけメッシュを直接引っぱって足す</strong>機能です。</p>
+
+<p>動画の例は「画面外に乱暴に引き抜かれる」動きで、<strong>リグの範囲を超えたストレッチ</strong>を後乗せしています。
+カートゥーン的な誇張や、ヒットの一瞬の潰しに効きます。</p>
+
+<h2>手順</h2>
+
+<ol>
+  <li>アニメーションが終わったら <strong>Scene Invoke</strong> を配置し、
+      <strong>Unpack Geometry を有効にします</strong>。これでキャラのジオメトリに手が届く状態になります</li>
+  <li><strong>Shot Sculpt</strong> を配置して<strong>第1入力</strong>に繋ぎます</li>
+  <li>下部に新しいパネルを開き、<strong>Animation → Shot Sculpt</strong> を出します（作業領域を広く取ります）</li>
+  <li>ビューポートで <code>Enter</code> を押して <strong>Shot Sculpt ステート</strong>に入ります</li>
+  <li>目的のフレームへ移動し <code>3</code> を押します（<strong>Move ツールのホットキー</strong>。
+      Shot Sculpt では基本これだけ使います）</li>
+  <li>引っぱると<strong>新しいトラックが自動で作られます</strong>。
+      効き始めが早すぎたらトラックを後ろにずらして調整します</li>
+  <li>2つ目のスカルプトを足すには <strong>Add → Add Sculpt Track</strong>、または <code>Ctrl</code> + <code>T</code></li>
+  <li><strong>キャッシュ</strong>に入れて実時間で再生確認します</li>
+</ol>
+
+<img src="img/howto-sculpt-animated-000240.png" alt="Shot Sculpt の作業状態。右のパラメータは Brush が Move、Radius 0.512、Strength 0.5。下部の Shot Sculpt ペインには Sculpt Track 0 と 1 が積まれ、紫のブロックが効き始めと終わりのエンベロープとして表示されている">
+
+<h3>画面で確認した設定</h3>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>Mode / Geometry Type</td><td>Sculpt / Polygons</td></tr>
+    <tr><td>Brush / Stroke / Shape</td><td>Move / Dots / Volume</td></tr>
+    <tr><td>Radius / Strength</td><td>0.512 / 0.5</td></tr>
+    <tr><td>Spacing / Falloff</td><td>0.1 / 0.5</td></tr>
+    <tr><td>ネットワーク</td><td><code>Pull_Animation</code> → <code>sceneinvoke1</code> → <code>shotsculpt1</code></td></tr>
+  </tbody>
+</table></div>
+
+<h2>トラックという仕組み</h2>
+
+<p>スカルプトは<strong>1つ1つがタイムライン上のトラック</strong>になり、
+効き始めと終わりがエンベロープで表現されます。</p>
+
+<p>だから<strong>「いつ効かせるか」を後から動かせます</strong>し、複数のスカルプトを重ねられます。
+1回で完璧に彫るのではなく、<strong>浅いスカルプトを複数トラックに分けて時間をずらす</strong>のが使い方です。</p>
+
+<p>アニメーションを直接壊すのではなく、上に層として乗せる形になっているので、
+気に入らなければトラックを消せば元に戻ります。</p>
+
+<h2>つまずくところ</h2>
+
+<p><strong>Scene Invoke で Unpack Geometry を有効にしないと何も選択できません。</strong></p>
+
+<p>APEX のキャラはパックされたジオメトリなので、Shot Sculpt が触れる状態になっていないのです。
+「ノードを選んでいるのに何もできない」ときはここです。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>Scene Invoke → Unpack Geometry を有効に → Shot Sculpt</strong> の順です</li>
+  <li>ステートに入って <code>3</code>（Move）で引っぱるだけ。ブラシは基本これだけ使います</li>
+  <li>スカルプトは<strong>トラックとして積まれ、効くタイミングを後から動かせます</strong></li>
+  <li>浅いスカルプトを<strong>複数トラックに分けて時間差で効かせる</strong>のが使い方です</li>
+  <li><code>Ctrl</code> + <code>T</code> でトラックを追加できます</li>
+  <li>Unpack Geometry を忘れると何も選択できません</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

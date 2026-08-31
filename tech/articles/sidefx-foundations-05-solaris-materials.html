@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 5 — Quick Surface Material でテクスチャを割り当てる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Quick Surface Material の正体（同梱 USD の参照）から、Material Linker での割り当て、テクスチャ4枚の入れ方、背景の繰り返しを UV Project で直すところ、Render Gallery でネットワークごと戻す方法まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 5 — Quick Surface Material でテクスチャを割り当てる</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=K0hErUd1Pwo">H22 Foundations | Model Render Animate 5 | Solaris: Materials</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第5回 / Houdini 22 / 10:24 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-foundations-04-solaris-objects.html">Solaris に持ち込んでカメラとライトを置く</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/K0hErUd1Pwo"
+          title="H22 Foundations | Model Render Animate 5 | Solaris: Materials" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li><code>Quick Surface Material</code> を2つ作って、ボールと背景に割り当てること</li>
+  <li><strong>マテリアルは作っただけでは何も起きない</strong>こと。割り当てるのは <code>Material Linker</code> の仕事です</li>
+  <li>この回いちばんの落とし穴 — <strong>Material Linker に表示フラグを立てるとカメラとライトが消えます</strong></li>
+  <li>テクスチャ4枚（color / reflect / roughness / normal）の入れ方と、パスを <code>$HIP/tex/…</code> で書くこと</li>
+  <li>背景のテクスチャが繰り返してしまう問題を <code>UV Project</code> で直すこと</li>
+  <li><strong>Render Gallery</strong> でスナップショットを A / B 比較し、<strong>ネットワークの状態ごと戻せる</strong>こと</li>
+</ul>
+
+<h2>1. Quick Surface Material を2つ置く</h2>
+
+<p>ネットワークの<strong>いちばん上</strong>（背景とボールより前）に <code>Tab</code> から
+<strong>Quick Surface Material</strong> を置いて <code>soccerball_mat</code> と名付けます。
+それを <code>Alt</code> + ドラッグで複製して <code>backdrop_mat</code> にし、それぞれを繋ぎます。</p>
+
+<p>まず背景のほうだけ色を触ります。動画では緑にして少し暗く落としています。
+ボール側はこの時点では何もしません。</p>
+
+<h3>Quick Surface Material とは何なのか</h3>
+
+<p>名前から「簡易マテリアル」に見えますが、中身はけっこう考えて作られたものです。
+公式ヘルプによると、<strong>VOP でシェーダーを組むのではなく、Houdini に同梱された USD ファイルを参照する</strong>仕組みになっています。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>性質</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>ベース</td><td><strong>MaterialX Standard Surface</strong> と <strong>PBR Texture Set</strong></td></tr>
+    <tr><td>クック</td><td>参照するだけなので速い。Material Library の中で VOP を USD に変換する手間がありません</td></tr>
+    <tr><td>メモリ</td><td>インスタンス間でデータを共有するので USD 側のオーバーヘッドが小さい</td></tr>
+    <tr><td>Karma XPU</td><td>シェーダーモデルが固定なので、<strong>GPU 側のシェーダー再コンパイルが減ります</strong></td></tr>
+    <tr><td>テクスチャ</td><td>内部で MtlX Image を使い、<strong>パラメータごとに signature があらかじめ設定済み</strong>です</td></tr>
+  </tbody>
+</table></div>
+
+<p>この「signature が設定済み」というのが地味に効いています。
+roughness や metalness のような float のパラメータには <code>float</code> のマップ、
+色のパラメータには <code>color3</code> のテクスチャが割り当たるようになっていて、
+<strong>ノーマルマップだけは <code>vector3</code> として raw で読まれます</strong>。
+だから後述のバンプの欄にノーマルマップを入れて、そのまま意図通りに効きます。</p>
+
+<h2>2. Material Linker で割り当てる</h2>
+
+<p>マテリアルを2つ置いてもビューは何も変わりません。<strong>まだ割り当てていないから</strong>です。
+<code>Tab</code> から <strong>Material Linker</strong> を置きます。</p>
+
+<p>ここで<strong>表示フラグの場所に注意</strong>します。Material Linker に表示フラグを立ててしまうと、
+そこより下流にあるカメラもライトも<strong>全部消えます</strong>。
+表示フラグはチェーンのいちばん下に置いたままにして、
+Material Linker のパラメータだけを触るのが正しい進め方です。</p>
+
+<p>LOP のネットワークは上から下に積み上がるので、<strong>「見ている場所」＝「そこまで積んだ状態」</strong>になります。
+SOP でも同じ理屈ではあるのですが、Solaris だとライトやカメラまで消えるので影響が大きく感じられます。</p>
+
+<h3>割り当ての操作</h3>
+
+<ol>
+  <li>Material Linker の中でジオメトリのツリーを開きます（<code>backdrop</code> と <code>soccerball_geo</code> が並びます）</li>
+  <li>マテリアルをリストにドラッグし、そこにジオメトリをドラッグします</li>
+</ol>
+
+<p>背景に <code>backdrop_mat</code> を当てると緑になり、割り当てが効いたことが目で分かります。
+ボールのほうは色を触っていないので、少しツヤが出るくらいの変化です。
+このツヤで「ライトが少し強すぎるかも」と気づける、という進み方も参考になります。</p>
+
+<h2>3. テクスチャを4枚入れる</h2>
+
+<p><code>soccerball_mat</code> に戻ってテクスチャを入れていきます。
+各項目の <strong>set or create</strong> を押すと、まず既定の UV グリッドが入るので、
+それをボタンから実ファイルに差し替えます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>入れるもの</th><th>効果</th></tr></thead>
+  <tbody>
+    <tr><td>Color → Color Map</td><td><code>$HIP/tex/soccerball_color</code></td><td>白黒のパッチの絵が乗ります</td></tr>
+    <tr><td>Specular Color</td><td>reflect マップ</td><td>強すぎたスペキュラのハイライトが落ち着きます</td></tr>
+    <tr><td>Roughness</td><td>roughness マップ</td><td>場所ごとのざらつきの差が出ます</td></tr>
+    <tr><td>Bump</td><td>normal マップ（強さ <code>0.5</code>）</td><td>革の細かい傷や凹凸が出ます</td></tr>
+  </tbody>
+</table></div>
+
+<p>パスを <code>$HIP/tex/…</code> で書けるのは、レッスン1で <strong>Set Project</strong> をやっておいたおかげです。
+ここで効いてきます。</p>
+
+<p>寄って見ると、ノーマルマップを入れたことで表面の傷が感じられるようになります。
+強さ 0.5 くらいで十分効くようです。</p>
+
+<p class="tx-muted">テクスチャの欄の横にある COP のボタンを押すと、そのパラメータを COP で作るためのネットワークが作られます。
+すでにマップが入っている場合は、そのファイルを読み込んだ File COP が用意されるので、画像処理を足せます。
+このコースでは使いませんが、覚えておくと使いどころがありそうです。</p>
+
+<h3>ロゴの位置をずらす</h3>
+
+<p>テクスチャを貼ってみると、ロゴの位置が思ったところに来ないことがあります。
+その場合はボールを選んで <code>R</code> で回します。
+このとき<strong>チェーンの下のほうに変換用のノードが作られる</strong>のですが、
+それを掴んで<strong>ボールの直後に差し込み直す</strong>ことができます。
+「実際に動かしたのはボールなのだから、ボールの近くに置く」という整理です。
+バイパスすれば前後を比べられます。</p>
+
+<h2>4. 背景のテクスチャが繰り返してしまう問題</h2>
+
+<p>背景にもテクスチャを入れます。色を <code>1, 1, 1</code> に戻してから
+Color Map に <code>$HIP/tex/backdrop_color</code> を、Specular にも backdrop の reflect を入れます。</p>
+
+<p>ところが<strong>絵が繰り返して並んでしまいます</strong>。1枚で全体を覆ってほしいのに、
+タイル状になってしまう状態です。原因は背景の UV です。
+Grid には最初からある UV がそのまま残っていて、狙った範囲になっていません。</p>
+
+<p>直し方は Solaris 側ではなく、<strong>SOP に戻って背景の Grid のところで直します</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ノード</th><th>パラメータ</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td><code>uvproject</code></td><td><code>vrange</code> — V Range</td><td><code>-1</code> を入れて V 方向を反転させます</td></tr>
+  </tbody>
+</table></div>
+
+<p>V Range は「投影ジオメトリ上でテクスチャの下端と上端がどこに来るか」を決めるパラメータです。
+ここを反転させることで、1枚のテクスチャが背景全体を覆う形になります。
+Solaris に戻ると、繰り返しが消えて狙った見た目になっています。</p>
+
+<p class="tx-muted">見た目の問題を見た目のある場所（Solaris）で直そうとすると迷子になりがちですが、
+UV の問題は UV を作った場所（SOP）に戻るのが早い、という良い例だと思います。</p>
+
+<h2>5. Render Gallery で比べて、戻す</h2>
+
+<p>ここからが便利な機能の紹介です。<strong>スナップショット</strong>を撮って、
+<strong>Render Gallery</strong> で並べて比べられます。</p>
+
+<ol>
+  <li>今の状態でスナップショットを撮ります</li>
+  <li>Light Mixer をバイパスして、もう1枚撮ります</li>
+  <li>Render Gallery で片方を <strong>A</strong>、もう片方を <strong>B</strong> に設定して見比べます</li>
+</ol>
+
+<p>動画では「バイパスしたほうが明るいけれど、Light Mixer を通したほうのトーンが良い」という判断をしています。
+判断そのものより、<strong>この比べ方ができる</strong>ことがここでの学びだと思います。</p>
+
+<p>そしてもう一段便利なのが、ギャラリーの画像を右クリックして <strong>revert network</strong> を選ぶと、
+<strong>その絵を出したときのネットワークの状態に戻る</strong>ことです。
+バイパスを切っていたなら、それも含めて戻ります。</p>
+
+<p>つまり設定を変えながらスナップショットを撮り溜めておけば、
+後から気に入ったものを選んでネットワークごと復元できます。
+探りながら進める作業では、かなり効くやり方だと思います。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><code>Quick Surface Material</code> は VOP で組むものではなく、<strong>同梱の USD を参照する</strong>仕組みです。クックが速く、Karma XPU のシェーダー再コンパイルも減ります</li>
+  <li>パラメータごとにテクスチャの signature が設定済みで、<strong>ノーマルマップは <code>vector3</code> として raw で読まれます</strong></li>
+  <li><strong>マテリアルは作っただけでは何も起きません。</strong><code>Material Linker</code> で割り当てて初めて効きます</li>
+  <li><strong>Material Linker に表示フラグを立てるとカメラとライトが消えます。</strong>表示フラグはチェーンの最後に置いたままにします</li>
+  <li>テクスチャのパスは <code>$HIP/tex/…</code> で書けます。レッスン1の <strong>Set Project</strong> がここで効きます</li>
+  <li>背景のテクスチャが繰り返すのは UV の問題です。<strong>SOP に戻って <code>uvproject</code> の V Range を反転</strong>させて直します</li>
+  <li><strong>Render Gallery は絵を比べるだけでなく、ネットワークの状態ごと戻せます</strong>（右クリック → revert network）</li>
+</ul>
+
+<p>次の第6回はシリーズ最長の27分で、場所も変わります。
+ボールにスケルトンを入れてキャプチャし、APEX のセットドリブンキーで
+スクワッシュ＆ストレッチを仕込んで、リグを1つのアセットに固めるところまでやります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

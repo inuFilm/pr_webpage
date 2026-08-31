@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pyro FX レシピ — これも Copernicus の話 | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Copernicus の Pyro ソルバの現在地です。implicit surface ベースの Pyro Source Shapes、flame は明示的に有効化しないと空のままという仕様、そして density と fire を合成した可視化がまだ無い理由まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Pyro FX レシピ — これも Copernicus の話</h1>
+        <p class="tech-meta">houdini-fx / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=gL8DJ2b7n5c">H22 - Pyro FX Recipes | Attila Torok | Houdini 22 HIVE</a>
+（SideFX 公式 Houdini 22 HIVE の講演 / 講演者 Attila Torok さん / Houdini 22 / 36:03 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/gL8DJ2b7n5c"
+          title="H22 - Pyro FX Recipes | Attila Torok | Houdini 22 HIVE" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>位置づけ</h2>
+
+<p>講演者自身の言葉です。</p>
+
+<blockquote>2つの Copernicus 講演に挟まれているが、実はこれも Copernicus を使っている。</blockquote>
+
+<p>前リリースで始まった <strong>Copernicus の Pyro ソルバの続き</strong>です。
+「Pyro の話」として聞くと肩透かしですが、
+<strong>Copernicus で流体を解くという路線の現在地</strong>を知る講演になっています。</p>
+
+<h2>話の流れ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>時刻</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>03:46</td><td><strong>density の出力を入力に繋ぐ必要がなくなった</strong></td></tr>
+    <tr><td>07:29</td><td><strong>Pyro Source Shapes</strong> — implicit surface ベースの新しいソーシング方法</td></tr>
+    <tr><td>11:16</td><td>基本形状（box など）を使う例</td></tr>
+    <tr><td>15:02</td><td>velocity に効かせ、density で制御する。<strong>Control Mass</strong></td></tr>
+    <tr><td>18:42</td><td><strong>flame を使うには明示的に有効化する必要がある</strong></td></tr>
+    <tr><td>22:25</td><td><strong>Adaptive Confinement</strong></td></tr>
+    <tr><td>26:07</td><td><strong>現時点の制約</strong> — 可視化について</td></tr>
+    <tr><td>29:47</td><td>今後の予定 — シェルフツール化</td></tr>
+    <tr><td>33:35</td><td>Q&amp;A: COPs 内の Pyro でライティングや編集はできるか</td></tr>
+  </tbody>
+</table></div>
+
+<h2>1. 配線が減った</h2>
+
+<p><strong>density の出力を入力に繋ぐ必要がなくなりました。</strong></p>
+
+<p>効果は2つです。<strong>ネットワークが煩雑にならない</strong>こと、そして
+<strong>ブロック内にノードを置きたいときも簡単に外せる</strong>ことです。</p>
+
+<p><a href="howto-pyro-in-cops.html">ハウツーの Pyro の回</a>で
+「COP Pyro Block 2.0 では主要な設定が全部 Block End に載っている」という話が出てきましたが、
+同じ方向の整理です。<strong>ブロックの内側に手を入れる必要を減らす</strong>という設計になっています。</p>
+
+<h2>2. Pyro Source Shapes — implicit surface</h2>
+
+<p>新しいソーシング方法です。<strong>点を出力して Pyro Solver のジオメトリ入力に差します。</strong></p>
+
+<img src="img/hive-pyro-recipes-000810.png" alt="Pyro Source Shape ノード（OPlibPyroCop.hda）のパラメータ。Shape が Box に設定され、Size、Roundness、Transform の欄が並んでいる">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>パラメータ</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>Shape</td><td>Box など基本形状</td></tr>
+    <tr><td>Size / Roundness</td><td>形の調整</td></tr>
+    <tr><td>Transform</td><td>位置と向き</td></tr>
+  </tbody>
+</table></div>
+
+<p>基本形状を使う例が 11:16 からで、
+<strong>implicit surface のワークフローが自動で処理してくれる部分がある</strong>という話が出てきます。</p>
+
+<p>数式で面を記述するので、形が解像度に依存しません。
+ソースの形を作るためにジオメトリを組む必要が減ります。</p>
+
+<h2>3. velocity と Control Mass</h2>
+
+<p>velocity に効かせて density で制御する、という使い方です。
+<strong>Control Mass を有効にします。</strong></p>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>レンジ</td><td><strong>既定でほぼ良い</strong>とのことです</td></tr>
+    <tr><td>Uniform Scale</td><td>変えると<strong>効き方が変わります</strong></td></tr>
+  </tbody>
+</table></div>
+
+<h2>4. flame は明示的に有効化する（重要）</h2>
+
+<p>ここが引っかかりやすい仕様です。</p>
+
+<blockquote><strong>flame を使いたいなら明示的に有効化する必要があります</strong>（direction も同様）。
+しないと flame フィールドは空のまま advect もされません。</blockquote>
+
+<p>「炎が出ない」と悩むときの原因がこれです。
+フィールドが存在しないので、当然何も流れません。</p>
+
+<p><strong>カスタムフィールドは feedback 入力に入れます。</strong></p>
+
+<h2>5. Adaptive Confinement</h2>
+
+<p><strong>confinement をどこに効かせるかを賢く判断してくれます。</strong></p>
+
+<p>そして警告があります。<strong>効かせすぎるとシミュレーションが止まり、
+空間的な白ノイズだらけになります。</strong></p>
+
+<p>渦を締めて形を保つのが confinement ですが、締めすぎると流れそのものが死ぬ、という話です。
+「賢く判断する」機能があっても、量の判断は人の側に残ります。</p>
+
+<h2>6. 現時点の制約 — 可視化</h2>
+
+<p>この講演でいちばん実用的な情報がこれだと思います。</p>
+
+<blockquote><strong>density と fire を合成した適切なボリューム可視化ができません。</strong>
+（SOP の volume visualizer に相当するものが無い）</blockquote>
+
+<p><a href="howto-pyro-in-cops.html">ハウツーの Pyro の回</a>では、
+色を見るために <strong>Mono to RGB と VDB Visualize を自分で組む</strong>手順を扱っています。</p>
+
+<p><strong>なぜそんな手間が必要なのかの答えがここにあります。</strong>
+手順書だけ読むと「面倒だな」で終わりますが、
+<strong>そもそも用意されていないから自分で組んでいる</strong>と分かると納得できます。</p>
+
+<p>逆に言えば、ここが用意された時点でハウツーの手順は短くなるはずです。</p>
+
+<h2>7. 今後の予定</h2>
+
+<p><strong>すべてのパーティクルエフェクトがシェルフツールになる</strong>予定だそうです。
+<strong>オンラインで探さずに直接使える</strong>ようになります。</p>
+
+<p>レシピという形で配るのではなく、標準の道具として入れる方向です。</p>
+
+<h2>この講演から持ち帰るもの</h2>
+<ul>
+  <li>これも <strong>Copernicus の話</strong>です。Copernicus で流体を解く路線の続きになっています</li>
+  <li><strong>density の出力を入力に繋ぐ必要がなくなりました。</strong>ブロックの内側に手を入れる必要を減らす方向です</li>
+  <li><strong>Pyro Source Shapes</strong> は implicit surface ベースで、点を出力して Pyro Solver のジオメトリ入力に差します</li>
+  <li>velocity 制御には <strong>Control Mass</strong>。レンジは既定でほぼ良く、<strong>Uniform Scale</strong> で効き方が変わります</li>
+  <li><strong>flame と direction は明示的に有効化しないと、フィールドが空のまま advect もされません</strong></li>
+  <li>カスタムフィールドは <strong>feedback 入力</strong>に入れます</li>
+  <li><strong>Adaptive Confinement</strong> は効かせすぎるとシミュレーションが止まり、白ノイズになります</li>
+  <li><strong>density と fire を合成した可視化はまだありません。</strong>だから Mono to RGB と VDB Visualize を自分で組む必要があります</li>
+  <li>今後<strong>パーティクルエフェクトがシェルフツール化</strong>される予定です</li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Houdini 22 入門 7 — バウンシングボールをアニメートする | 技術メモ | makeinufilm</title>
+  <meta name="description" content="キーを先に並べて後から高さを付け、タンジェントを切って着地を鋭くし、モーションパスの上で軌跡そのものを調整します。落差に比例させたスクワッシュ＆ストレッチと USD 書き出しまで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Houdini 22 入門 7 — バウンシングボールをアニメートする</h1>
+        <p class="tech-meta">houdini / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=MPM2SQzDisY">H22 Foundations | Model Render Animate 7 | Animate a Bouncing Ball</a>
+（SideFX 公式チュートリアル H22 Foundations: Model, Render, Animate の第7回 / Houdini 22 / 9:33 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。
+前回は<a href="sidefx-foundations-06-rig.html">APEX でスクワッシュ＆ストレッチを仕込む</a>でした。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/MPM2SQzDisY"
+          title="H22 Foundations | Model Render Animate 7 | Animate a Bouncing Ball" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>この回で扱うこと</h2>
+<ul>
+  <li>フレーム範囲を先に決めてしまうこと（1〜120）</li>
+  <li>先に<strong>キーだけ並べて、後で高さを付ける</strong>という進め方</li>
+  <li>着地を鋭くするために<strong>タンジェントを切る</strong>こと。ここが「浮いて見える」原因への対処です</li>
+  <li>キーをまとめて時間方向に縮めて<strong>テンポを上げる</strong>操作</li>
+  <li><strong>モーションパス</strong>をバインドして、軌跡の上で直接バウンスを調整すること</li>
+  <li>前回作った <code>squash control</code> を使って、落下で伸び・着地で潰れる動きを付けること</li>
+  <li>USD として書き出すところまで</li>
+</ul>
+
+<h2>1. フレーム範囲を決める</h2>
+
+<p>グローバルアニメーションオプションを開いて、範囲を <strong>1〜120</strong> にします。
+既定の 240 フレームは要らないので、先に切ってしまいます。Apply して Close します。</p>
+
+<p>タイムラインの表示が更新されるので、以降の作業がこの範囲で収まります。
+アニメーションを始める前に尺を決めておくのは、地味ですが効きます。</p>
+
+<h2>2. まずキーを並べる</h2>
+
+<p><code>Enter</code> で Pose ツール（アニメートステート）に入ります。
+<code>Shift</code> + <code>F1</code> でヒントを消しておきます。</p>
+
+<p>動かすのは <code>root</code> です。前回リミットを入れておいたので、
+横に流れることも高すぎるところまで行くこともありません。</p>
+
+<ol>
+  <li>フレーム <strong>1</strong> でキーを打ちます</li>
+  <li>フレーム <strong>120</strong> で <code>K</code> を押し、前進の値を <strong>30</strong> にします</li>
+  <li>この時点でスクラブすると、ボールが転がって進みます（前回の Set Driven Key が効いています）</li>
+  <li>バウンスが起きる位置に中間キーを足します。<strong>15 / 25 / 35 / 40 / 45</strong></li>
+</ol>
+
+<p>この段階では中間キーは全部同じ値なので、見た目は何も変わりません。
+<strong>先に「どこで跳ねるか」だけを決めて、高さは後から付ける</strong>という段取りです。
+これは考え方として真似しやすいなと思いました。</p>
+
+<h3>高さを付ける</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>フレーム</th><th>やること</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>ボールを高く持ち上げます。ここから落ちてきます</td></tr>
+    <tr><td>25</td><td>持ち上げます。1回目より低くします</td></tr>
+    <tr><td>40</td><td>さらに小さく持ち上げます</td></tr>
+  </tbody>
+</table></div>
+
+<p>これで「ボン、ボン、ボン」と跳ねながら減衰していく形になります。
+再生が速すぎる場合は<strong>リアルタイム再生</strong>のオプションをオンにします。</p>
+
+<p class="tx-muted">後半はほぼ転がっているだけなので、タイムラインの表示範囲を 60 くらいに絞ると、
+跳ねている部分に集中して判断できます。</p>
+
+<h2>3. 着地を鋭くする — タンジェントを切る</h2>
+
+<p>この時点では「跳ねている」より「浮いている」ように見えます。原因はカーブです。</p>
+
+<p>アニメーションエディタで <code>translate Y</code> を選んで <code>H</code> を押すと、そのカーブが見えます。
+各キーの前後がなめらかに繋がっていて、<strong>その滑らかさがそのまま浮遊感になっています</strong>。</p>
+
+<p>そこで各キーの<strong>タンジェントを切ります</strong>。切ると前後を独立して扱えるようになるので、
+着地の瞬間だけ鋭い折れ線にできます。地面に当たった感じが出ます。</p>
+
+<p class="tx-muted">アニメーションエディタは中ドラッグでズームとトラックができます。跳ねている範囲に寄って作業します。</p>
+
+<p>切った後は、必要に応じて片側だけ引き出して形を作れます。
+カーブの形をこちらで決められる状態になった、というのがここでの成果です。</p>
+
+<h2>4. テンポを上げる</h2>
+
+<p>もう少し速くしたい場合は、<code>Shift</code> でキーを全部選んで、
+<strong>中ドラッグで時間方向に縮めます</strong>。動画では終わりが 30 くらいになるまで詰めています。</p>
+
+<p>これで跳ねる動きがアニメーションの前半に集まって、テンポが上がります。
+1つずつキーを動かさずに全体の速さを変えられるので、詰めの段階で使いやすい操作だと思います。</p>
+
+<h2>5. モーションパスで軌跡を直接いじる</h2>
+
+<p>設定の <strong>Motion Path</strong> からバインドすると、ボールの<strong>軌跡が画面に出ます</strong>。
+動画では表示範囲を 100 にしています。</p>
+
+<p>これが便利なのは、<strong>軌跡の上の点をそのまま掴んで動かせる</strong>ことです。</p>
+
+<ul>
+  <li>フレーム1の点を上げれば、最初の落下が高くなります</li>
+  <li>バウンスの点を横にずらせば、跳ねる位置が変わります</li>
+  <li>「ここのバウンスをもう少し大きく」といった判断を、軌跡を見ながら直接反映できます</li>
+</ul>
+
+<p>数値やカーブではなく<strong>絵として軌跡を見て決められる</strong>ので、
+バウンスの練習にはかなり向いている道具だと思います。調整が終わったらアンバインドします。</p>
+
+<h2>6. スクワッシュ＆ストレッチを付ける</h2>
+
+<p>ここからは <code>root</code> ではなく <strong><code>squash control</code></strong> を触ります。
+前回 Set Driven Key で繋いだ青いボックスです。</p>
+
+<p>基本の考え方はこうです。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>タイミング</th><th>形</th></tr></thead>
+  <tbody>
+    <tr><td>落下中</td><td><strong>伸びる</strong>（ストレッチ）</td></tr>
+    <tr><td>着地の直前</td><td>少し戻して丸めに近づける</td></tr>
+    <tr><td>着地の瞬間</td><td><strong>潰れる</strong>（スクワッシュ）。落差が大きいほど深く潰します</td></tr>
+    <tr><td>離れた直後</td><td>いったん均す</td></tr>
+    <tr><td>頂点</td><td>少し伸ばす。最初ほど強くはしません</td></tr>
+    <tr><td>最後</td><td><code>0</code> にして<strong>完全な丸</strong>に戻して <code>K</code></td></tr>
+  </tbody>
+</table></div>
+
+<p>各タイミングで <code>K</code> を押しながら進めていきます。
+<strong>落差の大小に合わせて潰し量を変える</strong>のが要点で、
+2回目・3回目のバウンスは跳ねが小さいので潰しも浅くします。</p>
+
+<p>操作するのはハンドル1つ（上下）だけです。
+体積を保つ変形は前回の Set Driven Key に仕込んであるので、
+ここでは「どれくらい潰すか」だけを考えれば済みます。<strong>リグを作った効果がここで出ます。</strong></p>
+
+<p>付け終わったらアニメーションエディタで並べて見ると、
+「大きく潰す → 少し潰す → もっと少し」という流れが確認できます。
+強調したければここでさらに触れます。</p>
+
+<h2>7. USD として書き出す</h2>
+
+<p>アニメーションができたら、レンダリングのために USD で書き出します。
+<code>Tab</code> から USD の書き出しノードを置いて、キャラクターの出力を繋ぎます。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>値</th></tr></thead>
+  <tbody>
+    <tr><td>ノード名</td><td><code>soccerball_anim</code></td></tr>
+    <tr><td>ルートのプリムパス</td><td><code>/geo</code></td></tr>
+    <tr><td>フレーム範囲</td><td>Current Frame Range（1〜120）</td></tr>
+    <tr><td>ファイル名</td><td><code>$OS</code> のまま。<strong>ノード自身の名前</strong>に展開されるので <code>soccerball_anim</code> になります</td></tr>
+  </tbody>
+</table></div>
+
+<p><code>$OS</code> を使っているので、ノード名を変えればファイル名も付いてきます。
+レッスン1で出てきた「パスを直に打たずに変数で書く」がここでも効いています。</p>
+
+<p>Save to Disk で書き出したら、次は Solaris に戻ってこれを読み込みます。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>フレーム範囲は<strong>グローバルアニメーションオプションで先に決めます</strong>（1〜120）</li>
+  <li><strong>キーを並べる → 後から高さを付ける</strong>、という順番で進められます</li>
+  <li>「浮いて見える」のはカーブのなめらかさが原因です。<strong>タンジェントを切る</strong>と着地が鋭くなります</li>
+  <li>キーを全選択して中ドラッグで縮めれば、<strong>全体のテンポ</strong>を変えられます</li>
+  <li><strong>モーションパス</strong>をバインドすると、軌跡の点を直接掴んでバウンスを調整できます</li>
+  <li>スクワッシュ＆ストレッチは<strong>落差に比例させます</strong>。跳ねが小さいところは潰しも浅くします</li>
+  <li>触るハンドルは1つだけです。体積保存は前回リグに仕込んであります</li>
+  <li>書き出しのファイル名は <code>$OS</code> にしておくと、ノード名と一致し続けます</li>
+</ul>
+
+<p>最後の第8回では Solaris に戻り、<strong>1つのネットワークの中に2つのショットを共存させて</strong>、
+Karma XPU で120フレームを連番レンダリングします。
+同じ <code>camera1</code> をショットごとに編集して使い分ける、というのがポイントになります。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

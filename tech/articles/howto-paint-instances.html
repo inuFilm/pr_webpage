@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Solaris でインスタンスをペイント配置する | 技術メモ | makeinufilm</title>
+  <meta name="description" content="Place / Paint / Fill の3ブラシでアセットを手置きします。ストローク前に Edit Last Stroke をオンにしておくと後から密度を詰められる、という要点と、Size と Scale の違いも。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Solaris でインスタンスをペイント配置する</h1>
+        <p class="tech-meta">houdini-solaris / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=k8tCteYC4N0">Houdini 22 | How to Paint Instances in Solaris</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 13:00 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/k8tCteYC4N0"
+          title="Houdini 22 | How to Paint Instances in Solaris" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>何ができる機能か</h2>
+
+<p><strong>Paint Instances LOP</strong> は、ブラシでアセットのインスタンスをジオメトリの上に置いていく機能です。
+配置も編集も<strong>すべてビューポート内</strong>で行うので、レイアウト作業を手で作り込めます。</p>
+
+<p>ブラシは大きく<strong>生成系（generators）</strong>と<strong>修正系（modifiers）</strong>に分かれます。</p>
+
+<p class="tx-muted">重要な仕様: <strong>Paint Instances が作るのは point instancer だけ</strong>です
+（USD のインスタンシング方式のうちの1つ）。</p>
+
+<h2>1. 下準備</h2>
+
+<ol>
+  <li>新しいペインを開き <strong>Solaris → Asset Catalog</strong>。既定では Houdini 付属のテストジオメトリのカタログが出ます</li>
+  <li>自分のカタログを作るには <strong>Create New Asset Database File</strong> → ディスクに保存 → アセットを追加。
+      <strong>Add Asset</strong>（1つ）と <strong>Add Directory</strong>（そのディレクトリのファイルとバリアントを全部）が選べます</li>
+</ol>
+
+<img src="img/howto-paint-instances-000102.png" alt="下部に Asset Catalog パネル。既定の読み取り専用カタログに barrel / electra / pig / rubbertoy / squab などが並んでいる。右は Karma Physical Sky のパラメータ。ネットワークは terrain（SOP Create）と render_cam と physical sky だけの最小構成">
+
+<p>シーンは <strong>terrain ＋ render camera ＋ physical sky だけの最小構成</strong>です。</p>
+
+<p><strong>注意:</strong> Paint Instances のブラシの一部は<strong>空のシーンでは動きません</strong> —
+ペイント先のジオメトリが必要です。平らでいいなら Grid 1枚でも構いません。</p>
+
+<h2>2. Place ブラシ — 1本ずつ置く</h2>
+
+<ol>
+  <li>Paint Instances を作って繋ぎ、<code>saguaro_instances</code> と命名。
+      <strong>プリムパスを正しい場所に</strong>（<code>/world/geometry</code> の子になるよう）指定します</li>
+  <li><strong>Prototypes</strong> ボタンでアセットカタログを開き、使うアセット（サボテン）を追加します</li>
+  <li><strong>Place ブラシ</strong>に切り替えます。一番基本のブラシで、1つずつ置いていきます</li>
+  <li><strong>Normal Blending を下げます</strong> — 斜面に置いたとき横向きに倒れるのを防ぎます</li>
+</ol>
+
+<p>置くたびに<strong>回転がランダムに振られます</strong>。
+<strong>ランダムスケール</strong>もかかるので全部同じ大きさにはなりません。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>操作</th><th>できること</th></tr></thead>
+  <tbody>
+    <tr><td>クリック＆ホールド → <code>Shift</code></td><td><strong>スケール</strong></td></tr>
+    <tr><td>クリック＆ホールド → <code>Ctrl</code></td><td><strong>向き</strong>（増分回転と自由回転があります）</td></tr>
+  </tbody>
+</table></div>
+
+<p class="tx-muted">操作方法はビューポートにヒントとして出ているので、覚えなくても進められます。</p>
+
+<h2>3. Paint ブラシ — 散らす</h2>
+
+<ol>
+  <li>2つ目の Paint Instances を作り <code>barrel_cactus_instances</code> と命名。
+      <strong>プリムパスは1つ目からコピペ</strong>して同じ場所に入れます</li>
+  <li><strong>Paint ブラシ</strong>に切り替えます。円形のブラシカーソルになります</li>
+</ol>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>操作</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>中ボタンのホイール</td><td>ブラシサイズを変えます</td></tr>
+    <tr><td><code>Shift</code> ＋ ホイール</td><td><strong>一度に置く数</strong>を増減できます。多すぎたら減らして塗り直します</td></tr>
+  </tbody>
+</table></div>
+
+<p>プロトタイプは<strong>ランダムに選ばれます</strong>。
+1種類だけ使いたいときは、その1つを選択しておきます。</p>
+
+<h2>4. Fill ブラシ — 範囲を囲んで散らす</h2>
+
+<p>低木は別の作り方をします。</p>
+
+<ol>
+  <li><strong>Point Instancer</strong> ノードで大量の低木を <strong>Empty Point Instancer</strong> に入れておきます</li>
+  <li>そこに Paint Instances を挿し、<strong>既存の point instancer を指す</strong>ように設定します。
+      プロトタイプが無い状態だとエラーになるので、指定したら<strong>ステートに入り直します</strong></li>
+  <li><strong>Fill ブラシ</strong>に切り替えます。<strong>Lasso</strong> で囲んだ範囲の中に散らせます</li>
+  <li>Normal Blend を少し下げます</li>
+</ol>
+
+<h3>Edit Last Stroke が要点</h3>
+
+<p><strong>ストロークを引く前に Edit Last Stroke をオンにしておきます。</strong>
+これがこの回で一番効くところで、<strong>ストロークを引いた後に散布設定を変えられるようになります</strong>。</p>
+
+<img src="img/howto-paint-instances-001010.png" alt="Fill ブラシの設定パネル。Brush Mode が Lasso、Snap To Input がオンで、Point Count や Uniform Scale などの散布設定が並んでいる。ビューポートには囲んだ範囲に低木が散らばっている">
+
+<p>塗ってから密度やスケールを詰められるので、<strong>一発で決める必要がありません</strong>。
+オフのまま塗ると、気に入らなければ塗り直しになります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>設定</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Snap to Input</strong></td><td>オンなら、インスタンスは<strong>確実にジオメトリの上に乗ります</strong></td></tr>
+    <tr><td><strong>Size</strong></td><td><strong>インスタンス同士の間隔</strong>です</td></tr>
+    <tr><td><strong>Scale</strong></td><td><strong>インスタンス自体の大きさ</strong>です。最大・最小を設定できます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>Size と Scale の違い</strong>は最初に迷うところだと思います。
+Size は「どれくらい離れて並ぶか」、Scale は「どれくらい大きいか」です。
+Size を大きくすると密度が下がり、Scale を大きくすると1つ1つが大きくなります。</p>
+
+<h2>5. 修正系のブラシ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>ブラシ</th><th>使い方</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Delete</strong></td>
+        <td>塗って消します。動画では<strong>サボテンに重なった低木を消す</strong>のに使っています。
+        「サボテンの真横に生えるのは不自然だから」という理由です</td></tr>
+    <tr><td><strong>Replace</strong></td>
+        <td>塗った範囲のインスタンスを別のプロトタイプに置き換えます。
+        <code>Ctrl</code> + クリックで<strong>使う種類を絞ってから</strong>塗ると、
+        その範囲だけ特定の低木に統一できます</td></tr>
+  </tbody>
+</table></div>
+
+<p>他にも<strong>積み重ねる</strong>ブラシや<strong>アセットで線を引く</strong>ブラシがあります。</p>
+
+<p><strong>Delete で「置いてはいけない場所」を消していく</strong>という進め方が実際的だと思いました。
+自動散布では作れない「サボテンの周りだけ空いている」という状態を、塗って作れます。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li>作るのは <strong>point instancer だけ</strong>です（USD のインスタンシング方式の1つ）</li>
+  <li>一部のブラシは<strong>空のシーンでは動きません</strong>。Grid 1枚でも置いておきます</li>
+  <li>ブラシは3つ。<strong>Place（1つずつ）/ Paint（散らす）/ Fill（囲んで散らす）</strong></li>
+  <li><strong>Normal Blending を下げる</strong>と、斜面で横倒しになるのを防げます</li>
+  <li><code>Shift</code>+ホイールで<strong>一度に置く数</strong>を変えられます</li>
+  <li><strong>ストロークの前に Edit Last Stroke をオンに。</strong>後から密度やスケールを詰められます</li>
+  <li><strong>Snap to Input</strong> で確実にジオメトリの上に乗ります</li>
+  <li><strong>Size は間隔、Scale は大きさ</strong>です</li>
+  <li><strong>Delete と Replace</strong> で後から整えます。「ここには生えない」を手で作れるのが手置きの強みです</li>
+</ul>
+
+<p>大量に自動で散らしたい場合は<a href="howto-scatter-instances.html">Scatter Instances の回</a>が対応します。
+あちらは<strong>点群を用意せず、プリムを指定するだけ</strong>で散らせます。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

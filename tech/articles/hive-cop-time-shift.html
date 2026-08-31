@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Adjacency でエフェクトを UV シームを越えて伝播させる | 技術メモ | makeinufilm</title>
+  <meta name="description" content="adjacency ノードはメッシュの隣接関係を持つので、UV シームで途切れません。前提となる UV アイランドの均し方、hue shift での色作り、そしてトポロジが荒れていると UV アンラップがクラッシュするという制約まで。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Adjacency でエフェクトを UV シームを越えて伝播させる</h1>
+        <p class="tech-meta">houdini-cop / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=EUjZ7ObaN1Y">H22 - Copernicus and Time Shift | Jakub Spacek | Houdini 22 HIVE</a>
+（SideFX 公式 Houdini 22 HIVE の講演 / 講演者 Jakub Spacek さん / Houdini 22 / 24:08 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/EUjZ7ObaN1Y"
+          title="H22 - Copernicus and Time Shift | Jakub Spacek | Houdini 22 HIVE" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>主題</h2>
+
+<p><strong>adjacency ノードを使って、エフェクトを UV 空間上で「広がらせる」話</strong>です。</p>
+
+<p>要点は<strong>UV シームで途切れないこと</strong>。
+テクスチャ空間で何かを伝播させると、通常はアイランドの境目で止まってしまいます。
+adjacency はメッシュの隣接関係を持っているので、シームを越えて繋がります。</p>
+
+<h2>話の流れ</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>時刻</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>03:33</td><td><strong>UV Layout の Spread Islands to All Available Space</strong> を有効にして UV アイランドを均す</td></tr>
+    <tr><td>07:07</td><td>広がりを駆動する<strong>カスタムソルバ</strong>。Block の仕組みには深入りしません
+        （Alex のチュートリアルのほうが詳しいと案内されます）</td></tr>
+    <tr><td>10:43</td><td>エフェクトの<strong>先端（leading edge）</strong>を作る</td></tr>
+    <tr><td>14:19</td><td><strong>UV シームでの問題が一切出ない</strong>ことの確認。色の作り方と Ripple Solver の試用</td></tr>
+    <tr><td>17:51</td><td>機械学習のパターンを育てる構想と、その反省</td></tr>
+    <tr><td>21:22</td><td>トポロジが前提になる、という話</td></tr>
+  </tbody>
+</table></div>
+
+<h2>1. 前提 — UV アイランドを均しておく</h2>
+
+<p><strong>UV Layout の Spread Islands to All Available Space</strong> を有効にします。</p>
+
+<p><strong>adjacency ノードを使う前提として重要です。</strong>
+アイランドが偏っていると、広がる速度が場所によって変わってしまいます。
+UV 空間を均等に使わせておくことで、伝播の速さが揃います。</p>
+
+<h2>2. 先端を作る — H22 で機能が入った</h2>
+
+<p>エフェクトの<strong>先端（leading edge）</strong>を作る話です。</p>
+
+<p>正直な話が入っていて、講演者は<strong>当初は自分でソルバを組んで時間経過の散逸を実装していた</strong>そうです。
+ところが <strong>H22 に同じことをする機能が入りました</strong>。</p>
+
+<p>自作していたものが標準機能になる、というのは追いかけている側にはよくある話ですが、
+それをそのまま話しているのが良いなと思いました。</p>
+
+<h2>3. UV シームで問題が出ない</h2>
+
+<p>これがこの講演の中心的な成果です。<strong>シームでの問題が一切出ません。</strong></p>
+
+<p>色も同じ原理で作っていて、<strong>hue shift と saturation をオフセットする</strong>やり方です。
+伝播している位置に応じて色相と彩度をずらせば、先端と後方で違う色になります。</p>
+
+<p>加えて <strong>Ripple Solver</strong> を試用していて、
+<strong>SOP でやっていたことが Copernicus でできる</strong>ことを確認しています。</p>
+
+<h2>4. うまくいかなかった話</h2>
+
+<p>各アイランドの上に<strong>機械学習のパターンを育てる</strong>構想があったそうですが、
+<strong>時間がかかりすぎることを見誤った</strong>と正直に述べています。</p>
+
+<p>講演で「やろうとしたができなかった」を話す人は少ないので、
+このあたりは読む価値があると思います。</p>
+
+<h2>5. トポロジが前提になる</h2>
+
+<p>実務上いちばん気をつけるべき点がここです。</p>
+
+<blockquote>三角形分割で密で汚い領域があると、UV アンラップがクラッシュするまで cook し続けた。</blockquote>
+
+<p><strong>トポロジを整えることが前提</strong>です。
+adjacency は隣接関係に依存するので、メッシュが荒れていると成立しません。</p>
+
+<p>「この手法を使いたいならモデルの側から整える必要がある」という制約なので、
+導入を考えるときは先に確認しておいたほうがよさそうです。</p>
+
+<h2>この講演から持ち帰るもの</h2>
+<ul>
+  <li><strong>adjacency ノードは UV シームを越えて伝播します。</strong>これが機能の核です</li>
+  <li>前提として <strong>UV Layout の Spread Islands to All Available Space</strong> でアイランドを均しておきます</li>
+  <li>先端（leading edge）の散逸は<strong>H22 で標準機能として入りました</strong>（講演者は自作していたそうです）</li>
+  <li>色は <strong>hue shift と saturation のオフセット</strong>で作れます</li>
+  <li><strong>Ripple Solver</strong> で SOP でやっていたことが Copernicus でできます</li>
+  <li><strong>トポロジが荒れていると UV アンラップがクラッシュします。</strong>整えるのが前提条件です</li>
+</ul>
+
+<p class="tx-muted">同じ HIVE の <a href="hive-cop-overview.html">Nikola Damjanov さんの Copernicus 講演</a>の
+Q&amp;A（32:12 あたり）でも adjacency ノードの話が出ていて、
+「Jakub の講演が詳しい」と案内されています。</p>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>

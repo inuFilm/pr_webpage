@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+	<script async src="https://www.googletagmanager.com/gtag/js?id=G-R7QHH5JRET"></script>
+	<script>
+	window.dataLayer = window.dataLayer || [];
+	function gtag(){dataLayer.push(arguments);}
+	gtag('js', new Date());
+
+	gtag('config', 'G-R7QHH5JRET');
+	</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Character Picker でコントロール選択 UI を作る | 技術メモ | makeinufilm</title>
+  <meta name="description" content="指のような小さいコントロールを確実に選ぶための2D UI です。ボタンが「そのとき選択されているコントロール」をターゲットにする挙動と、Create from Rig で3Dから投影する作り方が中心です。">
+  <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../tech.css">
+</head>
+<body class="tech">
+  <header class="tech-header">
+    <a class="tech-brand" href="../../index.html">makeinufilm.com</a>
+    <a class="tech-section-title" href="../index.html">技術メモ</a>
+  </header>
+  <div class="tech-layout">
+    <nav id="tech-sidebar" aria-label="記事一覧"></nav>
+    <main class="tech-main">
+      <article class="tech-article">
+        <h1>Character Picker でコントロール選択 UI を作る</h1>
+        <p class="tech-meta">houdini-animation / 2026-08-24</p>
+<p class="tx-muted">出典: <a href="https://www.youtube.com/watch?v=eQ4RaRpqTkk">Houdini 22 | How to Use the Character Picker</a>
+（SideFX 公式「Houdini 22 How-To」の1本 / Houdini 22 / 12:08 / 英語）。
+このページは、上記の動画を見ながら自分用にまとめた日本語の学習メモです。SideFX 公式の翻訳ではありません。</p>
+
+<div class="video-wrap">
+  <iframe src="https://www.youtube-nocookie.com/embed/eQ4RaRpqTkk"
+          title="Houdini 22 | How to Use the Character Picker" allowfullscreen loading="lazy"></iframe>
+</div>
+
+<h2>何のためのものか</h2>
+
+<p>H22 で追加された <strong>APEX Character Picker</strong> は、
+<strong>2Dの図とボタンでリグのコントロールを選択する UI</strong> です。</p>
+
+<p>ビューポートで直接クリックしづらいコントロール — 指のような小さいもの、
+ポーズや視点に隠れているもの — を確実に選べるようになります。
+<strong>指を1本ずつ選ぶために毎回カメラを回す</strong>、という手間が消えます。</p>
+
+<h2>1. 基本操作</h2>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>開き方</td><td><strong>New Pane Tab → Animation → Character Picker</strong></td></tr>
+    <tr><td>前提</td><td><strong>アニメートステートに入っていないと使えません。</strong>先にステートに入ります</td></tr>
+    <tr><td>選択に追加</td><td><code>Shift</code> + クリック</td></tr>
+    <tr><td>選択から除外</td><td><code>Ctrl</code> + クリック</td></tr>
+  </tbody>
+</table></div>
+
+<p>H22 では <strong>Electra と Auto のテストジオメトリにピッカーのレイアウトが同梱されています</strong>。
+自分のキャラでは自作します。</p>
+
+<h2>2. 作る場所は2つある</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>場所</th><th>特徴</th></tr></thead>
+  <tbody>
+    <tr><td><strong>キャラクターレベル</strong></td>
+        <td>新ノード <strong>Add Character Picker</strong> を使います。
+        <strong>レイアウトをキャラに埋め込める</strong>ので、後から使い回せます</td></tr>
+    <tr><td><strong>Scene Animate レベル</strong></td>
+        <td><strong>シーン内の複数オブジェクトを参照できる</strong>ピッカーを作れます
+        （複数キャラ、キャラ＋プロップの組み合わせなど）</td></tr>
+  </tbody>
+</table></div>
+
+<h2>3. 背景を作る（Background レイヤー）</h2>
+
+<p>Add Character Picker ノードを選ぶと、
+<strong>パラメータ欄がピッカーのパネルそのものに置き換わる</strong>のでその場で編集できます
+（独立パネルでも編集できます）。</p>
+
+<img src="img/howto-character-picker-000530.png" alt="Character Picker の Background レイヤー編集画面。左に体パーツのテンプレート画像カタログ（全身・胴・腕・手・足・顔）が並び、中央のキャンバスは 600×600。右上のタブには Hands 用の別レイアウトがある">
+
+<div class="table-wrap"><table>
+  <thead><tr><th>操作</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>キャンバスサイズ</td>
+        <td>ツールバーか<strong>リサイズウィジェット</strong>で。
+        <code>Shift</code> ドラッグで<strong>中心から</strong>、<code>Ctrl</code> ドラッグで<strong>アスペクト比を保持</strong></td></tr>
+    <tr><td>複数レイアウト</td>
+        <td><strong>タブを追加</strong>するか、<strong>Split View（左右／上下）</strong>で分割します。
+        例では「体用」と「手用（細かい）」の2つ</td></tr>
+    <tr><td>回転</td><td><code>Ctrl</code> を押すと<strong>15度刻みにスナップ</strong>します</td></tr>
+    <tr><td>左右揃え</td><td><strong>複製して反転</strong>すれば左右の手をすぐ揃えられます</td></tr>
+    <tr><td>ラベル</td><td>カタログからドラッグ。テキストはダブルクリックかツールバーで編集、フォントサイズと色も変えられます</td></tr>
+  </tbody>
+</table></div>
+
+<h3>画像の追加は4通り</h3>
+
+<ol>
+  <li>右クリック → <strong>Add Image from Viewport</strong>（キャラを良い見た目に並べてから撮ります）。
+      ドラッグで移動でき、<strong>スナップ線</strong>が中央合わせを助けます</li>
+  <li>ディスクから</li>
+  <li>URL からダウンロード</li>
+  <li>左のカタログからドラッグ — <strong>全身や各部位のテンプレート画像が用意されています</strong></li>
+</ol>
+
+<p><strong>画像をキャンバスにスケールする</strong>、逆に<strong>画像からキャンバスサイズを決める</strong>
+オプションもあります。</p>
+
+<h2>4. ボタンを置く（Buttons レイヤー）</h2>
+
+<p><strong>この機能でいちばん大事な挙動がこれです。</strong></p>
+
+<blockquote>ボタンを追加すると、そのときシーンで選択されているコントロールを自動でターゲットにします。</blockquote>
+
+<p>つまり<strong>先にコントロールを選んでからボタンを置く</strong>のが手順です。
+逆順にすると、ボタンだけができて何も選択できないものになります。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>操作</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>追加</td><td>カタログからドラッグ＆ドロップ、または単に <code>Ctrl</code> + クリック</td></tr>
+    <tr><td>ターゲットの変更</td><td>ツールバーから<strong>現在のビューポート選択に設定</strong>、または<strong>ツリービューから選択</strong></td></tr>
+    <tr><td>ボタンの見た目</td><td>名前の変更、ラベル表示のオン／オフ、色の設定</td></tr>
+  </tbody>
+</table></div>
+
+<h3>複数のボタンを一度に作る</h3>
+
+<p><strong>Add button per control</strong> を使います。
+シーンで複数のコントロールを選ぶと、
+<strong>ピッカーは選択した順番を覚えていて、同じ順番でボタンを作ります</strong>。</p>
+
+<p>だから背骨のコントロールを下から順に選んでおけば、
+ボタンも下から順に並び、順に選択していけます。
+<strong>選択順が保たれる</strong>のは地味ですが効きます。</p>
+
+<h3>並べるための道具</h3>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>機能</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>スナップ</td><td>既定でオン。他のボタンの位置に吸い付きます。
+        <strong><code>Shift</code> + <code>X</code></strong> かスナップメニューでオフにできます</td></tr>
+    <tr><td>Align</td><td>他のボタンと揃えます</td></tr>
+    <tr><td>Distribute</td><td>等間隔に並べます</td></tr>
+    <tr><td>サイズ</td><td><strong>ラベルに合わせる</strong> / <strong>最小サイズにする</strong> /
+        複数選択して<strong>サイズを揃える</strong></td></tr>
+    <tr><td><strong>Preserve button sizes</strong></td>
+        <td>グループをリサイズすると既定ではボタン自体も拡縮します。
+        これをオンにすると<strong>サイズを保ったまま配置だけ動かせます</strong></td></tr>
+    <tr><td>グループ選択 ↔ 個別選択</td>
+        <td>切り替えられます。<strong>位置を変えずに複数のボタンのサイズだけ変える</strong>ことができます</td></tr>
+  </tbody>
+</table></div>
+
+<h2>5. Create from Rig — 3Dから投影する</h2>
+
+<p>ゼロから並べるのは大変なので、<strong>3Dシーンのコントロールをレイアウトに投影できます</strong>。</p>
+
+<img src="img/howto-character-picker-000925.png" alt="Create from Rig ダイアログ。Rig と Controls（Selected）、Projection の設定欄があり、投影方向をビューポートか直交方向から選べるようになっている">
+
+<ol>
+  <li>投影したいコントロールをクリックして選びます</li>
+  <li><strong>投影方向を選びます</strong>（ビューポートから、または直交方向のいずれか）</li>
+  <li><strong>Create Buttons</strong> を押します</li>
+  <li>投影された位置にボタンが自動配置されるので、あとは微調整します</li>
+</ol>
+
+<p><strong>初期レイアウトを一気に作れる</strong>のがこの機能の価値です。
+そこから少し直すだけで済みます。コントロールを追加で選んで投影を繰り返すこともできます。</p>
+
+<h3>Mirror Button で反対側を作る</h3>
+
+<p>ボタンを選んで<strong>グループモードに戻して Mirror Button</strong> を押すと、
+反対側にミラーされます。<strong>これで指のセットアップが一気に終わります。</strong></p>
+
+<h2>6. その他のメニュー</h2>
+
+<div class="table-wrap"><table>
+  <tbody>
+    <tr><td>レイアウトの入出力</td><td><strong>JSON でインポート／エクスポート</strong>できます</td></tr>
+    <tr><td>タブの複製</td><td>現在のタブを複製できます</td></tr>
+    <tr><td>キャラクターの置換</td><td><strong>選択したボタン、または全タブのキャラクターを置き換えられます。</strong>
+        シーンレベルで作業するときに特に便利です</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>JSON で出し入れできる</strong>のは実務的です。レイアウトを資産として共有できます。</p>
+
+<h2>7. Scene Animate レベルでの見え方</h2>
+
+<p>複数キャラをマージした Scene Animate ノードでピッカーを開くと、
+<strong>各ピッカーのレイアウトが別々のタブとして入ってきます</strong>。</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>状態</th><th>挙動</th></tr></thead>
+  <tbody>
+    <tr><td>Edit モード</td>
+        <td>入ってきたタブは<strong>ロックされます</strong>。
+        <strong>下流では編集できず、作られたノードでしか編集できません</strong></td></tr>
+    <tr><td>ロックを外して Normal Select モード</td>
+        <td>Auto と Electra の既定ピッカー（HDA 経由で入ってきたもの）と、
+        自分で作ったレイアウトが並んで使えます</td></tr>
+  </tbody>
+</table></div>
+
+<p><strong>「編集は作った場所でしかできない」</strong>という制約は、
+最初は不便に見えますが、下流で勝手に変わらないという意味では妥当だと思います。
+シーンに集めるのは<strong>使うため</strong>で、直したければ元のノードに戻る、という分担です。</p>
+
+<h2>この回のまとめ</h2>
+<ul>
+  <li><strong>アニメートステートに入っていないと使えません。</strong>まずここです</li>
+  <li>作る場所は2つ。<strong>キャラに埋め込む</strong>（Add Character Picker）か、<strong>Scene Animate で複数を参照する</strong>か</li>
+  <li><strong>ボタンは「そのとき選択されているコントロール」をターゲットにします。先に選んでから置きます</strong></li>
+  <li><strong>Add button per control</strong> は<strong>選択した順番を覚えています</strong></li>
+  <li>並べる道具は揃っています。スナップ（<code>Shift</code>+<code>X</code> で切替）、Align、Distribute、サイズ揃え、<strong>Preserve button sizes</strong></li>
+  <li><strong>Create from Rig で 3D から投影</strong>すれば初期レイアウトが一気にできます。<strong>Mirror Button</strong> で反対側も即座に</li>
+  <li>レイアウトは <strong>JSON でインポート／エクスポート</strong>できます</li>
+  <li>Scene Animate に集めたタブは<strong>ロックされ、作ったノードでしか編集できません</strong></li>
+</ul>
+      </article>
+    </main>
+  </div>
+  <footer class="tech-footer">&copy; makeinufilm</footer>
+  <script>window.TECH_ROOT = "../";</script>
+  <script src="../articles.js"></script>
+  <script src="../tech-nav.js"></script>
+</body>
+</html>
