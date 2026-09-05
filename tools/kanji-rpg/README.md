@@ -16,6 +16,19 @@ python -m http.server 8000
 
 横画面推奨。マウス / 指 / ペン（Pointer Events）に対応。
 
+## 公開時のキャッシュ対策
+
+GitHub Pages は `Cache-Control: max-age=600` を付け、ブラウザも JS/CSS を長くキャッシュするため、
+`index.html` だけ新しくなって古い JS が動くことがあります。デプロイ前に必ず実行してください。
+
+```bash
+node tools/bump-version.js
+```
+
+`index.html` 内の `js/…?v=XXXX` `css/…?v=XXXX` を日時版に書き換え、タイトル画面右下の版表示も更新します。
+利用者がまだ古い表示のときは、タイトル画面の版番号で確認し、スーパーリロード（Ctrl+Shift+R / iPad は
+設定 → Safari → 履歴と Web サイトデータを消去）を案内してください。
+
 ## 構成
 
 ```
