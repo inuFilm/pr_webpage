@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#203744">
+<meta name="description" content="CG の数学を、数学記号を使わずプログラムの書き方だけで学ぶ教材。ベクトル・内積・行列から、ノイズ・L-system・フラクタル・物理まで、触って動かせる図で理解する。">
+<title>CGの数学を、数式なしで。 | makeinufilm</title>
+<link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+<link rel="stylesheet" href="style.css?v=20260905-2">
+</head>
+<body>
+<div class="app">
+<nav>
+  <div class="site-links"><a href="../../index.html">makeinufilm.com</a><span>/</span><a href="../../tech/articles/tools.html">ツールまとめ</a></div>
+  <h1>CGの数学を、数式なしで。</h1>
+  <p class="sub">触って・眺めて・コードで読む入門</p>
+  <ul id="nav-list"></ul>
+  <div class="progress"><span id="prog-text">0 / 0 完了</span><div class="bar"><i id="prog-bar"></i></div></div>
+</nav>
+
+<main>
+
+<!-- ============ 0 ============ -->
+<section class="lesson" data-part="Part 1　矢印の話" data-title="はじめに：数式なしで読むルール">
+<h2><span class="chap">CHAPTER</span>はじめに：数式なしで読むためのルール</h2>
+<p class="lead">CGの数学は、突き詰めると「点を動かす」「向きを測る」「大きさを変える」の3つでほぼ全部です。この教材では、数学の記号を一切使わず、<span class="hl">全部プログラムの書き方</span>で説明します。</p>
+
+<h3>この教材の書き方ルール</h3>
+<ul class="plain">
+  <li>ベクトル（矢印）は <code>{x: 2, y: 1}</code> のような「値のセット」。中身は <code>v.x</code> のように取り出します。</li>
+  <li>掛け算は <code>*</code>、割り算は <code>/</code>、平方根は <code>sqrt()</code>、円周率は <code>PI</code>（= 3.14159...）。</li>
+  <li>数学の「関数」は、本当にプログラムの関数です。<code>dot(a, b)</code> と書いてあったら「a と b を渡すと、数字が1個返ってくる」という意味。</li>
+  <li>「数学ではこう書く」は折りたたみに隠してあります。他の資料を読むとき用なので、最初は開かなくてOK。</li>
+</ul>
+
+<pre class="code"><span class="c">// この教材で出てくるコードは、だいたいこの形です</span>
+<span class="k">const</span> v = { x: <span class="n">2</span>, y: <span class="n">1</span> };          <span class="c">// 「右に2、上に1」の矢印</span>
+
+<span class="k">function</span> <span class="f">length</span>(v) {               <span class="c">// 矢印の長さを返す関数</span>
+  <span class="k">return</span> Math.sqrt(v.x * v.x + v.y * v.y);
+}</pre>
+
+<h3>学び方のコツ</h3>
+<div class="callout green">
+  <div class="t">「計算できる」必要はありません。「何をしているか」が分かればOK。</div>
+  各章に <b>触れる図</b> があります。ドラッグして、数字がどう変わるかを見て、それからコードを読む。この順番が一番ラクです。
+</div>
+<p>各章は10〜15分で読める分量です。Part 3 以降は Houdini で模様や動きを作るときの数学で、興味のある章から読んで構いません。Part 5 では、ここで学んだ道具（ベクトル・内積・行列・補間）が <span class="hl">LLM（ChatGPTなどの中身）でもそのまま使われている</span> ことを見ます。CGとAIは、同じ数学の上に立っています。</p>
+
+<div class="grid2">
+  <div class="card"><div class="t">Part 1：矢印の話</div>ベクトル → 長さ → 内積 → 外積 → sin/cos。全部「矢印をどう扱うか」。</div>
+  <div class="card"><div class="t">Part 2：空間を変える</div>行列 → 3D と投影 → 補間。「座標をどう変換するか」。</div>
+  <div class="card"><div class="t">Part 3：模様をつくる</div>乱数・ノイズ・繰り返し・距離関数・極座標・L-system・フラクタル・黄金角・ボロノイ・セルオートマトン・反応拡散。Houdini / シェーダーの模様の数学。</div>
+  <div class="card"><div class="t">Part 4：動きをつくる</div>速度と加速度・バネ・ベジェ・ベクトル場。シミュレーションとアニメーションの骨格。</div>
+  <div class="card"><div class="t">Part 5：AI と付録</div>LLM の中身が同じ数学でできていることを見て、最後に「数学記号 → コード → VEX」の対応表。</div>
+</div>
+</section>
+
+<!-- ============ 1 ============ -->
+<section class="lesson" data-title="ベクトル：矢印として考える">
+<h2><span class="chap">CHAPTER</span>ベクトル：数字のセットを「矢印」として考える</h2>
+<p class="lead">ベクトルとは、数字を何個かまとめたものです。CGでは <span class="hl">「矢印」</span> だと思うと一気にラクになります。</p>
+
+<pre class="code"><span class="k">const</span> v = { x: <span class="n">2</span>, y: <span class="n">1</span> };   <span class="c">// 右に 2、上に 1 進む矢印</span>
+<span class="k">const</span> p = { x: <span class="n">3</span>, y: <span class="n">0</span>, z: <span class="n">-5</span> };  <span class="c">// 3D なら z が増えるだけ</span></pre>
+
+<p>同じ <code>{x: 2, y: 1}</code> でも、読み方が2つあります。</p>
+<ul class="plain">
+  <li><span class="b">位置</span>として読む：「原点から矢印の先端の場所」。キャラクターの座標など。</li>
+  <li><span class="y">移動</span>として読む：「どっちにどれだけ動くか」。速度、風、ジャンプの勢いなど。</li>
+</ul>
+
+<h3>足し算＝矢印をつなげる</h3>
+<div class="viz">
+  <p class="hint">青い矢印 <b>a</b> の先端と、黄色い矢印 <b>b</b> の先端をドラッグしてみてください。</p>
+  <canvas id="c-vec"></canvas>
+  <div class="readout" id="r-vec"></div>
+</div>
+<pre class="code"><span class="k">function</span> <span class="f">add</span>(a, b) {
+  <span class="k">return</span> { x: a.x + b.x, y: a.y + b.y };   <span class="c">// 中身をそれぞれ足すだけ</span>
+}</pre>
+<p>「a だけ進んで、そこから b だけ進む」と「a + b を一気に進む」は同じ場所に着く。これが足し算の意味の全部です。</p>
+
+<h3>数字を掛ける＝矢印を伸び縮みさせる</h3>
+<pre class="code"><span class="k">function</span> <span class="f">scale</span>(v, k) {
+  <span class="k">return</span> { x: v.x * k, y: v.y * k };
+}
+scale(v, <span class="n">2</span>);     <span class="c">// 2倍の長さ（向きは同じ）</span>
+scale(v, <span class="n">0.5</span>);   <span class="c">// 半分</span>
+scale(v, <span class="n">-1</span>);    <span class="c">// 真逆の向き</span></pre>
+<div class="viz">
+  <p class="hint">スライダーで k を変えると、矢印がどう変わるか見てください。</p>
+  <canvas id="c-scale"></canvas>
+  <div class="controls"><label>k = <input type="range" id="s-k" min="-2" max="3" step="0.1" value="1.5"><span id="s-k-v">1.5</span></label></div>
+  <div class="readout" id="r-scale"></div>
+</div>
+
+<h3>CGでベクトルが使われる場所</h3>
+<div class="grid2">
+  <div class="card"><div class="t">位置・移動</div>キャラの座標、カメラの場所、1フレームごとの移動量。全部ベクトル。</div>
+  <div class="card"><div class="t">色もベクトル！</div><code>{r: 255, g: 128, b: 0}</code> は <code>{x, y, z}</code> と同じ扱い。色の混ぜ合わせ＝ベクトルの足し算と掛け算。</div>
+  <div class="card"><div class="t">向き（法線）</div>「面がどっちを向いているか」もベクトル。ライティングの主役（第3章・第4章）。</div>
+  <div class="card"><div class="t">LLM でも</div>単語1つが数百〜数千個の数字のセット＝ベクトル。LLM の章（Part 5）で見ます。</div>
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>ベクトルは太字の <b>v</b> や、上に矢印を付けて書きます。中身は縦に並べて (2, 1) のように書き、「成分」と呼びます。</p></details>
+
+<div class="quiz" data-answer="1" data-why="x どうし、y どうしを足すだけ。1+3 = 4、2+(-2) = 0。">
+  <div class="q"><code>add({x: 1, y: 2}, {x: 3, y: -2})</code> の結果は？</div>
+  <div class="opts">
+    <button class="opt">{x: 3, y: -4}</button>
+    <button class="opt">{x: 4, y: 0}</button>
+    <button class="opt">{x: 4, y: 4}</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section class="lesson" data-title="長さと正規化：向きだけ取り出す">
+<h2><span class="chap">CHAPTER</span>長さと正規化：「向きだけ」を取り出す</h2>
+<p class="lead">矢印の長さの求め方と、長さを 1 に揃える <span class="hl">normalize（正規化）</span>。CGのコードで一番よく見る関数のひとつです。</p>
+
+<h3>長さ＝三角形の斜めの辺</h3>
+<div class="viz">
+  <p class="hint">矢印の先端をドラッグ。横の長さ v.x と縦の長さ v.y から、斜めの長さが決まります。</p>
+  <canvas id="c-len"></canvas>
+  <div class="readout" id="r-len"></div>
+</div>
+<pre class="code"><span class="k">function</span> <span class="f">length</span>(v) {
+  <span class="k">return</span> Math.sqrt(v.x * v.x + v.y * v.y);   <span class="c">// 3D なら + v.z * v.z を足すだけ</span>
+}</pre>
+<p>なぜ「二乗して足して sqrt」なのか。図の直角三角形で、<span class="b">横の二乗 + 縦の二乗 = 斜めの二乗</span> になるという昔からの事実（ピタゴラスの定理）があるからです。だから斜めの長さは、その平方根。理由まで覚えなくても、「<code>length()</code> は矢印の長さを返す」で十分です。</p>
+
+<h3>normalize：長さを 1 にする</h3>
+<pre class="code"><span class="k">function</span> <span class="f">normalize</span>(v) {
+  <span class="k">const</span> len = length(v);
+  <span class="k">return</span> { x: v.x / len, y: v.y / len };   <span class="c">// 自分の長さで割る → 長さが 1 になる</span>
+}</pre>
+<p>上の図の <span class="y">黄色い矢印</span> が normalize した結果です。元の矢印をどれだけ伸ばしても、黄色は円（半径1）の上から動きません。<span class="hl">向きの情報だけが残る</span>、ということです。</p>
+
+<div class="callout">
+  <div class="t">なぜ長さ 1 が便利？</div>
+  「向き」を比べたいとき、長さが混ざっていると邪魔だからです。ライトの向き、カメラの向き、面の向き（法線）は、CGでは基本的に全部「長さ 1」で持ちます。次の章の内積が、これで劇的にシンプルになります。
+</div>
+<div class="callout pink">
+  <div class="t">バグの定番：長さ 0 の矢印</div>
+  <code>{x: 0, y: 0}</code> を normalize すると 0 で割ることになり、結果が <code>NaN</code>（数字じゃない）になります。実際のコードでは「長さが 0 ならそのまま返す」などのガードを入れます。
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>長さは |v| や ‖v‖ と書きます。normalize した結果は v の上に ^ を付けて「vハット」と読みます。</p></details>
+
+<div class="quiz" data-answer="0" data-why="length は sqrt(9 + 16) = sqrt(25) = 5。それぞれを 5 で割ると {0.6, 0.8}。確認： 0.36 + 0.64 = 1 なので長さは 1 です。">
+  <div class="q"><code>normalize({x: 3, y: 4})</code> の結果は？</div>
+  <div class="opts">
+    <button class="opt">{x: 0.6, y: 0.8}</button>
+    <button class="opt">{x: 1, y: 1}</button>
+    <button class="opt">{x: 0.3, y: 0.4}</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section class="lesson" data-title="内積：どれくらい同じ向き？">
+<h2><span class="chap">CHAPTER</span>内積（dot）：2本の矢印は、どれくらい同じ向き？</h2>
+<p class="lead">内積は、2本の矢印を渡すと <span class="hl">「どれくらい同じ方向を向いているか」を1つの数字</span> にして返す関数です。CGでもLLMでも、たぶん一番働いている関数。</p>
+
+<pre class="code"><span class="k">function</span> <span class="f">dot</span>(a, b) {
+  <span class="k">return</span> a.x * b.x + a.y * b.y;   <span class="c">// 3D なら + a.z * b.z</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">2本の矢印の先端をドラッグ。角度が変わると dot の値がどう変わるか見てください。点線は「b を a の上に落とした影」です。</p>
+  <canvas id="c-dot"></canvas>
+  <div class="readout" id="r-dot"></div>
+</div>
+
+<h3>読み方：長さ1どうしなら、-1 〜 1 の「同じ向き度」</h3>
+<ul class="plain">
+  <li><span class="g">1</span>：完全に同じ向き</li>
+  <li><span class="y">0</span>：直角（関係なし）</li>
+  <li><span class="p">-1</span>：真逆</li>
+  <li>その間は、なめらかに変わります。実はこの値は <code>cos(角度)</code> と同じものです（第5章）。</li>
+</ul>
+<p>長さが 1 でない場合は「同じ向き度 × a の長さ × b の長さ」になります。だから CG では、向きを比べたいときは先に normalize してから dot します。</p>
+
+<h3>使い道1：ライティング（面の明るさ）</h3>
+<p>面の向き（法線 <code>normal</code>）と、ライトの向き <code>lightDir</code> が同じ方向を向いているほど明るい。これだけで、あの「球に光が当たっている感じ」が作れます。</p>
+<pre class="code"><span class="c">// 一番シンプルな陰影（ランバート反射）。ゲームも映画も、根っこはこれ</span>
+<span class="k">const</span> brightness = Math.max(<span class="n">0</span>, dot(normal, lightDir));
+<span class="c">// max(0, ...) は「裏側（マイナス）は 0 にする」。真っ暗より暗くはならない</span></pre>
+<div class="viz">
+  <p class="hint">ライトの向きを動かすと、球の各点で <code>dot(normal, lightDir)</code> が計算され直しています。球の表面すべての点で、同じ1行が走っているだけです。</p>
+  <canvas id="c-lambert" width="240" height="240" style="max-width:240px"></canvas>
+  <div class="controls">
+    <label>ライトの水平方向 <input type="range" id="s-light" min="0" max="360" value="40"></label>
+    <label>ライトの高さ <input type="range" id="s-elev" min="-80" max="80" value="30"></label>
+  </div>
+  <div class="readout" id="r-lambert"></div>
+</div>
+
+<h3>使い道2：「前にいる？後ろにいる？」の判定</h3>
+<pre class="code"><span class="k">const</span> toEnemy = normalize(sub(enemy.pos, player.pos));   <span class="c">// 敵への向き</span>
+<span class="k">if</span> (dot(player.forward, toEnemy) &gt; <span class="n">0.7</span>) {
+  <span class="c">// 敵はだいたい正面（視野角 約90度）にいる</span>
+}</pre>
+<p>視界判定、バックフェースカリング（裏向きの面を描かない）、影の長さ、反射の計算。全部これの応用です。</p>
+
+<div class="callout blue">
+  <div class="t">LLM 予告</div>
+  「単語 A と単語 B はどれくらい意味が似ているか」も、単語のベクトルどうしを normalize して dot するだけです。LLM の章（Part 5）で見ます。
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>内積は a·b と真ん中に点を打って書きます。「ドット積」とも。角度を使って |a||b|cos θ とも書きます。</p></details>
+
+<div class="quiz" data-answer="2" data-why="1*0 + 0*1 = 0。右向きと上向きは直角なので「関係なし」の 0 です。">
+  <div class="q"><code>dot({x: 1, y: 0}, {x: 0, y: 1})</code> の結果は？</div>
+  <div class="opts">
+    <button class="opt">1（同じ向き）</button>
+    <button class="opt">-1（真逆）</button>
+    <button class="opt">0（直角）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section class="lesson" data-title="外積：面の向き（法線）を作る">
+<h2><span class="chap">CHAPTER</span>外積（cross）：面の「向き」を作る</h2>
+<p class="lead">内積が「同じ向き度」を返す関数なら、外積は <span class="hl">「2本の矢印の両方に直角な、新しい矢印」</span> を返す関数。3D の面の向き（法線）はこれで作ります。</p>
+
+<h3>まず 2D で：右？左？そして面積</h3>
+<pre class="code"><span class="k">function</span> <span class="f">cross2d</span>(a, b) {
+  <span class="k">return</span> a.x * b.y - a.y * b.x;   <span class="c">// 2D では数字が1つ返る</span>
+}</pre>
+<div class="viz">
+  <p class="hint">2本の矢印をドラッグ。b が a の左にあるか右にあるかで、符号が変わります。</p>
+  <canvas id="c-cross"></canvas>
+  <div class="readout" id="r-cross"></div>
+</div>
+<ul class="plain">
+  <li><span class="g">プラス</span>：b は a の左側（反時計回り）</li>
+  <li><span class="p">マイナス</span>：b は a の右側（時計回り）</li>
+  <li><span class="y">0</span>：平行（同じ直線上）</li>
+  <li>値の大きさ＝2本の矢印が張る <b>平行四辺形の面積</b>。三角形の面積はその半分。</li>
+</ul>
+
+<h3>3D で：両方に直角な矢印＝法線</h3>
+<pre class="code"><span class="k">function</span> <span class="f">cross</span>(a, b) {
+  <span class="k">return</span> {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,   <span class="c">// ← 2D 版と同じ形が z に入っている</span>
+  };
+}
+
+<span class="c">// 三角形 A, B, C の法線（面の向き）</span>
+<span class="k">const</span> normal = normalize( cross( sub(B, A), sub(C, A) ) );</pre>
+<p>「A から B への辺」と「A から C への辺」は、どちらも三角形の面の上に乗っている矢印。その両方に直角ということは、<span class="hl">面から垂直に生えている矢印</span> です。それが法線。</p>
+
+<div class="viz">
+  <p class="hint">三角形が回転しています。緑の矢印が <code>cross()</code> で作った法線。面の明るさは第3章の <code>dot(normal, 視線)</code> で決めていて、裏を向くと赤くなります。</p>
+  <canvas id="c-cross3d"></canvas>
+  <div class="controls"><label><input type="checkbox" id="k-spin" checked> 回転する</label></div>
+  <div class="readout" id="r-cross3d"></div>
+</div>
+
+<div class="callout">
+  <div class="t">内積と外積はセットで働く</div>
+  外積で <b>面の向き</b> を作り、内積で <b>その向きとライトの同じ向き度</b> を測る。これがライティングの骨格です。「裏向きの面は描かない（バックフェースカリング）」も、<code>dot(normal, カメラへの向き) &lt; 0</code> なら裏、という1行です。
+</div>
+<p>順番に注意：<code>cross(a, b)</code> と <code>cross(b, a)</code> は真逆の矢印になります。3Dツールで「法線が反転してる」「面が裏返ってる」と言われるのは、頂点の順番が逆だったということです。</p>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>外積は a×b と書きます。「クロス積」とも。「ベクトル積」と書く本もあります。</p></details>
+
+<div class="quiz" data-answer="1" data-why="法線は面に垂直に生えている矢印。「面がどっちを向いているか」を表し、ライティングに使います。">
+  <div class="q">「法線（normal）」とは何？</div>
+  <div class="opts">
+    <button class="opt">面の真ん中の位置</button>
+    <button class="opt">面に直角に生えている、面の向きを表す矢印</button>
+    <button class="opt">面の一番長い辺</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section class="lesson" data-title="sin / cos：角度から矢印を作る">
+<h2><span class="chap">CHAPTER</span>sin / cos：「角度」から「矢印」を作る道具</h2>
+<p class="lead">三角関数と聞くと身構えますが、CGで必要なのは1つだけ。<span class="hl">「角度 angle を渡すと、その向きの長さ1の矢印が返ってくる」</span>。それが sin と cos です。</p>
+
+<pre class="code"><span class="c">// 角度 angle の方向を向いた、長さ 1 の矢印</span>
+<span class="k">const</span> dir = { x: Math.cos(angle), y: Math.sin(angle) };</pre>
+
+<div class="viz">
+  <p class="hint">スライダーで角度を変えると、円の上の点が動きます。その点の x が cos、y が sin。右のグラフは、角度を増やしていったときの x と y の変化です。</p>
+  <canvas id="c-circle"></canvas>
+  <div class="controls">
+    <label>角度 <input type="range" id="s-ang" min="0" max="360" value="45"><span id="s-ang-v">45°</span></label>
+    <label><input type="checkbox" id="k-ang-play"> 自動で回す</label>
+  </div>
+  <div class="readout" id="r-circle"></div>
+</div>
+
+<h3>ラジアン：プログラムの角度の単位</h3>
+<p><code>Math.cos()</code> に渡す角度は「度」ではなく「ラジアン」です。難しく考えなくて大丈夫。<span class="hl">一周 360° = <code>2 * PI</code></span>、それだけ。</p>
+<pre class="code"><span class="k">const</span> rad = deg * Math.PI / <span class="n">180</span>;   <span class="c">// 度 → ラジアン</span>
+<span class="c">//  90° = PI / 2      180° = PI      360° = 2 * PI</span></pre>
+
+<h3>回転：点をぐるっと回す</h3>
+<pre class="code"><span class="k">function</span> <span class="f">rotate</span>(p, angle) {
+  <span class="k">const</span> c = Math.cos(angle);
+  <span class="k">const</span> s = Math.sin(angle);
+  <span class="k">return</span> {
+    x: p.x * c - p.y * s,
+    y: p.x * s + p.y * c,
+  };
+}</pre>
+<p>この式の形、次の章の「行列」でもう一度出てきます。実は <code>rotate</code> は「行列で変換する」の一例です。</p>
+
+<h3>波：時間を角度に入れると揺れる</h3>
+<pre class="code"><span class="c">// 毎フレーム呼ぶ。time は経過秒数</span>
+boat.y = Math.sin(time * <span class="n">2</span>) * <span class="n">0.3</span>;         <span class="c">// 上下に揺れる（速さ 2、振れ幅 0.3）</span>
+light.brightness = <span class="n">0.5</span> + <span class="n">0.5</span> * Math.sin(time);   <span class="c">// 0〜1 で明滅</span></pre>
+<p>sin は -1 〜 1 をなめらかに往復する数字。「ゆらゆら」「ぴかぴか」「ふわふわ」は、だいたい sin です。</p>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>角度は θ（シータ）で書くのが定番。sin θ、cos θ。tan θ = sin θ / cos θ で「傾き」も出せます。</p></details>
+
+<div class="quiz" data-answer="2" data-why="角度 0 は真右向き。cos(0) = 1、sin(0) = 0 なので {x: 1, y: 0}。">
+  <div class="q">角度 0 のとき <code>{x: cos(0), y: sin(0)}</code> はどんな矢印？</div>
+  <div class="opts">
+    <button class="opt">{x: 0, y: 1}（真上）</button>
+    <button class="opt">{x: 0, y: 0}（長さ 0）</button>
+    <button class="opt">{x: 1, y: 0}（真右）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section class="lesson" data-part="Part 2　空間を変える" data-title="行列：空間を変形するレシピ">
+<h2><span class="chap">CHAPTER</span>行列：空間ぜんぶを変形する「レシピ」</h2>
+<p class="lead">行列は数字の表に見えますが、正体はシンプル。<span class="hl">「x 方向の矢印 i がどこへ行くか」「y 方向の矢印 j がどこへ行くか」を書いたメモ</span> です。それだけで空間全体の変形が決まります。</p>
+
+<pre class="code"><span class="c">// 行列 = 「i の行き先」と「j の行き先」のセット</span>
+<span class="k">const</span> m = {
+  i: { x: <span class="n">1</span>, y: <span class="n">0</span> },   <span class="c">// 右向きの矢印 {1,0} は、変形後どこへ？</span>
+  j: { x: <span class="n">0</span>, y: <span class="n">1</span> },   <span class="c">// 上向きの矢印 {0,1} は、変形後どこへ？</span>
+};                       <span class="c">// ↑これは「何もしない」行列（単位行列）</span>
+
+<span class="k">function</span> <span class="f">transform</span>(m, p) {
+  <span class="c">// p = 「i を p.x 個 と j を p.y 個」 なので、行き先も同じ組み合わせ</span>
+  <span class="k">return</span> add( scale(m.i, p.x), scale(m.j, p.y) );
+}</pre>
+
+<div class="viz">
+  <p class="hint"><span class="g">緑の矢印 i</span> と <span class="p">ピンクの矢印 j</span> の先端をドラッグ。方眼ごと家が変形します。紫の点は「変形前の点 p」で、変形後の行き先が表示されます。</p>
+  <canvas id="c-mat"></canvas>
+  <div class="controls" id="mat-presets">
+    <button class="btn" data-m="id">何もしない</button>
+    <button class="btn" data-m="rot">回転 45°</button>
+    <button class="btn" data-m="scl">拡大 (2, 0.5)</button>
+    <button class="btn" data-m="shr">せん断</button>
+    <button class="btn" data-m="flip">左右反転</button>
+    <button class="btn" data-m="rs">回転→拡大</button>
+    <button class="btn" data-m="sr">拡大→回転</button>
+  </div>
+  <div class="readout" id="r-mat"></div>
+</div>
+
+<h3>「回転」も「拡大」も、行列の中身が違うだけ</h3>
+<pre class="code"><span class="c">// 回転 45°： i と j をどちらも 45° 回した先を書く（第5章の rotate と同じ式）</span>
+{ i: { x: cos(a), y: sin(a) },  j: { x: -sin(a), y: cos(a) } }
+
+<span class="c">// 拡大： i を 2 倍、j を 0.5 倍</span>
+{ i: { x: <span class="n">2</span>, y: <span class="n">0</span> },  j: { x: <span class="n">0</span>, y: <span class="n">0.5</span> } }
+
+<span class="c">// せん断（斜めにずらす）： j だけ右に傾ける</span>
+{ i: { x: <span class="n">1</span>, y: <span class="n">0</span> },  j: { x: <span class="n">1</span>, y: <span class="n">1</span> } }</pre>
+
+<h3>行列の掛け算＝変形を続けて行うこと</h3>
+<p>「回転してから拡大」と「拡大してから回転」は、上のボタンで試すと分かるように <span class="hl">結果が違います</span>。行列どうしを掛けるとは「2つの変形をまとめて1つの行列にする」ことで、順番が大事です。</p>
+<pre class="code"><span class="c">// 「先に a、次に b」をまとめた行列。i と j を a で変形して、さらに b で変形した先を書く</span>
+<span class="k">function</span> <span class="f">compose</span>(b, a) {
+  <span class="k">return</span> {
+    i: transform(b, a.i),
+    j: transform(b, a.j),
+  };
+}</pre>
+
+<div class="callout green">
+  <div class="t">つながり：面積が何倍になるか ＝ cross2d(m.i, m.j)</div>
+  第4章の外積は「2本の矢印が張る平行四辺形の面積」でした。i と j は元々 1×1 の正方形を張っているので、変形後の <code>cross2d(m.i, m.j)</code> は「面積が何倍になったか」。これを <b>行列式（det）</b> と呼びます。マイナスなら裏返っている、0 なら潰れている。上の図の readout に出ています。
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>行列は数字を縦横に並べて [[a, c], [b, d]] のように書きます。左の列が i の行き先、右の列が j の行き先です。点 p の変形は M·p と書きます。掛け算 AB は「先に B、次に A」の意味なので、右から読みます。</p></details>
+
+<div class="quiz" data-answer="0" data-why="i が {0, 1}（上）に、j が {-1, 0}（左）に行く。これは 90° 反時計回りの回転です。">
+  <div class="q"><code>{ i: {x: 0, y: 1}, j: {x: -1, y: 0} }</code> はどんな変形？</div>
+  <div class="opts">
+    <button class="opt">90° 回転</button>
+    <button class="opt">2 倍に拡大</button>
+    <button class="opt">何もしない</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section class="lesson" data-title="3D と投影：画面に映るまで">
+<h2><span class="chap">CHAPTER</span>3D と投影：立体が画面に映るまでの道のり</h2>
+<p class="lead">3D は「z が増えるだけ」。行列も i, j に k が増えるだけ。でも1つだけ困ることがあって、それを解決するのが <span class="hl">4×4 行列</span> です。そして最後に「遠いものは小さく」するのが投影。</p>
+
+<h3>困りごと：行列は「原点」を動かせない</h3>
+<p>行列は i, j, k の行き先を書いたメモでした。すると原点 {0,0,0} は、何を掛けても {0,0,0} のまま。つまり <b>平行移動（ずらす）が書けない</b>。回転と拡大はできるのに、移動だけできないのは不便です。</p>
+<p>解決策：座標に <code>w: 1</code> という4つ目の値を付け足し、行列にも「<b>w 方向の矢印 t の行き先</b>」を足す。すると p.w = 1 なので、t が「原点がどこへ行くか」＝平行移動になります。</p>
+<pre class="code"><span class="k">const</span> p = { x: <span class="n">1</span>, y: <span class="n">2</span>, z: <span class="n">3</span>, w: <span class="n">1</span> };   <span class="c">// w は「1」を入れておくだけの席</span>
+
+<span class="k">const</span> m = {
+  i: {...}, j: {...}, k: {...},     <span class="c">// 回転・拡大（3×3 と同じ）</span>
+  t: { x: <span class="n">5</span>, y: <span class="n">0</span>, z: <span class="n">0</span> },        <span class="c">// ← 平行移動：右に 5 ずらす</span>
+};
+
+<span class="k">function</span> <span class="f">transform4</span>(m, p) {
+  <span class="k">return</span> add( scale(m.i, p.x), scale(m.j, p.y), scale(m.k, p.z), scale(m.t, p.w) );
+}                                  <span class="c">// p.w = 1 なので t がそのまま足される</span></pre>
+<p>これが「4×4 行列」「同次座標」の正体です。難しい名前ですが、やっていることは「移動も行列に入れたいから席を1つ増やした」だけ。</p>
+
+<h3>パイプライン：3つの座標変換</h3>
+<div class="viz">
+  <p class="hint">スライダーを動かすと、立方体の頂点が「モデル → ワールド → カメラ → 画面」と変換されて描かれます。readout は頂点1つ分の途中経過です。</p>
+  <canvas id="c-3d"></canvas>
+  <div class="controls">
+    <label>回転 Y <input type="range" id="s-ry" min="0" max="360" value="30"></label>
+    <label>回転 X <input type="range" id="s-rx" min="-80" max="80" value="20"></label>
+    <label>カメラの距離 <input type="range" id="s-dist" min="2.5" max="10" step="0.1" value="5"></label>
+    <label>焦点距離（ズーム） <input type="range" id="s-focal" min="100" max="700" value="300"></label>
+    <label><input type="checkbox" id="k-ortho"> 平行投影（遠近なし）</label>
+  </div>
+  <div class="readout" id="r-3d"></div>
+</div>
+
+<ol>
+  <li><b>モデル → ワールド</b>：物を世界に置く。回転・拡大・移動の行列を掛ける。</li>
+  <li><b>ワールド → ビュー（カメラ）</b>：カメラが原点に来るように、世界ぜんぶを逆にずらす。「カメラを動かす」＝「世界を逆に動かす」。</li>
+  <li><b>投影</b>：遠いものを小さくして、2D に潰す。</li>
+</ol>
+
+<h3>投影の正体：z で割るだけ</h3>
+<pre class="code"><span class="k">function</span> <span class="f">project</span>(p, focal) {
+  <span class="k">return</span> {
+    x: p.x / p.z * focal,   <span class="c">// 遠い（z が大きい）ほど、画面の中心に寄る＝小さく見える</span>
+    y: p.y / p.z * focal,
+  };
+}</pre>
+<p>遠近感の全部が <code>/ p.z</code> の1文字です。<code>focal</code>（焦点距離）はズームの強さ。「視野角（FOV）」は同じものを角度で言い換えただけで、視野が広い＝focal が短い、です。平行投影にすると割り算をしないので、遠くても同じ大きさになります。</p>
+
+<div class="callout">
+  <div class="t">なぜここまで全部「行列」なのか</div>
+  モデル・ビュー・投影の3つを <code>compose()</code> で1つの行列にまとめれば、頂点ひとつにつき掛け算1回で済みます。GPU は「行列 × ベクトル」を何百万回も同時にやる機械。だから CG は行列で書くのです。
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>頂点 v の変換は P·V·M·v と書きます（右から順に、Model → View → Projection）。MVP 行列という言葉はこれです。</p></details>
+
+<div class="quiz" data-answer="1" data-why="遠近感は「z で割る」から生まれます。z が大きい（遠い）ほど x/z は小さくなり、画面中央に寄って小さく見えます。">
+  <div class="q">「遠いものが小さく見える」のは、どの計算のおかげ？</div>
+  <div class="opts">
+    <button class="opt">z を掛ける</button>
+    <button class="opt">z で割る</button>
+    <button class="opt">z を引く</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section class="lesson" data-title="補間：lerp とイージング">
+<h2><span class="chap">CHAPTER</span>補間（lerp）：A と B の「あいだ」を作る</h2>
+<p class="lead">アニメーション、グラデーション、ブレンド、テクスチャの色の混ぜ合わせ。全部この <span class="hl">3行の関数</span> から始まります。</p>
+
+<pre class="code"><span class="k">function</span> <span class="f">lerp</span>(a, b, t) {
+  <span class="k">return</span> a + (b - a) * t;   <span class="c">// t=0 で a、t=1 で b、t=0.5 でちょうど真ん中</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">t を動かすと、点の位置・色・グラフの3つが同時に変わります。イージングを切り替えると「t の変え方」が変わります。</p>
+  <canvas id="c-lerp"></canvas>
+  <div class="controls">
+    <label>t <input type="range" id="s-t" min="0" max="1" step="0.01" value="0.3"><span id="s-t-v">0.3</span></label>
+    <label><input type="checkbox" id="k-t-play"> 再生</label>
+  </div>
+  <div class="controls" id="ease-btns">
+    <button class="btn active" data-e="linear">linear</button>
+    <button class="btn" data-e="smooth">smoothstep</button>
+    <button class="btn" data-e="in">easeIn</button>
+    <button class="btn" data-e="out">easeOut</button>
+    <button class="btn" data-e="back">easeOutBack</button>
+  </div>
+  <div class="readout" id="r-lerp"></div>
+</div>
+
+<h3>ベクトルにも色にも、そのまま使える</h3>
+<pre class="code"><span class="k">function</span> <span class="f">lerpVec</span>(a, b, t) {
+  <span class="k">return</span> { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) };   <span class="c">// 中身をそれぞれ lerp</span>
+}
+<span class="c">// 色も同じ（r, g, b をそれぞれ lerp）。グラデーションの正体</span>
+<span class="k">const</span> color = lerpVec3(red, blue, t);</pre>
+
+<h3>イージング：t を「変形」してから lerp する</h3>
+<p>t を 0 → 1 に一定の速さで動かすと、機械的な動きになります。<b>t 自体を曲げてから lerp に渡す</b> と、「最初ゆっくり、最後ゆっくり」のような自然な動きになります。</p>
+<pre class="code"><span class="k">function</span> <span class="f">smoothstep</span>(t) { <span class="k">return</span> t * t * (<span class="n">3</span> - <span class="n">2</span> * t); }   <span class="c">// 両端がなめらか。シェーダーの定番</span>
+<span class="k">function</span> <span class="f">easeIn</span>(t)     { <span class="k">return</span> t * t; }                 <span class="c">// 最初ゆっくり、あとで加速</span>
+<span class="k">function</span> <span class="f">easeOut</span>(t)    { <span class="k">return</span> <span class="n">1</span> - (<span class="n">1</span> - t) * (<span class="n">1</span> - t); }   <span class="c">// 最初速く、最後ゆっくり</span>
+
+pos = lerpVec(start, goal, smoothstep(t));   <span class="c">// t を曲げてから渡す</span></pre>
+
+<div class="callout">
+  <div class="t">どこにでもいる lerp</div>
+  <ul class="plain">
+    <li><b>アニメーションのキーフレーム</b>：2つのポーズの間を t で補間。</li>
+    <li><b>テクスチャの拡大</b>：隣り合うピクセルの色を lerp（バイリニア補間＝lerp を2回）。</li>
+    <li><b>ブレンドシェイプ / モーフ</b>：顔 A と顔 B の頂点位置を lerp。</li>
+    <li><b>LLM の attention</b>：複数の単語ベクトルを「重み付きで混ぜる」= lerp の一般化（Part 5 の LLM の章）。</li>
+  </ul>
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>lerp は (1 − t)a + tb と書くことが多いです。展開すると a + (b − a)t と同じです。</p></details>
+
+<div class="quiz" data-answer="1" data-why="10 + (20 - 10) * 0.25 = 10 + 2.5 = 12.5。t = 0.25 なので、a から b へ 4 分の 1 だけ進んだ場所。">
+  <div class="q"><code>lerp(10, 20, 0.25)</code> の結果は？</div>
+  <div class="opts">
+    <button class="opt">15</button>
+    <button class="opt">12.5</button>
+    <button class="opt">2.5</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P1 乱数 ============ -->
+<section class="lesson" data-part="Part 3　模様をつくる数学" data-title="乱数：「バラバラ」も計算">
+<h2><span class="chap">CHAPTER</span>乱数：「バラバラ」も、実は計算でできている</h2>
+<p class="lead">Houdini で <code>rand(@ptnum)</code> と書くと点ごとにバラバラな値が出ます。でもこれは本当のサイコロではなく、<span class="hl">「種（seed）を入れると、決まったバラバラな数字が返ってくる関数」</span>です。ここが「模様の数学」の出発点。</p>
+
+<pre class="code"><span class="c">// 種 seed を入れると 0〜1 の「バラバラに見える」数字が返る。同じ seed なら毎回同じ</span>
+<span class="k">function</span> <span class="f">rand</span>(seed) {
+  <span class="k">const</span> x = Math.sin(seed * <span class="n">127.1</span> + <span class="n">311.7</span>) * <span class="n">43758.5453</span>;   <span class="c">// でかい数を作って</span>
+  <span class="k">return</span> x - Math.floor(x);                                <span class="c">// 小数部分だけ取る → 0〜1</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">各点の大きさと色は <code>rand(番号 + seed)</code> で決めています。seed を変えると全部変わり、戻すと <b>同じ模様に戻る</b>ことを確かめてください。</p>
+  <canvas id="c-rand"></canvas>
+  <div class="controls">
+    <label>seed <input type="range" id="s-seed" min="0" max="20" step="1" value="3"><span id="s-seed-v">3</span></label>
+  </div>
+  <div class="readout" id="r-rand"></div>
+</div>
+
+<h3>「同じ seed なら同じ結果」が、なぜ大事か</h3>
+<ul class="plain">
+  <li>フレームごとに結果が変わったら、アニメがチラつく。点の番号を seed にすれば、毎フレーム同じ「バラバラ」になる。</li>
+  <li>気に入った散らばりを、seed の数字1つで再現できる。Scatter SOP の Seed パラメータはこれ。</li>
+  <li>本物の乱数は必要ない。「バラバラに見える」だけで十分。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Point Wrangle：点ごとに違う大きさ・色。seed をスライダーで変えられるように</span>
+<span class="k">float</span> seed = ch(<span class="n">"seed"</span>);
+@pscale = fit01( rand(@ptnum + seed), <span class="n">0.2</span>, <span class="n">1.0</span> );   <span class="c">// 0〜1 を 0.2〜1.0 に変換</span>
+@Cd = rand(@ptnum + seed + <span class="n">100</span>);                     <span class="c">// vector で受けると r,g,b がバラバラに</span></pre>
+  Scatter / Copy to Points / Attribute Randomize は、中でこれをやっています。
+</div>
+
+<div class="quiz" data-answer="1" data-why="rand は「seed が同じなら同じ値を返す関数」。だから点番号を seed にすると、フレームが変わっても各点の値は固定されます。">
+  <div class="q"><code>rand(@ptnum)</code> を毎フレーム評価すると、点 5 番の値はどうなる？</div>
+  <div class="opts">
+    <button class="opt">毎フレーム違う値になる</button>
+    <button class="opt">毎フレーム同じ値になる</button>
+    <button class="opt">だんだん大きくなる</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P2 ノイズ ============ -->
+<section class="lesson" data-title="ノイズ：なめらかな乱数">
+<h2><span class="chap">CHAPTER</span>ノイズ：乱数を「なめらか」にすると、地形と雲になる</h2>
+<p class="lead">rand は隣どうしが無関係にバラバラ。それを <span class="hl">格子の上だけ乱数にして、間を lerp でつなぐ</span> と「なめらかなバラバラ」= ノイズになります。Mountain SOP、Attribute Noise、雲・地形・木目、ほぼ全部これ。</p>
+
+<div class="viz">
+  <p class="hint">周波数（細かさ）と重ねる回数を変えてみてください。「重ねる」= 細かいノイズを小さく足していく。これを fBm（フラクタルノイズ）と呼びます。</p>
+  <canvas id="c-noise"></canvas>
+  <div class="controls">
+    <label>細かさ freq <input type="range" id="s-nfreq" min="1" max="8" step="0.5" value="3"><span id="s-nfreq-v">3</span></label>
+    <label>重ねる回数 octaves <input type="range" id="s-noct" min="1" max="6" step="1" value="1"><span id="s-noct-v">1</span></label>
+    <label><input type="checkbox" id="k-nplay"> 流す（time を足す）</label>
+  </div>
+  <div class="readout" id="r-noise"></div>
+</div>
+
+<pre class="code"><span class="c">// 1. 格子点 (整数の場所) だけ rand で決める。2. 間は第8章の lerp でつなぐ</span>
+<span class="k">function</span> <span class="f">noise</span>(x, y) {
+  <span class="k">const</span> ix = Math.floor(x), iy = Math.floor(y);      <span class="c">// どの格子マスにいるか</span>
+  <span class="k">const</span> fx = x - ix,        fy = y - iy;             <span class="c">// マスの中のどこか (0〜1)</span>
+  <span class="k">const</span> sx = smoothstep(fx), sy = smoothstep(fy);   <span class="c">// 角ばらないように曲げる</span>
+  <span class="k">const</span> a = rand2(ix, iy),     b = rand2(ix + <span class="n">1</span>, iy);
+  <span class="k">const</span> c = rand2(ix, iy + <span class="n">1</span>), d = rand2(ix + <span class="n">1</span>, iy + <span class="n">1</span>);
+  <span class="k">return</span> lerp( lerp(a, b, sx), lerp(c, d, sx), sy );   <span class="c">// 4隅を混ぜる</span>
+}
+
+<span class="c">// 3. 細かいノイズを、だんだん小さく重ねる (fBm)</span>
+<span class="k">function</span> <span class="f">fbm</span>(x, y, octaves) {
+  <span class="k">let</span> sum = <span class="n">0</span>, amp = <span class="n">0.5</span>, freq = <span class="n">1</span>;
+  <span class="k">for</span> (<span class="k">let</span> i = <span class="n">0</span>; i &lt; octaves; i++) {
+    sum  += noise(x * freq, y * freq) * amp;
+    freq *= <span class="n">2</span>;     <span class="c">// 2倍細かく</span>
+    amp  *= <span class="n">0.5</span>;   <span class="c">// 半分の強さで</span>
+  }
+  <span class="k">return</span> sum;
+}</pre>
+
+<div class="callout">
+  <div class="t">パラメータの読み方（Houdini のノイズ系ノード共通）</div>
+  <ul class="plain">
+    <li><b>Frequency / Element Size</b>：細かさ。座標に掛ける数。</li>
+    <li><b>Amplitude</b>：強さ。結果に掛ける数。</li>
+    <li><b>Octaves / Turbulence</b>：重ねる回数。多いほどザラザラした細部が増える。</li>
+    <li><b>Roughness</b>：重ねるときに amp を何倍にするか（上のコードでは 0.5）。</li>
+    <li><b>Offset</b>：座標に足す数。time を足すと流れる。</li>
+  </ul>
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Point Wrangle：法線方向にノイズで押し出す（Mountain SOP の中身）</span>
+<span class="k">float</span> freq = ch(<span class="n">"freq"</span>);
+<span class="k">float</span> amp  = ch(<span class="n">"amp"</span>);
+<span class="k">float</span> n = noise(@P * freq + @Time * <span class="n">0.5</span>);   <span class="c">// noise() は 0〜1 くらい。中心を 0 にしたいなら n - 0.5</span>
+@P += @N * (n - <span class="n">0.5</span>) * amp;</pre>
+  VEX の <code>noise()</code> は上のコードより上等な Perlin ノイズですが、「格子の乱数をなめらかにつなぐ」考え方は同じ。<code>anoise()</code>（fBm 入り）、<code>curlnoise()</code>（渦になるノイズ、後の章）も仲間です。
+</div>
+
+<div class="quiz" data-answer="2" data-why="ノイズ = 格子点の乱数を lerp でなめらかにつないだもの。だから隣の値が似ていて、模様に見えます。">
+  <div class="q">rand とノイズの違いは？</div>
+  <div class="opts">
+    <button class="opt">ノイズのほうが本物の乱数に近い</button>
+    <button class="opt">違いはない（呼び方だけ）</button>
+    <button class="opt">ノイズは隣どうしの値がなめらかにつながっている</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P3 タイリング ============ -->
+<section class="lesson" data-title="mod と fract：繰り返し模様">
+<h2><span class="chap">CHAPTER</span>mod / fract / floor：「繰り返し」を作る3つの道具</h2>
+<p class="lead">縞、市松、レンガ、タイル。繰り返す模様は、<span class="hl">座標を「整数部分」と「小数部分」に分ける</span> だけで作れます。シェーダーの最初の一歩であり、Houdini の UV や Grid の分割も同じ考え方。</p>
+
+<pre class="code"><span class="c">// 3 つの道具</span>
+Math.floor(<span class="n">3.7</span>)   <span class="c">// → 3     整数部分。「何番目のタイルか」</span>
+fract(<span class="n">3.7</span>)        <span class="c">// → 0.7   小数部分。「タイルの中のどこか」  fract(x) = x - floor(x)</span>
+<span class="n">7</span> % <span class="n">3</span>             <span class="c">// → 1     余り（mod）。「3個ごとに 0,1,2 を繰り返す」</span></pre>
+
+<div class="viz">
+  <p class="hint">座標を n 倍してから fract を取ると、0〜1 が n 回繰り返される。それに「0.5 より小さいか」「中心からの距離」などの条件を付けると模様になります。</p>
+  <canvas id="c-tile"></canvas>
+  <div class="controls" id="tile-modes">
+    <button class="btn active" data-m="stripe">縞</button>
+    <button class="btn" data-m="checker">市松</button>
+    <button class="btn" data-m="dots">水玉</button>
+    <button class="btn" data-m="brick">レンガ</button>
+    <button class="btn" data-m="grid">格子線</button>
+  </div>
+  <div class="controls">
+    <label>繰り返し n <input type="range" id="s-tn" min="1" max="16" step="1" value="6"><span id="s-tn-v">6</span></label>
+    <label>太さ / 半径 <input type="range" id="s-tw" min="0.05" max="0.5" step="0.01" value="0.3"><span id="s-tw-v">0.3</span></label>
+  </div>
+  <div class="readout" id="r-tile"></div>
+</div>
+
+<h3>コツ：まず「タイル1枚の中の座標」を作る</h3>
+<pre class="code"><span class="c">// uv は 0〜1 の座標。n 枚のタイルに分ける</span>
+<span class="k">const</span> tileId = { x: Math.floor(uv.x * n), y: Math.floor(uv.y * n) };   <span class="c">// 何番目のタイル？（整数）</span>
+<span class="k">const</span> local  = { x: fract(uv.x * n),      y: fract(uv.y * n) };        <span class="c">// タイルの中の 0〜1 座標</span>
+
+<span class="c">// あとは local に対して「1枚分の絵」を描くだけ。自動的に n×n 枚に増える</span>
+<span class="k">const</span> isDot = length( sub(local, {x: <span class="n">0.5</span>, y: <span class="n">0.5</span>}) ) &lt; radius;   <span class="c">// 水玉</span>
+<span class="k">const</span> isCheck = (tileId.x + tileId.y) % <span class="n">2</span> === <span class="n">0</span>;                <span class="c">// 市松（番号の和が偶数）</span></pre>
+<p>tileId は「タイルごとに違う値が欲しいとき」に使います。<code>rand(tileId.x + tileId.y * 1000)</code> とすれば、タイルごとにバラバラな色。前の章の乱数がここで効きます。</p>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Attribute Wrangle（Grid の上で）：市松模様で色分け</span>
+<span class="k">float</span> n = ch(<span class="n">"tiles"</span>);
+<span class="k">int</span> ix = <span class="k">int</span>( floor(@P.x * n) );
+<span class="k">int</span> iz = <span class="k">int</span>( floor(@P.z * n) );
+@Cd = ((ix + iz) % <span class="n">2</span> == <span class="n">0</span>) ? {<span class="n">1</span>,<span class="n">1</span>,<span class="n">1</span>} : {<span class="n">0.1</span>,<span class="n">0.1</span>,<span class="n">0.1</span>};</pre>
+  Grid SOP の Rows/Columns、UV Texture の Repeat、Copy to Points でタイルを並べるのも「整数で番号、小数で中の位置」の同じ発想です。負の数の <code>%</code> は言語によって結果が変わるので、VEX では <code>ix &amp; 1</code> や <code>abs()</code> を挟むと安全。
+</div>
+
+<div class="quiz" data-answer="0" data-why="fract は小数部分だけ返すので、2.25 → 0.25。座標を n 倍して fract を取ると、0〜1 が n 回繰り返されます。">
+  <div class="q"><code>fract(2.25)</code> は？</div>
+  <div class="opts">
+    <button class="opt">0.25</button>
+    <button class="opt">2</button>
+    <button class="opt">0.75</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P4 距離関数 ============ -->
+<section class="lesson" data-title="距離関数（SDF）：形を「距離」で表す">
+<h2><span class="chap">CHAPTER</span>距離関数（SDF）：形を「そこまでの距離」で表す</h2>
+<p class="lead">「円」を <span class="hl">「中心からの距離 − 半径」を返す関数</span> で表す。これが距離関数（SDF）。マイナスなら中、プラスなら外、0 なら輪郭。Houdini の VDB、Boolean、Distance from Geometry の裏側はこれです。</p>
+
+<pre class="code"><span class="c">// 円の距離関数。返り値 = 「輪郭までの距離」（中はマイナス）</span>
+<span class="k">function</span> <span class="f">sdCircle</span>(p, center, r) {
+  <span class="k">return</span> length( sub(p, center) ) - r;
+}
+
+<span class="c">// 四角の距離関数（少しトリッキーだけど、やってることは「中心からの距離」）</span>
+<span class="k">function</span> <span class="f">sdBox</span>(p, center, half) {
+  <span class="k">const</span> d = { x: Math.abs(p.x - center.x) - half.x, y: Math.abs(p.y - center.y) - half.y };
+  <span class="k">return</span> length({ x: Math.max(d.x, <span class="n">0</span>), y: Math.max(d.y, <span class="n">0</span>) }) + Math.min(Math.max(d.x, d.y), <span class="n">0</span>);
+}</pre>
+
+<div class="viz">
+  <p class="hint">円と四角の中心をドラッグ。色の帯は「距離の等高線」、青い部分が中（マイナス）。2つの形の合成方法をボタンで切り替えてください。</p>
+  <canvas id="c-sdf"></canvas>
+  <div class="controls" id="sdf-modes">
+    <button class="btn active" data-m="union">合体 min(a, b)</button>
+    <button class="btn" data-m="smin">なめらか合体 smin</button>
+    <button class="btn" data-m="sub">引き算 max(a, -b)</button>
+    <button class="btn" data-m="inter">交差 max(a, b)</button>
+  </div>
+  <div class="controls">
+    <label>なめらかさ k <input type="range" id="s-sk" min="0.02" max="0.8" step="0.02" value="0.3"><span id="s-sk-v">0.3</span></label>
+  </div>
+  <div class="readout" id="r-sdf"></div>
+</div>
+
+<h3>距離で持つと、合成が「min と max」だけになる</h3>
+<pre class="code">union(a, b)     = Math.min(a, b);      <span class="c">// どっちかの中なら中 → 合体</span>
+intersect(a, b) = Math.max(a, b);      <span class="c">// 両方の中だけ中 → 交差</span>
+subtract(a, b)  = Math.max(a, -b);     <span class="c">// b を裏返して交差 → くり抜き</span>
+
+<span class="c">// なめらかな合体（メタボールっぽくくっつく）</span>
+<span class="k">function</span> <span class="f">smin</span>(a, b, k) {
+  <span class="k">const</span> h = clamp(<span class="n">0.5</span> + <span class="n">0.5</span> * (b - a) / k, <span class="n">0</span>, <span class="n">1</span>);
+  <span class="k">return</span> lerp(b, a, h) - k * h * (<span class="n">1</span> - h);   <span class="c">// lerp して、継ぎ目を少し削る</span>
+}</pre>
+<p>ポリゴンの Boolean は「どの面がどの面と交わるか」を計算するので壊れやすい。距離関数（VDB）の Boolean は min/max するだけなので壊れない。Houdini で「VDB に変換してから Boolean → 戻す」が定番なのはそのためです。</p>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+  <ul class="plain">
+    <li><b>VDB from Polygons</b>（Distance VDB）：メッシュを距離関数に変換。<b>VDB Combine</b> で union / intersect / subtract / smooth union。</li>
+    <li><b>Distance from Geometry</b> SOP：各点に「ジオメトリまでの距離」属性を付ける。次章のフォールオフに直結。</li>
+    <li>VEX：<code>xyzdist(1, @P)</code> が「2番目の入力までの距離」。<code>volumesample()</code> で VDB の値を読む。</li>
+  </ul>
+</div>
+
+<div class="quiz" data-answer="1" data-why="距離関数は「輪郭までの距離」。中はマイナス、輪郭で 0、外はプラスです。">
+  <div class="q">距離関数の値がマイナスの点は、どこにある？</div>
+  <div class="opts">
+    <button class="opt">形の外</button>
+    <button class="opt">形の中</button>
+    <button class="opt">ちょうど輪郭の上</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P5 フォールオフ ============ -->
+<section class="lesson" data-title="フォールオフ：距離で効き目を変える">
+<h2><span class="chap">CHAPTER</span>フォールオフ：距離に応じて「効き目」を変える</h2>
+<p class="lead">Soft Transform、Soft Selection、ブラシの硬さ、Attribute Transfer の Distance Threshold。全部 <span class="hl">「距離 → 0〜1 の重み」に変換する関数</span> でできています。第8章の lerp / smoothstep と前章の距離を合体させるだけ。</p>
+
+<div class="viz">
+  <p class="hint">中心をドラッグ。半径と柔らかさを変えて、点の色（＝重み）がどう変わるか見てください。</p>
+  <canvas id="c-falloff"></canvas>
+  <div class="controls" id="fo-modes">
+    <button class="btn" data-m="linear">直線 fit</button>
+    <button class="btn active" data-m="smooth">smoothstep</button>
+    <button class="btn" data-m="hard">硬い（段差）</button>
+  </div>
+  <div class="controls">
+    <label>半径 r <input type="range" id="s-fr" min="0.3" max="3" step="0.05" value="1.6"><span id="s-fr-v">1.6</span></label>
+    <label>柔らかさ soft <input type="range" id="s-fs" min="0" max="2" step="0.05" value="0.8"><span id="s-fs-v">0.8</span></label>
+  </div>
+  <div class="readout" id="r-falloff"></div>
+</div>
+
+<pre class="code"><span class="c">// 距離を 0〜1 の重みに変換する。中心で 1、r より遠いと 0</span>
+<span class="k">function</span> <span class="f">falloff</span>(p, center, r, soft) {
+  <span class="k">const</span> d = length( sub(p, center) );
+  <span class="k">return</span> <span class="n">1</span> - smoothstep01(d, r - soft, r);   <span class="c">// r-soft から r の間で、なめらかに 1 → 0</span>
+}
+
+<span class="c">// smoothstep の「範囲付き」版。lo 以下で 0、hi 以上で 1、間はなめらか</span>
+<span class="k">function</span> <span class="f">smoothstep01</span>(x, lo, hi) {
+  <span class="k">const</span> t = clamp((x - lo) / (hi - lo), <span class="n">0</span>, <span class="n">1</span>);   <span class="c">// まず 0〜1 に変換（これが fit）</span>
+  <span class="k">return</span> t * t * (<span class="n">3</span> - <span class="n">2</span> * t);
+}
+
+<span class="c">// 重みが出たら、あとは lerp で「どれだけ動かすか」を決める</span>
+p = lerpVec(p, moved, weight);</pre>
+
+<div class="callout">
+  <div class="t">fit()：Houdini で一番使う変換関数</div>
+  <code>fit(x, 0, 10, 1, 0)</code> は「x が 0〜10 の範囲にあるとき、それを 1〜0 に対応させる」。距離 → 重み、ノイズ → 高さ、点番号 → 色、なんでもこれで変換します。中身は「(x − 0) / (10 − 0) で 0〜1 にして、lerp(1, 0, それ)」。fit の後に <code>chramp()</code>（ランプパラメータ）を通すと、カーブで好きな形の減衰が作れます。
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Point Wrangle：中心から遠いほど動かさない（Soft Transform の中身）</span>
+<span class="k">vector</span> center = chv(<span class="n">"center"</span>);
+<span class="k">float</span>  r    = ch(<span class="n">"radius"</span>);
+<span class="k">float</span>  d    = distance(@P, center);
+<span class="k">float</span>  w    = <span class="n">1</span> - smooth(r * <span class="n">0.5</span>, r, d);     <span class="c">// VEX の smooth(lo, hi, x) は smoothstep</span>
+w = chramp(<span class="n">"falloff"</span>, w);                  <span class="c">// ランプで形を調整</span>
+@P += chv(<span class="n">"move"</span>) * w;
+@Cd = w;                                   <span class="c">// 重みを色で確認するクセをつける</span></pre>
+</div>
+
+<div class="quiz" data-answer="2" data-why="fit(x, 0, 10, 1, 0) は 0〜10 を 1〜0 に対応させる。x=5 は真ん中なので 0.5。">
+  <div class="q"><code>fit(5, 0, 10, 1, 0)</code> は？</div>
+  <div class="opts">
+    <button class="opt">5</button>
+    <button class="opt">1</button>
+    <button class="opt">0.5</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P6 極座標 ============ -->
+<section class="lesson" data-title="極座標：角度と距離で描く">
+<h2><span class="chap">CHAPTER</span>極座標：「角度」と「距離」で座標を読み替える</h2>
+<p class="lead">x, y の代わりに <span class="hl">「中心からの角度」と「中心からの距離」</span> で場所を表す。それだけで、放射状の縞・渦巻き・花びらが、前の章のタイリングと同じコードで描けます。第5章の sin/cos の逆向きの道具です。</p>
+
+<pre class="code"><span class="c">// x, y → 角度と距離（極座標）。atan2 は「この矢印の角度は？」を返す関数（第5章の逆）</span>
+<span class="k">const</span> angle = Math.atan2(p.y, p.x);     <span class="c">// -PI 〜 PI（ラジアン）</span>
+<span class="k">const</span> r     = length(p);                <span class="c">// 中心からの距離</span>
+
+<span class="c">// 角度と距離 → x, y（第5章そのもの）</span>
+<span class="k">const</span> p = { x: Math.cos(angle) * r, y: Math.sin(angle) * r };</pre>
+
+<div class="viz">
+  <p class="hint">「角度を n 等分して fract」= 放射状の縞。「角度 + 距離」で fract = 渦巻き。「距離 &lt; cos(k × 角度)」= 花びら。全部、前章の繰り返しの道具です。</p>
+  <canvas id="c-polar"></canvas>
+  <div class="controls" id="polar-modes">
+    <button class="btn active" data-m="radial">放射状の縞</button>
+    <button class="btn" data-m="rings">同心円</button>
+    <button class="btn" data-m="spiral">渦巻き</button>
+    <button class="btn" data-m="rose">花びら</button>
+    <button class="btn" data-m="polygon">多角形</button>
+  </div>
+  <div class="controls">
+    <label>分割 k <input type="range" id="s-pk" min="1" max="16" step="1" value="6"><span id="s-pk-v">6</span></label>
+    <label>密度 f <input type="range" id="s-pf" min="1" max="10" step="0.5" value="4"><span id="s-pf-v">4</span></label>
+    <label><input type="checkbox" id="k-pplay"> 回す</label>
+  </div>
+  <div class="readout" id="r-polar"></div>
+</div>
+
+<div class="callout">
+  <div class="t">見えてきたパターン：「座標を作り替えてから、同じ模様を描く」</div>
+  タイリングも極座標も、やっていることは「座標を変換して、そのあと fract や比較で模様にする」。座標を歪めれば模様が歪む。座標にノイズを足せば模様が揺れる。<b>模様の数学は「座標をいじる数学」</b> です。
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Point Wrangle（Grid の上、XZ 平面）：花びら模様で色を付ける</span>
+<span class="k">float</span> k     = ch(<span class="n">"petals"</span>);
+<span class="k">float</span> angle = atan2(@P.z, @P.x);
+<span class="k">float</span> r     = length(<span class="k">set</span>(@P.x, <span class="n">0</span>, @P.z));
+<span class="k">float</span> flower = abs( cos(k * angle) );        <span class="c">// 角度で 0〜1 が k 回波打つ</span>
+@Cd = (r &lt; flower) ? {<span class="n">1</span>, <span class="n">0.8</span>, <span class="n">0.2</span>} : {<span class="n">0.1</span>, <span class="n">0.15</span>, <span class="n">0.2</span>};</pre>
+  Circle SOP を Copy して並べる、Sweep で放射状に…より、「Grid + Wrangle で座標を読み替える」ほうが自由が利きます。<code>polar</code> の考え方は Radial Blur、Spiral、渦の速度場（後の章）にも登場。
+</div>
+
+<div class="quiz" data-answer="0" data-why="atan2(y, x) は矢印 {x, y} の角度を返す関数。cos/sin が「角度 → 矢印」なので、その逆です。">
+  <div class="q"><code>Math.atan2(p.y, p.x)</code> が返すものは？</div>
+  <div class="opts">
+    <button class="opt">矢印 p の角度</button>
+    <button class="opt">矢印 p の長さ</button>
+    <button class="opt">p を 90° 回した矢印</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P7 波の重ね合わせ ============ -->
+<section class="lesson" data-title="波の重ね合わせ：干渉と波紋">
+<h2><span class="chap">CHAPTER</span>波の重ね合わせ：足すだけで、干渉と波紋になる</h2>
+<p class="lead">第5章の sin は「1本の波」でした。<span class="hl">波は足せる</span>。2つの波源からの sin を足すと干渉縞、たくさん足すと海面。Ripple Solver や Ocean Spectrum の一番奥にあるのは、この足し算です。</p>
+
+<div class="viz">
+  <p class="hint">2つの波源（点）をドラッグ。各点の高さ = <code>sin(波源1までの距離 × f − time) + sin(波源2までの距離 × f − time)</code>。重なって強め合う所と打ち消し合う所ができます。</p>
+  <canvas id="c-wave"></canvas>
+  <div class="controls">
+    <label>周波数 f <input type="range" id="s-wf" min="2" max="20" step="0.5" value="8"><span id="s-wf-v">8</span></label>
+    <label><input type="checkbox" id="k-wplay" checked> 動かす</label>
+    <label><input type="checkbox" id="k-wsingle"> 波源を1つにする</label>
+  </div>
+  <div class="readout" id="r-wave"></div>
+</div>
+
+<pre class="code"><span class="c">// 点 p の高さ。波源が何個あっても「距離で sin を作って足す」だけ</span>
+<span class="k">function</span> <span class="f">height</span>(p, sources, freq, time) {
+  <span class="k">let</span> h = <span class="n">0</span>;
+  <span class="k">for</span> (<span class="k">const</span> s <span class="k">of</span> sources) {
+    <span class="k">const</span> d = length( sub(p, s) );          <span class="c">// 波源までの距離</span>
+    h += Math.sin(d * freq - time);           <span class="c">// 距離が進むほど位相が進む → 同心円の波</span>
+  }
+  <span class="k">return</span> h;                                   <span class="c">// 波源が 2 個なら -2〜2</span>
+}</pre>
+
+<h3>足すと何が起きるか</h3>
+<ul class="plain">
+  <li><b>山と山</b> が重なる所は高く（強め合う）、<b>山と谷</b> が重なる所は 0（打ち消す）。これが干渉。</li>
+  <li>方向の違う平らな波（<code>sin(dot(p, dir) * f)</code>）を何本も足すと、それっぽい海面になる。Ocean Spectrum はこれを何百本も、周波数ごとの強さを変えて足しています。</li>
+  <li>時間 time を引くと、波が外に進む。足すと内に進む。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Point Wrangle（Grid、XZ 平面）：波源 2 つの干渉。波源の位置は chv で</span>
+<span class="k">vector</span> s1 = chv(<span class="n">"src1"</span>), s2 = chv(<span class="n">"src2"</span>);
+<span class="k">float</span>  f  = ch(<span class="n">"freq"</span>), amp = ch(<span class="n">"amp"</span>);
+<span class="k">float</span> h = sin(distance(@P, s1) * f - @Time * <span class="n">4</span>)
+        + sin(distance(@P, s2) * f - @Time * <span class="n">4</span>);
+@P.y = h * amp;</pre>
+  「時間で減衰する波紋」なら <code>h *= exp(-d * 0.5)</code> のように距離で弱める（前々章のフォールオフ）。Ripple Solver は波の「伝わり方」までシミュレーションしますが、見た目の骨格は同じ sin の足し算です。
+</div>
+
+<div class="quiz" data-answer="1" data-why="波は足し算できる。山と谷が重なると打ち消し合って 0 になり、これが干渉縞の暗い部分です。">
+  <div class="q">2つの波の「山」と「谷」がちょうど重なった場所の高さは？</div>
+  <div class="opts">
+    <button class="opt">2倍の高さ</button>
+    <button class="opt">0（打ち消し合う）</button>
+    <button class="opt">波が壊れて計算できない</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P8 L-system ============ -->
+<section class="lesson" data-title="L-system：文字の置き換えで植物">
+<h2><span class="chap">CHAPTER</span>L-system：「文字の置き換え」だけで植物が生える</h2>
+<p class="lead">Houdini の L-System SOP は魔法に見えますが、中身は2段階。<span class="hl">1. 文字列を「ルール」で置き換えて長くする。2. その文字列を「亀」に読ませて線を描く。</span> 数学というより、文字遊びです。</p>
+
+<h3>ステップ1：置き換えのルール</h3>
+<pre class="code"><span class="c">// 出発の文字列（Premise）と、置き換えルール（Rule）</span>
+<span class="k">const</span> axiom = <span class="n">"F"</span>;
+<span class="k">const</span> rules = { F: <span class="n">"F[+F]F[-F]F"</span> };   <span class="c">// F を見つけたら、これに置き換える</span>
+
+<span class="k">function</span> <span class="f">expand</span>(text, rules, generations) {
+  <span class="k">for</span> (<span class="k">let</span> g = <span class="n">0</span>; g &lt; generations; g++) {
+    <span class="k">let</span> next = <span class="n">""</span>;
+    <span class="k">for</span> (<span class="k">const</span> ch <span class="k">of</span> text) next += rules[ch] || ch;   <span class="c">// ルールがある文字は置き換え、無ければそのまま</span>
+    text = next;
+  }
+  <span class="k">return</span> text;
+}
+<span class="c">// 世代 0: F</span>
+<span class="c">// 世代 1: F[+F]F[-F]F</span>
+<span class="c">// 世代 2: F[+F]F[-F]F[+F[+F]F[-F]F]F[+F]F[-F]F[-F[+F]F[-F]F]F[+F]F[-F]F   ← どんどん長くなる</span></pre>
+
+<h3>ステップ2：亀（タートル）に読ませる</h3>
+<pre class="code"><span class="c">// 文字を 1 つずつ読んで、亀を動かす。亀は「位置」と「向き（角度）」を持っている</span>
+<span class="k">const</span> turtle = { pos: {x: <span class="n">0</span>, y: <span class="n">0</span>}, angle: <span class="n">90</span> };   <span class="c">// 上向きスタート</span>
+<span class="k">const</span> stack = [];                                  <span class="c">// [ ] 用のメモ</span>
+
+<span class="k">for</span> (<span class="k">const</span> ch <span class="k">of</span> text) {
+  <span class="k">if</span> (ch === <span class="n">"F"</span>) { <span class="c">// 前に進んで線を引く（第5章：角度 → 矢印）</span>
+    <span class="k">const</span> next = add(turtle.pos, { x: Math.cos(rad(turtle.angle)) * len, y: Math.sin(rad(turtle.angle)) * len });
+    drawLine(turtle.pos, next);  turtle.pos = next;
+  }
+  <span class="k">else if</span> (ch === <span class="n">"+"</span>) turtle.angle += delta;         <span class="c">// 左に曲がる</span>
+  <span class="k">else if</span> (ch === <span class="n">"-"</span>) turtle.angle -= delta;         <span class="c">// 右に曲がる</span>
+  <span class="k">else if</span> (ch === <span class="n">"["</span>) stack.push({ ...turtle });     <span class="c">// 今の位置と向きを覚える（枝分かれ）</span>
+  <span class="k">else if</span> (ch === <span class="n">"]"</span>) Object.assign(turtle, stack.pop());   <span class="c">// 覚えた場所に戻る</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">プリセットを選ぶか、ルールを直接書き換えてください（1行に「文字=置き換え」）。世代を増やすと急に複雑になるのが L-system の特徴です。</p>
+  <div class="controls" id="ls-presets">
+    <button class="btn active" data-p="plant">植物</button>
+    <button class="btn" data-p="tree">木</button>
+    <button class="btn" data-p="koch">コッホ曲線</button>
+    <button class="btn" data-p="snow">雪の結晶</button>
+    <button class="btn" data-p="dragon">ドラゴン曲線</button>
+    <button class="btn" data-p="sierp">シェルピンスキー</button>
+  </div>
+  <div class="ls-editor">
+    <label>Premise（出発）<input type="text" id="ls-axiom" value="X"></label>
+    <label>Rules（1行1ルール）<textarea id="ls-rules" rows="3">X=F+[[X]-X]-F[-FX]+X
+F=FF</textarea></label>
+  </div>
+  <canvas id="c-lsys"></canvas>
+  <div class="controls">
+    <label>世代 <input type="range" id="s-lgen" min="0" max="7" step="1" value="5"><span id="s-lgen-v">5</span></label>
+    <label>角度 <input type="range" id="s-lang" min="5" max="120" step="0.5" value="25"><span id="s-lang-v">25°</span></label>
+  </div>
+  <div class="readout" id="r-lsys"></div>
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：L-System SOP のパラメータ対応</div>
+  <table class="sheet">
+    <tr><th>この教材</th><th>L-System SOP</th><th>意味</th></tr>
+    <tr><td><code>axiom</code></td><td>Premise</td><td>出発の文字列</td></tr>
+    <tr><td><code>rules</code></td><td>Rule 1, 2, 3...（<code>X=F+[[X]-X]-F[-FX]+X</code> の形式）</td><td>置き換えルール</td></tr>
+    <tr><td><code>generations</code></td><td>Generations</td><td>置き換えを何回するか（小数だと途中まで伸びる）</td></tr>
+    <tr><td><code>delta</code></td><td>Angle</td><td>+ − で曲がる角度</td></tr>
+    <tr><td><code>len</code></td><td>Step Size</td><td>F で進む長さ</td></tr>
+    <tr><td>—</td><td>Values タブの Random Scale / Seed</td><td>rand で長さと角度を揺らす（第1章の乱数）</td></tr>
+  </table>
+  3D では <code>&amp;</code> <code>^</code>（上下に曲がる）、<code>\</code> <code>/</code>（ねじる）が追加され、<code>"</code> で長さを縮めます。<code>J</code> <code>K</code> <code>M</code> で葉のジオメトリを置くのも、亀が「ここに置いて」と言っているだけ。
+</div>
+
+<div class="quiz" data-answer="2" data-why="[ は今の位置と向きを覚え、] でそこに戻る。だから枝分かれ（幹に戻って別の枝を伸ばす）ができます。">
+  <div class="q">L-system の <code>[</code> と <code>]</code> は何をしている？</div>
+  <div class="opts">
+    <button class="opt">線を太くする / 細くする</button>
+    <button class="opt">描画を止める / 再開する</button>
+    <button class="opt">位置と向きを覚える / そこに戻る（枝分かれ）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P9 再帰とフラクタル ============ -->
+<section class="lesson" data-title="再帰とフラクタル：自分を呼ぶ">
+<h2><span class="chap">CHAPTER</span>再帰とフラクタル：「自分を呼ぶ関数」が無限の細部を作る</h2>
+<p class="lead">L-system は「文字列」で自己相似を作りました。同じことを <span class="hl">「関数が自分自身を呼ぶ」</span> で書くのが再帰。木、雪の結晶、海岸線、山。「どこまで拡大しても同じ形」= フラクタルは、たいてい数行の再帰です。</p>
+
+<pre class="code"><span class="c">// 木を描く関数。「枝を1本描いて、その先で自分を2回呼ぶ」だけ</span>
+<span class="k">function</span> <span class="f">tree</span>(pos, angle, len, depth) {
+  <span class="k">const</span> end = add(pos, { x: Math.cos(angle) * len, y: Math.sin(angle) * len });
+  drawLine(pos, end);
+  <span class="k">if</span> (depth === <span class="n">0</span>) <span class="k">return</span>;                        <span class="c">// ← 止まる条件。これが無いと永遠に続く</span>
+  tree(end, angle + spread, len * <span class="n">0.7</span>, depth - <span class="n">1</span>);   <span class="c">// 左の枝（自分を呼ぶ）</span>
+  tree(end, angle - spread, len * <span class="n">0.7</span>, depth - <span class="n">1</span>);   <span class="c">// 右の枝（自分を呼ぶ）</span>
+}
+tree({x: <span class="n">0</span>, y: <span class="n">0</span>}, PI / <span class="n">2</span>, <span class="n">1</span>, <span class="n">8</span>);   <span class="c">// depth 8 → 枝は 2^8 = 256 本</span></pre>
+
+<div class="viz">
+  <p class="hint">深さを上げると、同じルールが小さなスケールで繰り返されます。線の本数がどう増えるか readout を見てください。</p>
+  <canvas id="c-fractal"></canvas>
+  <div class="controls" id="fr-modes">
+    <button class="btn active" data-m="tree">木</button>
+    <button class="btn" data-m="koch">コッホ雪片</button>
+    <button class="btn" data-m="sierp">シェルピンスキー</button>
+    <button class="btn" data-m="circles">円の再帰</button>
+  </div>
+  <div class="controls">
+    <label>深さ depth <input type="range" id="s-fd" min="0" max="8" step="1" value="6"><span id="s-fd-v">6</span></label>
+    <label>広がり / 比率 <input type="range" id="s-fa" min="0.1" max="1.2" step="0.01" value="0.45"><span id="s-fa-v">0.45</span></label>
+    <label><input type="checkbox" id="k-fjit"> 乱数で揺らす</label>
+  </div>
+  <div class="readout" id="r-fractal"></div>
+</div>
+
+<h3>再帰を読むコツ</h3>
+<ul class="plain">
+  <li><b>止まる条件を最初に探す</b>。<code>if (depth === 0) return;</code> が無い再帰はバグ。</li>
+  <li>「自分を呼ぶ」の中身を追わない。「小さい版の同じ問題を解いてもらう」と信じて読む。</li>
+  <li>本数は「何回自分を呼ぶか」の depth 乗で増える。2回なら 2^depth、コッホは 4^depth。depth 10 で 100 万本。すぐ重くなるので、Houdini ではジオメトリの量に注意。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+  <ul class="plain">
+    <li><b>For-Each Loop（Feedback）</b>：「前回の結果を入力にして同じ処理を繰り返す」。再帰の depth がループ回数。Copy → Transform を Feedback で回すとフラクタル。</li>
+    <li><b>Solver SOP</b>：フレームごとに前フレームを入力にする Feedback ループ。時間方向の再帰。</li>
+    <li><b>Copy to Points を重ねる</b>：点に形を置き、その形の点にまた同じ形を置く（Copy の Copy）。シェルピンスキーはこれで 3 段くらい。</li>
+    <li>VEX に再帰関数はないので、ループ + スタック（配列に push/pop）で書く。L-system 章の <code>[ ]</code> と同じ手法。</li>
+  </ul>
+</div>
+
+<div class="quiz" data-answer="0" data-why="自分を 2 回呼ぶ再帰は、深さごとに本数が 2 倍。2^5 = 32 本の末端の枝ができます。">
+  <div class="q">自分を 2 回呼ぶ tree() で depth = 5 のとき、一番細い末端の枝は何本？</div>
+  <div class="opts">
+    <button class="opt">32 本（2 の 5 乗）</button>
+    <button class="opt">10 本（2 × 5）</button>
+    <button class="opt">5 本</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P10 黄金角 ============ -->
+<section class="lesson" data-title="黄金角：ひまわりの並び方">
+<h2><span class="chap">CHAPTER</span>黄金角：ひまわりの種は、なぜあの並び方なのか</h2>
+<p class="lead">「n 番目の点を、角度 n × 137.5°、距離 sqrt(n) に置く」。たった2行で、ひまわり・松ぼっくり・多肉植物の配置になります。<span class="hl">137.5° が特別なのは、「どれだけ回しても、前の点と重ならない角度」だから</span>。</p>
+
+<pre class="code"><span class="c">// 点を n 個、螺旋状に置く（第5章：角度 → 矢印、前章：極座標）</span>
+<span class="k">const</span> goldenAngle = <span class="n">137.508</span> * PI / <span class="n">180</span>;   <span class="c">// ≒ 2.39996 ラジアン</span>
+<span class="k">for</span> (<span class="k">let</span> i = <span class="n">0</span>; i &lt; n; i++) {
+  <span class="k">const</span> angle = i * goldenAngle;             <span class="c">// i 個目は、i 回ぶん回した角度</span>
+  <span class="k">const</span> r     = Math.sqrt(i) * spacing;      <span class="c">// sqrt にすると密度が一定になる（面積が i に比例）</span>
+  points.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+}</pre>
+
+<div class="viz">
+  <p class="hint">角度を 137.5° からほんの少しずらすと、腕（放射状の列）ができて隙間が空きます。黄金角だけが「隙間なく、腕もなく」埋まる。</p>
+  <canvas id="c-phyllo"></canvas>
+  <div class="controls">
+    <label>角度 <input type="range" id="s-ga" min="120" max="150" step="0.05" value="137.5"><span id="s-ga-v">137.5°</span></label>
+    <button class="btn" id="b-golden">黄金角 137.508° に戻す</button>
+    <label>個数 <input type="range" id="s-gn" min="50" max="1200" step="10" value="500"><span id="s-gn-v">500</span></label>
+  </div>
+  <div class="readout" id="r-phyllo"></div>
+</div>
+
+<h3>なぜ 137.5° なのか（ざっくり）</h3>
+<p>角度が 90° なら 4 個ごとに同じ向きに戻って 4 本の腕になる。120° なら 3 本。「p/q 回転で元に戻る」角度は全部、腕ができて隙間が空く。<b>一番「分数で表しにくい」回転</b> が黄金比（1.618...）ぶんの回転で、それが 137.5°。分数にならないから、いつまでも前の点と重ならない。植物は「新しい葉を、いちばん空いている方向に出す」を繰り返した結果、この角度に落ち着きます。</p>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Detail Wrangle（入力なし）：ひまわり配置の点を生成</span>
+<span class="k">int</span>   n       = chi(<span class="n">"count"</span>);
+<span class="k">float</span> spacing = ch(<span class="n">"spacing"</span>);
+<span class="k">float</span> golden  = radians(<span class="n">137.508</span>);
+<span class="k">for</span> (<span class="k">int</span> i = <span class="n">0</span>; i &lt; n; i++) {
+  <span class="k">float</span> a = i * golden;
+  <span class="k">float</span> r = sqrt(i) * spacing;
+  <span class="k">int</span> pt = addpoint(<span class="n">0</span>, <span class="k">set</span>(cos(a) * r, <span class="n">0</span>, sin(a) * r));
+  setpointattrib(<span class="n">0</span>, <span class="n">"pscale"</span>, pt, fit(i, <span class="n">0</span>, n, <span class="n">0.3</span>, <span class="n">1</span>));   <span class="c">// 外ほど大きく</span>
+}</pre>
+  この点に Copy to Points で種や鱗片を置き、<code>@N</code> を外向きにすれば松ぼっくり。球面に投影すれば「Fibonacci Sphere」（球の上に均等に点を置く定番テク）になります。Scatter より均等で、点数が決め打ちできるのが利点。
+</div>
+
+<div class="quiz" data-answer="1" data-why="角度が「分数で表せる回転」だと、何個かごとに同じ向きに戻って腕ができる。黄金角は分数で表しにくい回転なので、いつまでも重ならず均等に埋まります。">
+  <div class="q">黄金角 137.5° がひまわり配置で特別な理由は？</div>
+  <div class="opts">
+    <button class="opt">一番きれいな数字だから</button>
+    <button class="opt">何回回しても前の点と重ならず、隙間なく埋まる角度だから</button>
+    <button class="opt">180° の 4 分の 3 だから</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P11 ボロノイ ============ -->
+<section class="lesson" data-title="ボロノイ：一番近い点はどれ？">
+<h2><span class="chap">CHAPTER</span>ボロノイ：「一番近い点はどれ？」だけで割れ目ができる</h2>
+<p class="lead">Voronoi Fracture、キリンの模様、泡、乾いた泥。全部 <span class="hl">「場所ごとに、いちばん近い種（seed 点）を探す」</span> だけ。同じ種に属する場所を集めると、細胞のような領域になります。</p>
+
+<pre class="code"><span class="c">// 場所 p にいちばん近い種の番号を返す。距離の比べっこ（第2章の length）</span>
+<span class="k">function</span> <span class="f">nearest</span>(p, seeds) {
+  <span class="k">let</span> best = <span class="n">-1</span>, bestDist = Infinity;
+  <span class="k">for</span> (<span class="k">let</span> i = <span class="n">0</span>; i &lt; seeds.length; i++) {
+    <span class="k">const</span> d = length( sub(p, seeds[i]) );
+    <span class="k">if</span> (d &lt; bestDist) { bestDist = d; best = i; }
+  }
+  <span class="k">return</span> best;   <span class="c">// この番号で色を塗れば、ボロノイ図</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">種（白い点）をドラッグ。「セル」は同じ種が最寄りの場所、「距離」は最寄りの種までの距離（Worley ノイズと呼ばれる模様）。境界線は「1番近い種と 2番目に近い種の距離がほぼ同じ場所」です。</p>
+  <canvas id="c-voro"></canvas>
+  <div class="controls" id="voro-modes">
+    <button class="btn active" data-m="cells">セル（番号で色）</button>
+    <button class="btn" data-m="dist">距離 F1</button>
+    <button class="btn" data-m="edge">境界 F2 − F1</button>
+  </div>
+  <div class="controls">
+    <button class="btn" id="b-voro-rand">種をランダムに置き直す</button>
+    <label>種の数 <input type="range" id="s-vn" min="3" max="30" step="1" value="12"><span id="s-vn-v">12</span></label>
+  </div>
+  <div class="readout" id="r-voro"></div>
+</div>
+
+<h3>種の置き方で、模様の性格が決まる</h3>
+<ul class="plain">
+  <li><b>ランダム</b>（Scatter）：自然な破片。岩の割れ目。</li>
+  <li><b>格子 + 少し乱す</b>：均一な泡、ハニカムっぽい細胞。</li>
+  <li><b>密度を偏らせる</b>（Scatter の Density Attribute）：衝撃点のまわりだけ細かく割れる、あの表現。</li>
+  <li><b>境界のところだけ取り出す</b>（F2 − F1 が小さい所）：ひび割れ線、キリン、葉脈。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Point Wrangle：入力2 の種点のうち一番近いものの番号で色分け（Voronoi の中身）</span>
+<span class="k">int</span> near = nearpoint(<span class="n">1</span>, @P);            <span class="c">// 一番近い点の番号（内部で距離の比べっこ）</span>
+@Cd = rand(near);                       <span class="c">// 番号で色（第1章）</span>
+i@cell = near;                          <span class="c">// この属性で Partition すれば破片に分けられる</span>
+
+<span class="c">// 境界っぽさ：近い 2 点の距離の差</span>
+<span class="k">int</span> pts[] = nearpoints(<span class="n">1</span>, @P, <span class="n">100</span>, <span class="n">2</span>);
+<span class="k">float</span> f1 = distance(@P, point(<span class="n">1</span>, <span class="n">"P"</span>, pts[<span class="n">0</span>]));
+<span class="k">float</span> f2 = distance(@P, point(<span class="n">1</span>, <span class="n">"P"</span>, pts[<span class="n">1</span>]));
+@edge = f2 - f1;                        <span class="c">// 小さいほど境界に近い</span></pre>
+  <b>Scatter → Voronoi Fracture</b> がまさにこれ。Voronoi Fracture SOP は「最寄り判定」を面の切断として厳密にやっています。RBD Material Fracture の Concrete も内部はボロノイ。
+</div>
+
+<div class="quiz" data-answer="2" data-why="ボロノイ図は「各場所がどの種に一番近いか」で塗り分けたもの。境界は 2 つの種からちょうど同じ距離の場所です。">
+  <div class="q">ボロノイのセルの境界線は、どんな場所？</div>
+  <div class="opts">
+    <button class="opt">種から一番遠い場所</button>
+    <button class="opt">種そのものの位置</button>
+    <button class="opt">2 つの種からちょうど同じ距離の場所</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P12 セルオートマトン ============ -->
+<section class="lesson" data-title="セルオートマトン：隣を見るだけ">
+<h2><span class="chap">CHAPTER</span>セルオートマトン：「隣を見て決める」を繰り返すと生き物になる</h2>
+<p class="lead">マス目のそれぞれが「隣のマスの状態」だけを見て、次の自分を決める。それを毎ステップ繰り返す。<span class="hl">ルールは数行なのに、結果は予測できない模様と動き</span>。Solver SOP の考え方そのものです。</p>
+
+<pre class="code"><span class="c">// ライフゲーム：各マスは「生」か「死」。周り 8 マスの生きている数で次を決める</span>
+<span class="k">function</span> <span class="f">nextState</span>(alive, neighbors) {
+  <span class="k">if</span> (alive)  <span class="k">return</span> neighbors === <span class="n">2</span> || neighbors === <span class="n">3</span>;   <span class="c">// 2〜3 なら生き残る。少なすぎ多すぎは死</span>
+  <span class="k">else</span>        <span class="k">return</span> neighbors === <span class="n">3</span>;                     <span class="c">// ちょうど 3 なら誕生</span>
+}
+
+<span class="c">// 全マスについて、同時に更新する（重要：更新しながら読まない。前の状態は別に持つ）</span>
+<span class="k">for</span> (<span class="k">let</span> y = <span class="n">0</span>; y &lt; H; y++) <span class="k">for</span> (<span class="k">let</span> x = <span class="n">0</span>; x &lt; W; x++) {
+  <span class="k">const</span> n = countNeighbors(prev, x, y);        <span class="c">// 周り 8 マスを数える</span>
+  next[y][x] = nextState(prev[y][x], n);
+}</pre>
+
+<div class="viz">
+  <p class="hint">マスをクリックして生死を切り替え、再生してください。ルールを変えるとまったく別の世界になります。</p>
+  <canvas id="c-life"></canvas>
+  <div class="controls">
+    <button class="btn" id="b-life-play">▶ 再生</button>
+    <button class="btn" id="b-life-step">1ステップ</button>
+    <button class="btn" id="b-life-rand">ランダム</button>
+    <button class="btn" id="b-life-clear">クリア</button>
+    <label>ルール <select id="life-rule">
+      <option value="23/3">ライフゲーム 23/3</option>
+      <option value="1234/3">迷路 1234/3</option>
+      <option value="45678/3">サンゴ 45678/3</option>
+      <option value="/2">種 /2</option>
+    </select></label>
+  </div>
+  <div class="readout" id="r-life"></div>
+</div>
+<p>ルールの読み方：「<b>生き残る数 / 誕生する数</b>」。23/3 なら、生きているマスは隣が 2 か 3 で生き残り、死んでいるマスは隣が 3 で誕生。これを変えるだけで迷路やサンゴのような模様になります。</p>
+
+<div class="callout green">
+  <div class="t">Solver SOP の考え方は、これと同じ</div>
+  「前フレームの結果を入力にして、隣を見て、自分を更新する」。ライフゲームは 0/1 でしたが、値を小数にして「隣の平均に少し近づく」にすれば拡散（ぼかし）、「隣との差で加速する」にすれば波。次の章の反応拡散もこの形です。<b>時間方向の再帰</b>（前々章）と、<b>隣を見る</b>（この章）。この 2 つが「シミュレーション」の骨格。
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Solver SOP の中の Point Wrangle（Grid の点、@alive 属性で生死）。Prev_Frame を入力 0 に</span>
+<span class="k">int</span> pts[] = neighbours(<span class="n">0</span>, @ptnum);      <span class="c">// エッジでつながった隣の点（Grid なら 4 方向）</span>
+<span class="k">int</span> n = <span class="n">0</span>;
+<span class="k">foreach</span> (<span class="k">int</span> pt; pts) n += <span class="k">int</span>( point(<span class="n">0</span>, <span class="n">"alive"</span>, pt) );
+<span class="k">if</span> (@alive == <span class="n">1</span>) @alive = (n == <span class="n">2</span> || n == <span class="n">3</span>) ? <span class="n">1</span> : <span class="n">0</span>;
+<span class="k">else</span>            @alive = (n == <span class="n">3</span>) ? <span class="n">1</span> : <span class="n">0</span>;
+@Cd = @alive;</pre>
+  8 近傍が欲しいなら <code>nearpoints(0, @P, radius)</code> で半径内の点を取る（前章）。Wrangle は全点を「同時に」処理するので、「前の状態を別に持つ」問題は自動的に解決されています。
+</div>
+
+<div class="quiz" data-answer="1" data-why="セルオートマトンの本質は「各マスが隣だけを見て、全マス同時に更新する」こと。全体を見る司令塔はいません。">
+  <div class="q">セルオートマトンで、各マスが次の状態を決めるとき見るものは？</div>
+  <div class="opts">
+    <button class="opt">全体の模様</button>
+    <button class="opt">隣のマスの状態だけ</button>
+    <button class="opt">乱数だけ</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ P13 反応拡散 ============ -->
+<section class="lesson" data-title="反応拡散：チューリング模様">
+<h2><span class="chap">CHAPTER</span>反応拡散：「にじむ」と「反応する」で、動物の模様ができる</h2>
+<p class="lead">ヒョウの斑点、シマウマの縞、サンゴ、指紋。1952年にチューリング（コンピュータの父）が「2種類の薬品が <span class="hl">にじみながら反応するだけ</span> で模様になる」と予言し、本当にそうでした。前章のセルオートマトンを「小数」にしたものです。</p>
+
+<pre class="code"><span class="c">// 各マスに 2 つの値 u, v がある（2 種類の薬品の濃さ）。毎ステップこれを更新</span>
+<span class="k">function</span> <span class="f">step</span>(u, v, x, y) {
+  <span class="k">const</span> lapU = neighborsAverage(u, x, y) - u[y][x];   <span class="c">// 「隣との差」= にじむ方向（ラプラシアン）</span>
+  <span class="k">const</span> lapV = neighborsAverage(v, x, y) - v[y][x];
+  <span class="k">const</span> uvv  = u[y][x] * v[y][x] * v[y][x];             <span class="c">// 反応：u が v に食われる量</span>
+
+  nextU[y][x] = u[y][x] + (Du * lapU - uvv + feed * (<span class="n">1</span> - u[y][x]));    <span class="c">// にじむ − 食われる + 補充</span>
+  nextV[y][x] = v[y][x] + (Dv * lapV + uvv - (feed + kill) * v[y][x]); <span class="c">// にじむ + 増える − 除去</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">feed（補充）と kill（除去）のほんの少しの違いで、斑点・縞・迷路になります。クリックで v を垂らせます。</p>
+  <canvas id="c-rd"></canvas>
+  <div class="controls" id="rd-presets">
+    <button class="btn active" data-p="coral">サンゴ</button>
+    <button class="btn" data-p="spots">斑点</button>
+    <button class="btn" data-p="worms">ミミズ</button>
+    <button class="btn" data-p="mitosis">細胞分裂</button>
+    <button class="btn" data-p="stripes">縞</button>
+  </div>
+  <div class="controls">
+    <label>feed <input type="range" id="s-rdf" min="0.01" max="0.08" step="0.0005" value="0.0545"><span id="s-rdf-v">0.0545</span></label>
+    <label>kill <input type="range" id="s-rdk" min="0.045" max="0.07" step="0.0005" value="0.062"><span id="s-rdk-v">0.062</span></label>
+    <button class="btn" id="b-rd-reset">リセット</button>
+    <label><input type="checkbox" id="k-rdplay" checked> 再生</label>
+  </div>
+  <div class="readout" id="r-rd"></div>
+</div>
+
+<h3>読み解き</h3>
+<ul class="plain">
+  <li><b>にじむ（拡散）</b>：「隣との差」を少し足す。差があれば埋まる方向に動く。ぼかしと同じ。</li>
+  <li><b>反応</b>：u と v が出会うと v が増える。v が u より <b>にじみにくい</b>（Dv &lt; Du）ので、v は塊を作る。</li>
+  <li><b>feed / kill</b>：u を補充し、v を取り除く速さ。このバランスが「斑点か縞か」を決める。</li>
+  <li>全部ローカルな計算。誰も「斑点を作ろう」とはしていないのに、斑点になる。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Solver SOP 内の Point Wrangle（Grid、@u @v 属性）。Prev_Frame を入力 0 に</span>
+<span class="k">float</span> f = ch(<span class="n">"feed"</span>), k = ch(<span class="n">"kill"</span>);
+<span class="k">int</span> pts[] = neighbours(<span class="n">0</span>, @ptnum);
+<span class="k">float</span> su = <span class="n">0</span>, sv = <span class="n">0</span>;
+<span class="k">foreach</span> (<span class="k">int</span> pt; pts) { su += point(<span class="n">0</span>, <span class="n">"u"</span>, pt); sv += point(<span class="n">0</span>, <span class="n">"v"</span>, pt); }
+<span class="k">float</span> lapU = su / len(pts) - @u;
+<span class="k">float</span> lapV = sv / len(pts) - @v;
+<span class="k">float</span> uvv = @u * @v * @v;
+@u += <span class="n">1.0</span> * lapU - uvv + f * (<span class="n">1</span> - @u);
+@v += <span class="n">0.5</span> * lapV + uvv - (f + k) * @v;
+@Cd = <span class="n">1</span> - @v * <span class="n">4</span>;</pre>
+  Solver の Sub Steps を上げると 1 フレームで何回も回せます。Labs の <b>Reaction Diffusion</b> ノード、COP（画像）で Solver を回すやり方もあります。@v を高さや pscale に流せば、サンゴやカリフラワーの立体に。
+</div>
+
+<div class="quiz" data-answer="0" data-why="拡散 = 隣との差を少しずつ埋める（ぼかし）。反応 = u と v が出会って v が増える。この 2 つのローカルな計算だけで模様が生まれます。">
+  <div class="q">反応拡散の「拡散」とは、コードで言うと？</div>
+  <div class="opts">
+    <button class="opt">隣との差を少しずつ埋める（ぼかす）</button>
+    <button class="opt">乱数を足す</button>
+    <button class="opt">全体の平均に一気に揃える</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ M1 速度と加速度 ============ -->
+<section class="lesson" data-part="Part 4　動きをつくる数学" data-title="速度と加速度：物理の基本形">
+<h2><span class="chap">CHAPTER</span>速度と加速度：シミュレーションの基本形は3行</h2>
+<p class="lead">POP、RBD、Vellum、FLIP。どのソルバーも一番奥では <span class="hl">「速度に力を足す。位置に速度を足す。」</span> を毎フレーム繰り返しているだけ。第1章の「ベクトル＝移動」がそのまま動きになります。</p>
+
+<pre class="code"><span class="c">// 毎フレーム呼ぶ。dt = 1 フレームの時間（1/24 秒など）</span>
+<span class="k">function</span> <span class="f">update</span>(ball, dt) {
+  <span class="k">const</span> gravity = { x: <span class="n">0</span>, y: <span class="n">-9.8</span> };
+  ball.v = add(ball.v, scale(gravity, dt));   <span class="c">// 1. 速度に加速度を足す（重力で下向きに速くなる）</span>
+  ball.p = add(ball.p, scale(ball.v, dt));    <span class="c">// 2. 位置に速度を足す（今の速度ぶん進む）</span>
+
+  <span class="k">if</span> (ball.p.y &lt; <span class="n">0</span>) {                        <span class="c">// 3. 床にめり込んだら</span>
+    ball.p.y = <span class="n">0</span>;
+    ball.v.y = -ball.v.y * bounce;            <span class="c">//    上向きに跳ね返す（bounce = 0.8 なら少し勢いが減る）</span>
+  }
+}</pre>
+
+<div class="viz">
+  <p class="hint">画面をクリックするとボールが増えます。重力と跳ね返りを変えてみてください。矢印は速度ベクトル。</p>
+  <canvas id="c-phys"></canvas>
+  <div class="controls">
+    <label>重力 <input type="range" id="s-pg" min="0" max="30" step="0.5" value="9.8"><span id="s-pg-v">9.8</span></label>
+    <label>跳ね返り bounce <input type="range" id="s-pb" min="0" max="1" step="0.05" value="0.8"><span id="s-pb-v">0.8</span></label>
+    <label>風 <input type="range" id="s-pw" min="-5" max="5" step="0.5" value="0"><span id="s-pw-v">0</span></label>
+    <button class="btn" id="b-phys-reset">リセット</button>
+  </div>
+  <div class="readout" id="r-phys"></div>
+</div>
+
+<h3>「力」を足せば、何でも作れる</h3>
+<ul class="plain">
+  <li><b>風</b>：一定の力を足す。<code>v += wind * dt</code></li>
+  <li><b>空気抵抗</b>：速度と逆向きに、速度に比例した力。<code>v = scale(v, 1 - drag * dt)</code></li>
+  <li><b>引き寄せ</b>：目標へ向かうベクトル（第1章の sub）を力にする。<code>v += scale(normalize(sub(target, p)), k * dt)</code></li>
+  <li><b>ノイズで揺らす</b>：第2章のノイズを力にする。POP Force の Noise はこれ。</li>
+</ul>
+
+<div class="callout pink">
+  <div class="t">dt（時間刻み）が大きいと壊れる</div>
+  「今の速度で dt ぶん進む」は、速度が dt の間じゅう変わらないと仮定しています。動きが速いほど、dt が大きいほど、この仮定がウソになる。Houdini の <b>Substeps</b> は dt を細かく刻んでこの誤差を減らす設定。「めり込む」「爆発する」はたいてい dt が大きすぎ。
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// POP Wrangle（POP Solver の中）：これが上の update と同じ。@v と @P は POP Solver が積分してくれる</span>
+<span class="k">vector</span> gravity = <span class="k">set</span>(<span class="n">0</span>, ch(<span class="n">"gravity"</span>), <span class="n">0</span>);
+@v += gravity * @TimeInc;             <span class="c">// @TimeInc = dt。POP Force を使わず自前で力を足すならこう</span>
+@v *= <span class="n">1</span> - ch(<span class="n">"drag"</span>) * @TimeInc;      <span class="c">// 空気抵抗</span>
+
+<span class="c">// SOP Solver（DOP なし）で自前の物理をやるなら、@P の更新も自分で書く</span>
+@P += @v * @TimeInc;
+<span class="k">if</span> (@P.y &lt; <span class="n">0</span>) { @P.y = <span class="n">0</span>; @v.y *= -ch(<span class="n">"bounce"</span>); }</pre>
+  POP Force の Gravity は <code>@v += force * dt</code>、POP Drag は <code>@v *= (1 - drag*dt)</code>、POP Attract は「目標への向き × 強さ」。中身を知っていると、パラメータが「どの式のどの数字か」で読めます。
+</div>
+
+<div class="quiz" data-answer="1" data-why="速度に力（加速度 × dt）を足し、位置に速度 × dt を足す。この 2 行が物理シミュレーションの基本形です。">
+  <div class="q">物理シミュレーションの毎フレームの基本形は？</div>
+  <div class="opts">
+    <button class="opt">位置に重力を直接足す</button>
+    <button class="opt">速度に力を足し、位置に速度を足す</button>
+    <button class="opt">位置を乱数で動かす</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ M2 バネと減衰 ============ -->
+<section class="lesson" data-title="バネと減衰：揺れて止まる">
+<h2><span class="chap">CHAPTER</span>バネと減衰：「戻ろうとする力」と「止まろうとする力」</h2>
+<p class="lead">髪、布、ゼリー、追従カメラ、UI のバウンス。「揺れて、だんだん止まる」動きは全部 <span class="hl">バネ（元の場所に戻る力）+ 減衰（速度を殺す力）</span>。Vellum の Stiffness と Damping はこの 2 つの数字です。</p>
+
+<pre class="code"><span class="c">// 1 次元のバネ。x = 元の場所からのズレ、v = 速度</span>
+<span class="k">function</span> <span class="f">update</span>(s, dt) {
+  <span class="k">const</span> springForce = -stiffness * s.x;   <span class="c">// ズレと逆向きに、ズレに比例した力（フックの法則）</span>
+  <span class="k">const</span> dampForce   = -damping   * s.v;   <span class="c">// 速度と逆向きに、速度に比例した力（ブレーキ）</span>
+  s.v += (springForce + dampForce) * dt;   <span class="c">// 前章と同じ：速度に力を足す</span>
+  s.x += s.v * dt;                         <span class="c">// 位置に速度を足す</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">おもりをドラッグして離してください。右のグラフは位置の時間変化。stiffness で速さ、damping で止まりやすさが変わります。</p>
+  <canvas id="c-spring"></canvas>
+  <div class="controls">
+    <label>stiffness（硬さ）<input type="range" id="s-sk2" min="5" max="300" step="5" value="80"><span id="s-sk2-v">80</span></label>
+    <label>damping（減衰）<input type="range" id="s-sd" min="0" max="30" step="0.5" value="2"><span id="s-sd-v">2</span></label>
+    <button class="btn" id="b-spring-kick">弾く</button>
+  </div>
+  <div class="readout" id="r-spring"></div>
+</div>
+
+<h3>2 つの数字の読み方</h3>
+<ul class="plain">
+  <li><b>stiffness 大</b>：速く戻る、細かく震える。小さいと、ゆっくり大きく揺れる。</li>
+  <li><b>damping 0</b>：永遠に揺れ続ける。<b>大きすぎ</b>：揺れずにヌルッと戻る（過減衰）。「1回だけ行き過ぎて戻る」くらいが気持ちいい（臨界減衰の少し手前）。</li>
+  <li>dt が大きいと、stiffness が大きいとき爆発する（前章の注意）。Vellum の Substeps / Constraint Iterations を上げる理由。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// SOP Solver 内の Point Wrangle：各点を rest 位置（@rest）へバネで戻す。ゼリー的な揺れ</span>
+<span class="k">float</span> k = ch(<span class="n">"stiffness"</span>), c = ch(<span class="n">"damping"</span>);
+<span class="k">vector</span> offset = @P - v@rest;          <span class="c">// ズレ（ベクトル版）</span>
+@v += (-k * offset - c * @v) * @TimeInc;
+@P += @v * @TimeInc;</pre>
+  <ul class="plain">
+    <li><b>Vellum</b>：Stretch Stiffness = 隣の点との距離を保つバネの硬さ。Damping Ratio = 上の damping を「0〜1 の割合」にしたもの（1 で臨界減衰）。</li>
+    <li><b>CHOP の Lag / Spring</b>：チャンネル（アニメーションカーブ）にこの式をかけて、追従の遅れと揺れを付ける。</li>
+    <li><b>追従カメラ / 二次アニメーション</b>：目標に向かって同じ式。「揺れて止まる」は全部これ。</li>
+  </ul>
+</div>
+
+<div class="quiz" data-answer="2" data-why="damping は速度に比例したブレーキ。0 だとブレーキが無いので、揺れがいつまでも減りません。">
+  <div class="q">damping を 0 にするとどうなる？</div>
+  <div class="opts">
+    <button class="opt">すぐに止まる</button>
+    <button class="opt">バネが効かなくなる</button>
+    <button class="opt">永遠に揺れ続ける</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ M3 ベジェ曲線 ============ -->
+<section class="lesson" data-title="ベジェ曲線：lerp の lerp">
+<h2><span class="chap">CHAPTER</span>ベジェ曲線：「lerp の lerp の lerp」で曲線になる</h2>
+<p class="lead">Illustrator のパス、アニメーションカーブ、フォント、Houdini の Curve SOP。全部ベジェ曲線で、中身は <span class="hl">第8章の lerp を入れ子にしただけ</span>。制御点を触ると曲線が動く理由も、これで分かります。</p>
+
+<pre class="code"><span class="c">// 3 次ベジェ：制御点 4 つ (p0, p1, p2, p3) と t (0〜1) から、曲線上の点を返す</span>
+<span class="k">function</span> <span class="f">bezier</span>(p0, p1, p2, p3, t) {
+  <span class="c">// 1 段目：隣どうしを lerp（3 点になる）</span>
+  <span class="k">const</span> a = lerpVec(p0, p1, t);
+  <span class="k">const</span> b = lerpVec(p1, p2, t);
+  <span class="k">const</span> c = lerpVec(p2, p3, t);
+  <span class="c">// 2 段目：また隣どうしを lerp（2 点になる）</span>
+  <span class="k">const</span> d = lerpVec(a, b, t);
+  <span class="k">const</span> e = lerpVec(b, c, t);
+  <span class="c">// 3 段目：最後の lerp（1 点になる）。これが曲線上の点</span>
+  <span class="k">return</span> lerpVec(d, e, t);
+}
+<span class="c">// t を 0 → 1 に動かしながら bezier() を呼んで線でつなぐと、曲線</span></pre>
+
+<div class="viz">
+  <p class="hint">制御点をドラッグ。t を動かすと、lerp の段階（灰 → 紫 → 緑）が見えます。曲線は p0 と p3 を通り、p1 と p2 には「引っ張られる」だけで通らない。</p>
+  <canvas id="c-bezier"></canvas>
+  <div class="controls">
+    <label>t <input type="range" id="s-bt" min="0" max="1" step="0.01" value="0.35"><span id="s-bt-v">0.35</span></label>
+    <label><input type="checkbox" id="k-bplay"> 動かす</label>
+    <label><input type="checkbox" id="k-bcons" checked> 作図線を表示</label>
+  </div>
+  <div class="readout" id="r-bezier"></div>
+</div>
+
+<h3>知っておくと便利なこと</h3>
+<ul class="plain">
+  <li>曲線の <b>始点の向き</b> は p0 → p1、<b>終点の向き</b> は p2 → p3。ハンドルの正体。</li>
+  <li>t を等間隔にしても、曲線上の点は等間隔にならない。Houdini の <b>Resample</b> が必要な理由。</li>
+  <li>アニメーションカーブの「イージング」は、横軸 t・縦軸 値 のベジェ曲線。第8章のイージングを、手で形作れるようにしたもの。</li>
+  <li>制御点を増やす（4 点以上）と、lerp の段数が増えるだけ。ただし普通は 4 点の曲線をつなげる（NURBS / スプライン）。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Detail Wrangle：制御点 4 つ（入力 0 の点 0〜3）から、ベジェ曲線の点を n 個生成</span>
+<span class="k">int</span> n = chi(<span class="n">"segments"</span>);
+<span class="k">vector</span> p0 = point(<span class="n">0</span>, <span class="n">"P"</span>, <span class="n">0</span>), p1 = point(<span class="n">0</span>, <span class="n">"P"</span>, <span class="n">1</span>), p2 = point(<span class="n">0</span>, <span class="n">"P"</span>, <span class="n">2</span>), p3 = point(<span class="n">0</span>, <span class="n">"P"</span>, <span class="n">3</span>);
+<span class="k">int</span> prim = addprim(<span class="n">0</span>, <span class="n">"polyline"</span>);
+<span class="k">for</span> (<span class="k">int</span> i = <span class="n">0</span>; i &lt;= n; i++) {
+  <span class="k">float</span> t = <span class="k">float</span>(i) / n;
+  <span class="k">vector</span> a = lerp(p0, p1, t), b = lerp(p1, p2, t), c = lerp(p2, p3, t);
+  <span class="k">vector</span> d = lerp(a, b, t),   e = lerp(b, c, t);
+  <span class="k">int</span> pt = addpoint(<span class="n">0</span>, lerp(d, e, t));
+  addvertex(<span class="n">0</span>, prim, pt);
+}</pre>
+  Curve SOP（Bezier）、Resample、Sweep。Bezier の <code>primuv()</code> で曲線上の位置を取るときの u は、この t です。
+</div>
+
+<div class="quiz" data-answer="1" data-why="3 次ベジェは lerp を 3 段（3 回 → 2 回 → 1 回、合計 6 回）入れ子にしたもの。曲線は両端の制御点だけを通ります。">
+  <div class="q">3 次ベジェ曲線が必ず通る制御点は？</div>
+  <div class="opts">
+    <button class="opt">4 つ全部</button>
+    <button class="opt">両端の p0 と p3 だけ</button>
+    <button class="opt">真ん中の p1 と p2 だけ</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ M4 ベクトル場 ============ -->
+<section class="lesson" data-title="ベクトル場：流れに乗せる">
+<h2><span class="chap">CHAPTER</span>ベクトル場：「場所ごとの矢印」に粒子を乗せる</h2>
+<p class="lead">煙の渦、髪の流れ、群れの動き、Advect by Volumes。空間の各点に「そこでの向き」を置いたものが <span class="hl">ベクトル場</span>。粒子はその矢印に従って進むだけ。第2章のノイズを「角度」に使うと、あの有機的な流れになります。</p>
+
+<pre class="code"><span class="c">// 場所 p での「流れの向き」を返す。ノイズ（第2章）を角度（第5章）にする</span>
+<span class="k">function</span> <span class="f">field</span>(p, time) {
+  <span class="k">const</span> angle = fbm(p.x * scale, p.y * scale + time * <span class="n">0.2</span>, <span class="n">3</span>) * PI * <span class="n">4</span>;   <span class="c">// ノイズ 0〜1 を角度に</span>
+  <span class="k">return</span> { x: Math.cos(angle), y: Math.sin(angle) };                     <span class="c">// 長さ 1 の矢印</span>
+}
+
+<span class="c">// 粒子は「今いる場所の矢印」の向きに進む（前々章の update と同じ形）</span>
+<span class="k">for</span> (<span class="k">const</span> pt <span class="k">of</span> particles) {
+  <span class="k">const</span> dir = field(pt.p, time);
+  pt.p = add(pt.p, scale(dir, speed * dt));
+}</pre>
+
+<div class="viz">
+  <p class="hint">薄い矢印がベクトル場、光る点が粒子。スケールを変えると渦の大きさが変わります。「渦」モードは curl ノイズ風（ノイズの「傾きを 90° 回した」向き）で、粒子が溜まらずに流れ続けます。</p>
+  <canvas id="c-flow"></canvas>
+  <div class="controls" id="flow-modes">
+    <button class="btn active" data-m="noise">ノイズを角度に</button>
+    <button class="btn" data-m="curl">渦（curl 風）</button>
+    <button class="btn" data-m="swirl">中心へ渦巻き</button>
+  </div>
+  <div class="controls">
+    <label>スケール <input type="range" id="s-fsc" min="0.3" max="3" step="0.1" value="1"><span id="s-fsc-v">1</span></label>
+    <label>速さ <input type="range" id="s-fsp" min="0.2" max="3" step="0.1" value="1.2"><span id="s-fsp-v">1.2</span></label>
+    <label><input type="checkbox" id="k-fplay" checked> 再生</label>
+    <label><input type="checkbox" id="k-farrows" checked> 矢印を表示</label>
+  </div>
+  <div class="readout" id="r-flow"></div>
+</div>
+
+<h3>ベクトル場の作り方いろいろ</h3>
+<ul class="plain">
+  <li><b>ノイズ → 角度</b>：上のコード。粒子が溜まる場所ができる（矢印が集まる所）。</li>
+  <li><b>curl ノイズ</b>：ノイズの「傾き」を 90° 回した向き。<code>{x: dNoise/dy, y: -dNoise/dx}</code>。矢印が集まる場所が無いので、粒子が均一に流れ続ける。煙・流体っぽさの定番。</li>
+  <li><b>中心へ渦巻き</b>：第6章の極座標。「中心への向き」と「それを 90° 回した向き」を混ぜる。</li>
+  <li><b>ジオメトリから</b>：法線や、Curve の接線を場にする（Attribute from Volume / Volume from Attribute）。髪の流れ、毛並み。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// POP Wrangle：curl ノイズの流れに乗せる（POP Advect by Volumes を使わない自前版）</span>
+<span class="k">vector</span> dir = curlnoise(@P * ch(<span class="n">"scale"</span>) + @Time * <span class="n">0.2</span>);   <span class="c">// VEX には curlnoise がある</span>
+@v = lerp(@v, dir * ch(<span class="n">"speed"</span>), <span class="n">0.2</span>);                    <span class="c">// いきなり変えず、少しずつ向きを合わせる</span>
+
+<span class="c">// Volume Wrangle（vel フィールド）：自前のベクトル場を書く → POP Advect by Volumes で粒子を流す</span>
+<span class="k">float</span> a = noise(@P * <span class="n">0.5</span>) * <span class="n">2</span> * PI;
+v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</pre>
+  Pyro の <code>vel</code> フィールドもベクトル場。「Advect（移流）」= その場の速度で運ぶ、は密度・温度・粒子すべてに同じ 1 行 <code>p += v * dt</code> です。
+</div>
+
+<div class="quiz" data-answer="0" data-why="ベクトル場 = 空間の各点に置いた矢印。粒子は今いる場所の矢印の向きに進むだけです。">
+  <div class="q">ベクトル場に乗った粒子は、何を見て進む向きを決める？</div>
+  <div class="opts">
+    <button class="opt">今いる場所に置かれた矢印</button>
+    <button class="opt">他の粒子の位置</button>
+    <button class="opt">画面の中心</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section class="lesson" data-part="Part 5　AI と付録" data-title="LLM の中身も、同じ数学">
+<h2><span class="chap">CHAPTER</span>LLM の中身も、ここまでと同じ数学でできている</h2>
+<p class="lead">ChatGPT のような LLM（大規模言語モデル）は、魔法ではありません。<span class="hl">ベクトル・内積・行列・補間</span>。ここまでの章の道具だけで、骨格が説明できます。</p>
+
+<h3>9-1. 単語はベクトル（埋め込み）</h3>
+<p>LLM は、単語（正確にはトークン）1つを <b>数百〜数千個の数字のセット＝ベクトル</b> にします。これを「埋め込み（embedding）」と呼びます。ポイントは <span class="hl">意味が近い単語ほど、近い場所に置かれる</span> こと。</p>
+<div class="viz">
+  <p class="hint">単語を2つクリックすると、似ている度（normalize してから dot）が出ます。ここでは見やすく 2 次元にしていますが、本物は数千次元で、やることは同じです。</p>
+  <canvas id="c-embed"></canvas>
+  <div class="controls">
+    <button class="btn" id="b-analogy">「王 − 男 + 女」を計算してみる</button>
+    <button class="btn" id="b-embed-clear">選択をクリア</button>
+  </div>
+  <div class="readout" id="r-embed"></div>
+</div>
+<pre class="code"><span class="c">// 似ている度（コサイン類似度）。第2章 + 第3章そのまま</span>
+<span class="k">function</span> <span class="f">similarity</span>(a, b) {
+  <span class="k">return</span> dot( normalize(a), normalize(b) );   <span class="c">// 1 に近いほど似ている</span>
+}
+
+<span class="c">// 意味の足し算引き算（第1章）。「王 − 男 + 女」に一番近い単語を探すと「女王」</span>
+<span class="k">const</span> q = add( sub(vec(<span class="n">"王"</span>), vec(<span class="n">"男"</span>)), vec(<span class="n">"女"</span>) );</pre>
+
+<h3>9-2. Attention：「どの単語を見るべきか」を内積で決めて、混ぜる</h3>
+<p>文の中のある単語を理解するには、他のどの単語と関係が深いかを知る必要があります。「食べた」の意味は「誰が」「何を」で変わる。LLM の中心部品 <b>attention</b> は、これを <span class="hl">内積で「関係の深さ」を測り、その割合で単語ベクトルを混ぜる</span> ことで実現します。</p>
+<div class="viz">
+  <p class="hint">注目する単語をクリック。他の単語との dot → softmax で「どれをどれだけ見るか」の割合が出ます。</p>
+  <div class="tokens" id="attn-tokens"></div>
+  <div class="bars" id="attn-bars"></div>
+  <div class="controls"><label>鋭さ（温度の逆） <input type="range" id="s-sharp" min="0.5" max="8" step="0.1" value="3"><span id="s-sharp-v">3</span></label></div>
+  <div class="readout" id="r-attn"></div>
+</div>
+<pre class="code"><span class="c">// 注目している単語 query が、文中の各単語 keys[i] をどれだけ見るか</span>
+<span class="k">for</span> (<span class="k">let</span> i = <span class="n">0</span>; i &lt; keys.length; i++) {
+  scores[i] = dot(query, keys[i]);          <span class="c">// 第3章：関係の深さ</span>
+}
+<span class="k">const</span> weights = softmax(scores);            <span class="c">// 合計が 1 になる「割合」に直す</span>
+
+<span class="c">// 割合どおりに単語ベクトルを混ぜる（第8章 lerp の親戚：重み付き平均）</span>
+<span class="k">let</span> output = zero();
+<span class="k">for</span> (<span class="k">let</span> i = <span class="n">0</span>; i &lt; values.length; i++) {
+  output = add(output, scale(values[i], weights[i]));
+}
+<span class="c">// output = 「文脈を混ぜ込んだ、新しい意味のベクトル」</span></pre>
+<pre class="code"><span class="c">// softmax：数字の列を「合計 1 の割合」に直す。大きい数字ほど大きい割合に</span>
+<span class="k">function</span> <span class="f">softmax</span>(xs) {
+  <span class="k">const</span> es = xs.map(<span class="k">function</span>(x) { <span class="k">return</span> Math.exp(x); });   <span class="c">// exp で全部プラスに、差を強調</span>
+  <span class="k">const</span> sum = es.reduce(<span class="k">function</span>(a, b) { <span class="k">return</span> a + b; }, <span class="n">0</span>);
+  <span class="k">return</span> es.map(<span class="k">function</span>(e) { <span class="k">return</span> e / sum; });
+}</pre>
+<p>本物では、query 用・key 用・value 用にそれぞれ <b>行列</b>（第6章）で単語ベクトルを変換してから dot します。「どんな関係に注目するか」をその行列が決めていて、それを学習で調整します。</p>
+
+<h3>9-3. 層 = 「行列で変形して、折り曲げる」</h3>
+<p>第6章の行列は「空間ぜんぶを変形するレシピ」でした。ニューラルネットの1層は、まさに <code>transform(m, p)</code> です。ただし行列だけだと直線的な変形しかできないので、<span class="hl">間に「折り曲げ」を挟みます</span>。一番よく使う折り曲げが ReLU：「マイナスは 0 にする」だけ。</p>
+<pre class="code"><span class="k">function</span> <span class="f">relu</span>(v) {
+  <span class="k">return</span> { x: Math.max(<span class="n">0</span>, v.x), y: Math.max(<span class="n">0</span>, v.y) };   <span class="c">// マイナスを 0 に折る</span>
+}
+<span class="k">function</span> <span class="f">layer</span>(m, p) {
+  <span class="k">return</span> relu( transform(m, p) );   <span class="c">// 変形 → 折り曲げ。これを何十回も重ねる</span>
+}</pre>
+<div class="viz">
+  <p class="hint">円に並んだ点（白）を、行列で変形（青）し、ReLU で折り曲げる（黄）。折り曲げのおかげで「まっすぐでない」変形が作れます。</p>
+  <canvas id="c-relu"></canvas>
+  <div class="controls">
+    <label><input type="checkbox" id="k-relu-m" checked> 行列で変形</label>
+    <label><input type="checkbox" id="k-relu-r" checked> ReLU で折り曲げ</label>
+  </div>
+</div>
+<p><b>学習</b> とは、この行列の中身（何百億個の数字）を「正解に近づく方向へ」少しずつ動かすことです。「どっちに動かすと結果がどれだけ変わるか」を測るのが微分ですが、概念としては「スライダーを少し動かして、良くなったらそっちへ進む」で十分です。</p>
+
+<div class="callout green">
+  <div class="t">まとめ：CG と LLM は同じ機械で動く</div>
+  <ul class="plain">
+    <li>単語 = ベクトル（第1章）、似ている度 = normalize + dot（第2・3章）</li>
+    <li>attention = dot で関係を測り、softmax で割合にし、重み付きで混ぜる（第8章の親戚）</li>
+    <li>層 = 行列で変形 + 折り曲げ（第6章）</li>
+  </ul>
+  GPU が「大量の dot と transform」を同時にやる機械だから、CG 用に作られた GPU が AI でも使われている。同じ数学だからです。
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>attention は softmax(QKᵀ / √d) V と書かれます。Q が query、K が key、V が value の行列で、QKᵀ が「全部の組み合わせの dot」を一気に計算したもの、√d で割るのはこの教材の「鋭さ」の調整です。</p></details>
+
+<div class="quiz" data-answer="0" data-why="attention は「関係の深さ」を dot で測ります。その後 softmax で割合にして、単語ベクトルを混ぜます。">
+  <div class="q">attention で「どの単語をどれだけ見るか」を決めるとき、最初に使う計算は？</div>
+  <div class="opts">
+    <button class="opt">dot（内積）で関係の深さを測る</button>
+    <button class="opt">cross（外積）で法線を作る</button>
+    <button class="opt">sqrt で長さを測る</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="lesson" data-title="チートシート：数学記号 → コード">
+<h2><span class="chap">CHAPTER</span>チートシート：数学記号を見たらこう読む</h2>
+<p class="lead">他の資料や論文に出てくる記号を、この教材のコードに翻訳する表です。「読めない記号が出てきたらここに戻る」用に。</p>
+
+<table class="sheet">
+<thead><tr><th>数学の書き方</th><th>読み方</th><th>コードではこう</th><th>章</th></tr></thead>
+<tbody>
+<tr><td class="m"><b>v</b>, v⃗</td><td>ベクトル v</td><td><code>v = {x, y, z}</code></td><td>1</td></tr>
+<tr><td class="m">|v|, ‖v‖</td><td>v の長さ</td><td><code>length(v)</code></td><td>2</td></tr>
+<tr><td class="m">v̂</td><td>長さ 1 にした v</td><td><code>normalize(v)</code></td><td>2</td></tr>
+<tr><td class="m">a · b</td><td>内積（同じ向き度）</td><td><code>dot(a, b)</code></td><td>3</td></tr>
+<tr><td class="m">a × b</td><td>外積（両方に直角な矢印）</td><td><code>cross(a, b)</code></td><td>4</td></tr>
+<tr><td class="m">θ, φ, α</td><td>角度（ラジアン）</td><td><code>angle</code></td><td>5</td></tr>
+<tr><td class="m">π</td><td>円周率</td><td><code>Math.PI</code></td><td>5</td></tr>
+<tr><td class="m">sin θ, cos θ</td><td>角度から矢印の y, x</td><td><code>Math.sin(angle)</code>, <code>Math.cos(angle)</code></td><td>5</td></tr>
+<tr><td class="m">x²</td><td>x の二乗</td><td><code>x * x</code></td><td>2</td></tr>
+<tr><td class="m">√x</td><td>平方根</td><td><code>Math.sqrt(x)</code></td><td>2</td></tr>
+<tr><td class="m">M, A（大文字）</td><td>行列（変形レシピ）</td><td><code>m = {i, j, k, t}</code></td><td>6</td></tr>
+<tr><td class="m">M v</td><td>行列で v を変形</td><td><code>transform(m, v)</code></td><td>6</td></tr>
+<tr><td class="m">A B</td><td>先に B、次に A の変形</td><td><code>compose(a, b)</code></td><td>6</td></tr>
+<tr><td class="m">M⁻¹</td><td>逆の変形（元に戻す）</td><td><code>inverse(m)</code></td><td>6</td></tr>
+<tr><td class="m">Mᵀ</td><td>転置（行と列を入れ替え）</td><td><code>transpose(m)</code></td><td>6</td></tr>
+<tr><td class="m">det M, |M|</td><td>面積・体積が何倍になるか</td><td><code>cross2d(m.i, m.j)</code></td><td>6</td></tr>
+<tr><td class="m">Σ</td><td>全部足す</td><td><code>for</code> ループ or <code>reduce</code></td><td>9</td></tr>
+<tr><td class="m">Π</td><td>全部掛ける</td><td><code>for</code> ループで <code>*=</code></td><td></td></tr>
+<tr><td class="m">eˣ, exp(x)</td><td>指数（急に大きくなる）</td><td><code>Math.exp(x)</code></td><td>9</td></tr>
+<tr><td class="m">f(x) = ...</td><td>関数の定義</td><td><code>function f(x) { return ...; }</code></td><td>0</td></tr>
+<tr><td class="m">x ∈ S</td><td>x は S の要素</td><td><code>S.includes(x)</code></td><td></td></tr>
+<tr><td class="m">[0, 1]</td><td>0 以上 1 以下の範囲</td><td><code>0 &lt;= t &amp;&amp; t &lt;= 1</code></td><td>8</td></tr>
+<tr><td class="m">max(0, x)</td><td>マイナスを 0 に</td><td><code>Math.max(0, x)</code>（ReLU、ランバート）</td><td>3, 9</td></tr>
+<tr><td class="m">argmax</td><td>一番大きい要素の番号</td><td><code>xs.indexOf(Math.max(...xs))</code></td><td>9</td></tr>
+<tr><td class="m">∂f/∂x, ∇f</td><td>x を少し動かすと f がどれだけ変わるか</td><td><code>(f(x + h) - f(x)) / h</code></td><td>9</td></tr>
+<tr><td class="m">∫</td><td>細かく刻んで全部足す</td><td><code>for</code> ループで <code>sum += f(x) * dx</code></td><td></td></tr>
+<tr><td class="m">ℝ³</td><td>3 次元の空間（x, y, z の世界）</td><td><code>{x, y, z}</code> の集まり</td><td>7</td></tr>
+</tbody>
+</table>
+
+<h3>VEX ではこう書く（この教材のコード → Houdini）</h3>
+<p>Part 3・4 の「Houdini でやるなら」で使った書き方のまとめ。JavaScript の関数と VEX の関数は、名前がほぼ同じです。</p>
+<table class="sheet">
+<thead><tr><th>この教材（JavaScript）</th><th>VEX（Wrangle）</th><th>メモ</th></tr></thead>
+<tbody>
+<tr><td><code>{x: 1, y: 2, z: 3}</code></td><td><code>set(1, 2, 3)</code> / <code>{1, 2, 3}</code></td><td>vector。<code>v.x</code> は同じ書き方</td></tr>
+<tr><td><code>add(a, b)</code>, <code>scale(v, k)</code></td><td><code>a + b</code>, <code>v * k</code></td><td>VEX は vector をそのまま足し算・掛け算できる</td></tr>
+<tr><td><code>length(v)</code></td><td><code>length(v)</code></td><td>2 点間なら <code>distance(a, b)</code></td></tr>
+<tr><td><code>normalize(v)</code></td><td><code>normalize(v)</code></td><td></td></tr>
+<tr><td><code>dot(a, b)</code> / <code>cross(a, b)</code></td><td><code>dot(a, b)</code> / <code>cross(a, b)</code></td><td>同じ</td></tr>
+<tr><td><code>Math.sin(a)</code>, <code>Math.atan2(y, x)</code></td><td><code>sin(a)</code>, <code>atan2(y, x)</code></td><td><code>radians(deg)</code> / <code>degrees(rad)</code> で変換</td></tr>
+<tr><td><code>lerp(a, b, t)</code></td><td><code>lerp(a, b, t)</code></td><td>vector にもそのまま使える</td></tr>
+<tr><td><code>smoothstep01(x, lo, hi)</code></td><td><code>smooth(lo, hi, x)</code></td><td>引数の順番に注意</td></tr>
+<tr><td><code>clamp(x, lo, hi)</code></td><td><code>clamp(x, lo, hi)</code></td><td></td></tr>
+<tr><td><code>fit</code>（範囲の変換）</td><td><code>fit(x, 0, 10, 1, 0)</code>, <code>fit01(x, a, b)</code></td><td>一番使う。<code>chramp("name", t)</code> でランプ</td></tr>
+<tr><td><code>rand(seed)</code></td><td><code>rand(@ptnum + seed)</code></td><td>vector で受けると 3 つバラバラ</td></tr>
+<tr><td><code>noise(x, y)</code> / <code>fbm(...)</code></td><td><code>noise(@P * freq)</code> / <code>anoise(...)</code> / <code>curlnoise(...)</code></td><td>Attribute Noise SOP も同じ</td></tr>
+<tr><td><code>Math.floor(x)</code>, <code>fract(x)</code>, <code>%</code></td><td><code>floor(x)</code>, <code>frac(x)</code>, <code>%</code></td><td>負の数の <code>%</code> に注意</td></tr>
+<tr><td><code>sdCircle</code> など距離関数</td><td><code>xyzdist(1, @P)</code>, <code>volumesample(...)</code></td><td>VDB from Polygons、Distance from Geometry</td></tr>
+<tr><td><code>nearest(p, seeds)</code></td><td><code>nearpoint(1, @P)</code>, <code>nearpoints(1, @P, r, n)</code></td><td>ボロノイ、Attribute Transfer</td></tr>
+<tr><td><code>countNeighbors</code></td><td><code>neighbours(0, @ptnum)</code></td><td>エッジでつながった隣の点。Solver SOP の中で</td></tr>
+<tr><td><code>transform(m, p)</code></td><td><code>p * m</code>（matrix3 / matrix）</td><td>VEX は「点 × 行列」の順。<code>maketransform()</code>、<code>ident()</code></td></tr>
+<tr><td><code>rotate(p, angle)</code></td><td><code>rotate(m, angle, axis)</code> or <code>qrotate(q, p)</code></td><td>3D の回転は四元数（quaternion）も使う</td></tr>
+<tr><td><code>v += force * dt; p += v * dt</code></td><td><code>@v += f * @TimeInc; @P += @v * @TimeInc;</code></td><td>POP Wrangle では @P の更新は POP Solver がやる</td></tr>
+<tr><td><code>for (const pt of points)</code></td><td>Wrangle は全点に対して自動で実行</td><td>Run Over: Points / Primitives / Detail</td></tr>
+<tr><td><code>points.push(p)</code></td><td><code>addpoint(0, p)</code>, <code>addprim</code>, <code>addvertex</code></td><td>Detail Wrangle でジオメトリを生成</td></tr>
+<tr><td>スライダーの値</td><td><code>ch("name")</code>, <code>chv("name")</code>, <code>chi("name")</code></td><td>書いてから「Create Spare Parameters」ボタン</td></tr>
+<tr><td>再帰（自分を呼ぶ）</td><td>For-Each Loop（Feedback）/ Solver SOP</td><td>VEX に再帰関数はない。配列を stack にする</td></tr>
+</tbody>
+</table>
+
+<h3>この先に進むなら</h3>
+<ul class="plain">
+  <li><a href="https://www.3blue1brown.com/topics/linear-algebra" target="_blank" rel="noopener">3Blue1Brown「Essence of linear algebra」</a>：この教材の第6章を、もっと深く。日本語字幕あり。</li>
+  <li><a href="https://thebookofshaders.com/?lan=jp" target="_blank" rel="noopener">The Book of Shaders（日本語版）</a>：sin / lerp / smoothstep を、実際に絵を描きながら。</li>
+  <li><a href="https://immersivemath.com/ila/" target="_blank" rel="noopener">Immersive Linear Algebra</a>：触れる図が全部の章についている線形代数の本。</li>
+  <li><a href="https://www.3blue1brown.com/topics/neural-networks" target="_blank" rel="noopener">3Blue1Brown「Neural networks」</a>：LLM の章の続き。attention の回が特に良いです。</li>
+</ul>
+
+<div class="callout green">
+  <div class="t">おつかれさまでした</div>
+  「点を動かす」「向きを測る」「大きさを変える」。CG の数学はこの3つの言い換えです。どこかで数式に出会ったら、上の表でコードに翻訳して読んでみてください。
+</div>
+</section>
+
+</main>
+</div>
+<script src="app.js?v=20260905-2"></script>
+<script src="app-patterns.js?v=20260905-2"></script>
+</body>
+</html>
