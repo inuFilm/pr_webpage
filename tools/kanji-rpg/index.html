@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1026">
+<title>漢字召喚RPG — カンジ・サモナーズ</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== タイトル ===== -->
+  <section id="screen-title" class="screen active">
+    <div class="title-bg"></div>
+    <div class="title-inner">
+      <div class="title-sub">かんじ しょうかん RPG</div>
+      <h1 class="title-logo"><span class="logo-kanji">漢字</span><span class="logo-sub">サモナーズ</span></h1>
+      <p class="title-tag">かいた漢字が、まほうになる。</p>
+      <div class="title-buttons">
+        <button id="btn-start" class="btn btn-primary btn-xl">はじめる</button>
+        <button id="btn-continue" class="btn btn-secondary btn-xl">つづきから</button>
+        <button id="btn-collection" class="btn btn-ghost">漢字図鑑</button>
+        <button id="btn-dev" class="btn btn-ghost small">開発者モード</button>
+      </div>
+      <div class="title-credit">書き順データ: <a href="http://kanjivg.tagaini.net" target="_blank" rel="noopener">KanjiVG</a> (CC BY-SA 3.0)</div>
+    </div>
+  </section>
+
+  <!-- ===== ステージ選択 ===== -->
+  <section id="screen-stages" class="screen">
+    <header class="bar">
+      <button class="btn btn-ghost" data-nav="title">◀ タイトル</button>
+      <h2>ぼうけんの地図</h2>
+      <button class="btn btn-ghost" data-nav="collection">漢字図鑑</button>
+    </header>
+    <div id="stage-list" class="stage-list"></div>
+  </section>
+
+  <!-- ===== バトル ===== -->
+  <section id="screen-battle" class="screen">
+    <div class="hud">
+      <div class="hud-player">
+        <div class="hud-label">漢字術師</div>
+        <div class="bar-track hp"><div id="player-hp" class="bar-fill"></div></div>
+      </div>
+      <div class="hud-center">
+        <div id="stage-title" class="hud-stage"></div>
+        <div class="bar-track mana"><div id="mana-fill" class="bar-fill"></div></div>
+        <div class="hud-mana-label">魔力</div>
+      </div>
+      <div class="hud-enemy">
+        <div id="enemy-name" class="hud-label">—</div>
+        <div class="bar-track hp enemy"><div id="enemy-hp" class="bar-fill"></div></div>
+      </div>
+    </div>
+
+    <div id="battle-stage" class="battle-stage">
+      <canvas id="battle-canvas"></canvas>
+      <div id="big-kanji" class="big-kanji hidden">
+        <div class="magic-circle"></div>
+        <div class="big-kanji-char"></div>
+        <div class="big-kanji-spell"></div>
+      </div>
+      <div id="stage-notice" class="stage-notice hidden"></div>
+    </div>
+
+    <div class="instruction">
+      <div id="instruction-text">…</div>
+    </div>
+
+    <div class="input-zone">
+      <aside class="side-panel left">
+        <div class="kanji-info">
+          <div id="cur-kanji" class="cur-kanji">火</div>
+          <div id="cur-reading" class="cur-reading">ひ</div>
+          <div class="stroke-counter"><span id="cur-stroke">1</span><span class="sep">/</span><span id="cur-total">4</span><span class="unit">画</span></div>
+        </div>
+      </aside>
+
+      <div id="input-pad-wrap" class="input-pad-wrap">
+        <div id="input-pad" class="input-pad"></div>
+      </div>
+
+      <aside class="side-panel right">
+        <button id="btn-hint" class="btn btn-round" title="ヒント"><span class="ico">💡</span><span class="lbl">ヒント</span></button>
+        <button id="btn-redo" class="btn btn-round" title="やり直し"><span class="ico">↺</span><span class="lbl">やり直し</span></button>
+        <button id="btn-pause" class="btn btn-round" title="一時停止"><span class="ico">⏸</span><span class="lbl">ポーズ</span></button>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ===== 漢字図鑑 ===== -->
+  <section id="screen-collection" class="screen">
+    <header class="bar">
+      <button class="btn btn-ghost" data-nav="back">◀ もどる</button>
+      <h2>漢字図鑑</h2>
+      <div class="filter-group">
+        <button class="btn btn-chip active" data-filter="all">すべて</button>
+        <button class="btn btn-chip" data-filter="1">1年生</button>
+        <button class="btn btn-chip" data-filter="2">2年生</button>
+      </div>
+    </header>
+    <div id="collection-summary" class="collection-summary"></div>
+    <div id="collection-grid" class="collection-grid"></div>
+  </section>
+
+  <!-- ===== 開発者モード ===== -->
+  <section id="screen-dev" class="screen">
+    <header class="bar">
+      <button class="btn btn-ghost" data-nav="title">◀ タイトル</button>
+      <h2>開発者モード — 書き順テンプレート登録</h2>
+      <span class="dev-hint">1画ずつ正しい書き方で描いて「この画を登録」</span>
+    </header>
+    <div class="dev-body">
+      <div class="dev-form">
+        <label>漢字を選ぶ / 新規
+          <div class="row">
+            <select id="dev-select"></select>
+            <input id="dev-kanji" type="text" maxlength="2" placeholder="新しい漢字" class="dev-kanji-input">
+          </div>
+        </label>
+        <label>読み <input id="dev-reading" type="text" placeholder="かぜ"></label>
+        <div class="row">
+          <label>学年
+            <select id="dev-grade"><option value="1">1年生</option><option value="2" selected>2年生</option></select>
+          </label>
+          <label>カテゴリ
+            <select id="dev-category">
+              <option>fire</option><option>water</option><option>nature</option><option>weather</option><option>animal</option>
+              <option>movement</option><option>weapon</option><option>support</option><option>object</option><option>location</option>
+            </select>
+          </label>
+        </div>
+        <label>能力名 (ability) <input id="dev-ability" type="text" placeholder="wind"></label>
+        <label>技名 <input id="dev-spell" type="text" placeholder="とっぷう"></label>
+        <label>指示文 <input id="dev-prompt" type="text" placeholder="「風」をかいて 風を よびだせ！"></label>
+        <div class="row checks">
+          <label><input id="dev-tutorial" type="checkbox"> tutorial</label>
+          <label><input id="dev-starter" type="checkbox"> starter</label>
+        </div>
+        <div class="dev-actions">
+          <button id="dev-save" class="btn btn-primary">保存（localStorage）</button>
+          <button id="dev-delete" class="btn btn-danger">この漢字の登録を削除</button>
+        </div>
+        <div class="dev-actions">
+          <button id="dev-export" class="btn btn-secondary">JSON書き出し</button>
+          <label class="btn btn-secondary file-btn">JSON読み込み<input id="dev-import" type="file" accept="application/json"></label>
+          <button id="dev-kanjivg" class="btn btn-secondary">KanjiVGから取り込み</button>
+        </div>
+        <div id="dev-status" class="dev-status"></div>
+        <div class="dev-list-wrap">
+          <div class="dev-list-title">登録済み（カスタム）</div>
+          <div id="dev-custom-list" class="dev-custom-list"></div>
+        </div>
+      </div>
+      <div class="dev-pad-col">
+        <div class="dev-pad-header">
+          <span id="dev-stroke-label">1画目を描いてください</span>
+          <label class="toggle"><input id="dev-show-ref" type="checkbox" checked> 参考表示（既存データ）</label>
+        </div>
+        <div id="dev-pad" class="dev-pad"></div>
+        <div class="dev-pad-actions">
+          <button id="dev-register" class="btn btn-primary">この画を登録</button>
+          <button id="dev-undo" class="btn btn-secondary">1画もどす</button>
+          <button id="dev-clear" class="btn btn-secondary">全部クリア</button>
+          <button id="dev-test" class="btn btn-secondary">判定テスト</button>
+        </div>
+        <pre id="dev-json" class="dev-json"></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== オーバーレイ ===== -->
+  <div id="overlay-card" class="overlay hidden">
+    <div class="card-new">
+      <div class="card-new-head">NEW KANJI</div>
+      <div id="card-kanji" class="card-new-kanji">風</div>
+      <div id="card-reading" class="card-new-reading">かぜ</div>
+      <div id="card-desc" class="card-new-desc">風のまほうを おぼえた！</div>
+      <button id="card-ok" class="btn btn-primary btn-xl">やった！</button>
+    </div>
+  </div>
+
+  <div id="overlay-clear" class="overlay hidden">
+    <div class="panel">
+      <div class="panel-head">STAGE CLEAR!</div>
+      <div id="clear-detail" class="panel-body"></div>
+      <div class="panel-actions">
+        <button id="clear-next" class="btn btn-primary btn-xl">つぎへ</button>
+        <button id="clear-map" class="btn btn-secondary">地図にもどる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-gameover" class="overlay hidden">
+    <div class="panel">
+      <div class="panel-head">たおれてしまった…</div>
+      <div class="panel-body">もういちど ちょうせんしよう！</div>
+      <div class="panel-actions">
+        <button id="gameover-retry" class="btn btn-primary btn-xl">もういちど</button>
+        <button id="gameover-map" class="btn btn-secondary">地図にもどる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-pause" class="overlay hidden">
+    <div class="panel">
+      <div class="panel-head">ポーズ</div>
+      <div class="panel-body settings">
+        <label class="toggle"><input id="set-sfx" type="checkbox" checked> 効果音</label>
+        <label class="toggle"><input id="set-voice" type="checkbox" checked> 読み上げ</label>
+        <label class="toggle volume"><span>🔈</span><input id="set-volume" type="range" min="0" max="100" step="5" value="60"><span>🔊</span><span id="set-volume-val" class="volume-val">60%</span></label>
+      </div>
+      <div class="panel-actions">
+        <button id="pause-resume" class="btn btn-primary btn-xl">つづける</button>
+        <button id="pause-map" class="btn btn-secondary">地図にもどる</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="overlay-message" class="overlay hidden">
+    <div class="panel">
+      <div id="message-head" class="panel-head"></div>
+      <div id="message-body" class="panel-body"></div>
+      <div class="panel-actions">
+        <button id="message-ok" class="btn btn-primary btn-xl">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="orientation-hint" class="orientation-hint hidden">📱 よこむきにすると あそびやすいよ</div>
+</div>
+
+<!-- データ -->
+<script src="js/core/geometry.js"></script>
+<script src="js/data/svgpath.js"></script>
+<script src="js/data/kanji-meta.js"></script>
+<script src="js/data/kanji-strokes.js"></script>
+<script src="js/data/combos.js"></script>
+<script src="js/data/stages.js"></script>
+<!-- コア -->
+<script src="js/core/events.js"></script>
+<script src="js/core/storage.js"></script>
+<script src="js/core/kanji-db.js"></script>
+<script src="js/core/recognizer.js"></script>
+<script src="js/core/scheduler.js"></script>
+<script src="js/core/sfx.js"></script>
+<!-- UI -->
+<script src="js/ui/input-pad.js"></script>
+<script src="js/ui/battle-fx.js"></script>
+<!-- ゲーム -->
+<script src="js/game/screens.js"></script>
+<script src="js/game/battle.js"></script>
+<script src="js/dev/devmode.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

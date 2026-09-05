@@ -22,7 +22,7 @@ window.TECH_ARTICLES = [
     "title": "ツールまとめ — ブラウザでそのまま使える自作ツール",
     "category": "ツール",
     "date": "2026-08-29",
-    "description": "公開している自作 Web ツールの一覧。VRM モデルにポーズを付けて作画資料にする VRM Pose Ref など。すべて端末内で動作し、モデルやデータは外部に送信されません。"
+    "description": "公開している自作 Web ツールの一覧。VRM モデルにポーズを付けて作画資料にする VRM Pose Ref、書き順で戦う漢字学習ゲーム 漢字サモナーズ（試験公開）など。すべて端末内で動作し、モデルやデータは外部に送信されません。"
   },
   {
     "slug": "sidefx-foundations-01-soccerball",
