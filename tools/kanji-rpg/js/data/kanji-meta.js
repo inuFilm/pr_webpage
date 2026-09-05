@@ -62,4 +62,86 @@ var KANJI_META = {
   '矢': { reading: 'や', grade: 2, category: 'weapon', ability: 'arrow', spell: 'ひかりのや', prompt: '「矢」をかいて 矢を はなて！', meaning: 'や' }
 };
 
-if (typeof module !== 'undefined' && module.exports) module.exports = KANJI_META;
+/* ===== 追加分（小1・小2 の残り全配当漢字） — コンパクト形式 =====
+ *  '漢字': [読み, 学年, カテゴリ, ability, 技名(省略可), 指示文(省略可)]
+ *  技名・指示文を省略すると kanji-db.js が ability 別のテンプレートから作る。
+ *  1年生は自動的に starter（最初から所持）。
+ *  ability は battle-fx.js の演出名。'heal' は回復（support）。
+ */
+var KANJI_META_EXTRA = {
+  /* ---- 小学1年生（残り56字） ---- */
+  '右': ['みぎ', 1, 'movement', 'dash'], '円': ['えん', 1, 'support', 'roar', 'まるいひびき'], '王': ['おう', 1, 'support', 'power', 'おうさまのちから'],
+  '音': ['おと', 1, 'support', 'roar', 'おおきなおと'], '下': ['した', 1, 'object', 'rock', 'したにおとす'], '花': ['はな', 1, 'nature', 'tree', 'はなふぶき'],
+  '貝': ['かい', 1, 'water', 'water', 'かいのみず'], '学': ['まなぶ', 1, 'support', 'grow', 'まなびのちから'], '気': ['き', 1, 'support', 'heal', 'げんきかいふく'],
+  '九': ['きゅう', 1, 'weapon', 'beam', 'きゅうれんビーム'], '休': ['やすむ', 1, 'support', 'heal', 'ひとやすみ'], '玉': ['たま', 1, 'object', 'stone', 'たまなげ'],
+  '金': ['きん', 1, 'weapon', 'light', 'きんのひかり'], '空': ['そら', 1, 'weather', 'cloud', 'そらのちから'], '見': ['みる', 1, 'support', 'eye', 'みやぶる'],
+  '五': ['ご', 1, 'weapon', 'beam', 'ごれんビーム'], '校': ['こう', 1, 'location', 'field', 'がっこうのかべ'], '左': ['ひだり', 1, 'movement', 'dash'],
+  '子': ['こ', 1, 'support', 'ally', 'こどものなかま'], '四': ['よん', 1, 'weapon', 'beam', 'よんれんビーム'], '糸': ['いと', 1, 'movement', 'stop', 'いとでしばる'],
+  '字': ['じ', 1, 'weapon', 'light', 'もじのひかり'], '耳': ['みみ', 1, 'support', 'eye', 'ききみみ'], '七': ['なな', 1, 'weapon', 'beam', 'ななれんビーム'],
+  '車': ['くるま', 1, 'movement', 'run', 'くるまでつっこむ'], '十': ['じゅう', 1, 'weapon', 'beam', 'じゅうれんビーム'], '出': ['でる', 1, 'movement', 'run', 'とびだす'],
+  '女': ['おんな', 1, 'support', 'ally', 'おんなのこのなかま'], '上': ['うえ', 1, 'support', 'grow', 'うえへのびる'], '森': ['もり', 1, 'nature', 'tree', 'もりのめざめ'],
+  '正': ['ただしい', 1, 'support', 'power', 'ただしいちから'], '生': ['いきる', 1, 'support', 'heal', 'いのちのちから'], '青': ['あお', 1, 'water', 'water', 'あおいみず'],
+  '夕': ['ゆう', 1, 'weather', 'sun', 'ゆうやけ'], '赤': ['あか', 1, 'fire', 'fire', 'あかいほのお'], '千': ['せん', 1, 'weapon', 'light', 'せんのひかり'],
+  '先': ['さき', 1, 'movement', 'dash', 'さきまわり'], '早': ['はやい', 1, 'movement', 'dash', 'はやわざ'], '草': ['くさ', 1, 'nature', 'tree', 'くさのしげり'],
+  '村': ['むら', 1, 'location', 'field', 'むらのまもり'], '男': ['おとこ', 1, 'support', 'ally', 'おとこのこのなかま'], '中': ['なか', 1, 'support', 'eye', 'まんなかをねらう'],
+  '町': ['まち', 1, 'location', 'field', 'まちのかべ'], '天': ['てん', 1, 'weather', 'sunny', 'てんのひかり'], '土': ['つち', 1, 'location', 'field', 'つちのかべ'],
+  '入': ['はいる', 1, 'movement', 'dash', 'とびこむ'], '年': ['とし', 1, 'support', 'grow', 'せいちょう'], '白': ['しろ', 1, 'weather', 'snow', 'しろいゆき'],
+  '八': ['はち', 1, 'weapon', 'beam', 'はちれんビーム'], '百': ['ひゃく', 1, 'weapon', 'light', 'ひゃくのひかり'], '文': ['ぶん', 1, 'weapon', 'light', 'ことばのひかり'],
+  '本': ['ほん', 1, 'nature', 'tree', 'おおきなき'], '名': ['な', 1, 'support', 'roar', 'なまえをよぶ'], '立': ['たつ', 1, 'support', 'grow', 'たちあがる'],
+  '林': ['はやし', 1, 'nature', 'tree', 'はやしのめざめ'], '六': ['ろく', 1, 'weapon', 'beam', 'ろくれんビーム'],
+
+  /* ---- 小学2年生（残り140字） ---- */
+  '引': ['ひく', 2, 'weapon', 'bow', 'ゆみをひく'], '羽': ['はね', 2, 'animal', 'bird', 'はねのまい'], '園': ['えん', 2, 'location', 'field', 'にわのまもり'],
+  '遠': ['とおい', 2, 'weapon', 'arrow', 'とおくへとばす'], '何': ['なに', 2, 'support', 'eye', 'なにかをさがす'], '科': ['か', 2, 'support', 'eye', 'かがくのめ'],
+  '夏': ['なつ', 2, 'fire', 'fire', 'なつのあつさ'], '家': ['いえ', 2, 'location', 'field', 'いえのまもり'], '歌': ['うた', 2, 'support', 'roar', 'うたのちから'],
+  '画': ['が', 2, 'support', 'eye', 'えをかく'], '回': ['まわる', 2, 'support', 'roar', 'まわるひびき'], '会': ['あう', 2, 'support', 'ally', 'であいのなかま'],
+  '絵': ['え', 2, 'support', 'eye', 'えのちから'], '外': ['そと', 2, 'movement', 'run', 'そとへとびだす'], '角': ['かど', 2, 'weapon', 'sword', 'かどのいちげき'],
+  '楽': ['たのしい', 2, 'support', 'heal', 'たのしいきぶん'], '活': ['かつ', 2, 'support', 'heal', 'かっぱつ'], '間': ['あいだ', 2, 'support', 'eye', 'すきまをねらう'],
+  '丸': ['まる', 2, 'support', 'roar', 'まるいはどう'], '顔': ['かお', 2, 'support', 'eye', 'かおをみる'], '汽': ['き', 2, 'weather', 'cloud', 'ゆげのくも'],
+  '記': ['しるす', 2, 'support', 'eye', 'きろくする'], '帰': ['かえる', 2, 'movement', 'walk', 'かえりみち'], '京': ['きょう', 2, 'location', 'road', 'みやこのみち'],
+  '強': ['つよい', 2, 'support', 'power', 'つよくなる'], '教': ['おしえる', 2, 'support', 'ally', 'せんせいのなかま'], '近': ['ちかい', 2, 'movement', 'walk', 'ちかづく'],
+  '兄': ['あに', 2, 'support', 'ally', 'おにいさんのなかま'], '形': ['かたち', 2, 'object', 'stone', 'かたちをなげる'], '計': ['はかる', 2, 'support', 'eye', 'はかるめ'],
+  '元': ['もと', 2, 'support', 'heal', 'げんきのもと'], '言': ['いう', 2, 'support', 'roar', 'ことばのひびき'], '原': ['はら', 2, 'location', 'field', 'のはらのちから'],
+  '戸': ['と', 2, 'location', 'field', 'とのまもり'], '古': ['ふるい', 2, 'object', 'rock', 'ふるいいわ'], '午': ['ご', 2, 'weather', 'sun', 'まひるのひかり'],
+  '後': ['あと', 2, 'movement', 'stop', 'あとにひかせる'], '語': ['かたる', 2, 'support', 'roar', 'かたりのちから'], '工': ['こう', 2, 'object', 'rock', 'こうじのいわ'],
+  '公': ['こう', 2, 'support', 'ally', 'みんなのなかま'], '広': ['ひろい', 2, 'location', 'field', 'ひろいだいち'], '交': ['まじる', 2, 'movement', 'dash', 'いれかわり'],
+  '光': KANJI_META['光'] ? undefined : ['ひかり', 2, 'weapon', 'light'],
+  '考': ['かんがえる', 2, 'support', 'eye', 'かんがえるめ'], '行': ['いく', 2, 'movement', 'run', 'つきすすむ'], '高': ['たかい', 2, 'location', 'mountain', 'たかいやま'],
+  '黄': ['き', 2, 'weather', 'sun', 'きいろいひかり'], '合': ['あう', 2, 'support', 'ally', 'ちからをあわせる'], '谷': ['たに', 2, 'location', 'mountain', 'たにのかべ'],
+  '国': ['くに', 2, 'location', 'mountain', 'くにのまもり'], '黒': ['くろ', 2, 'weather', 'cloud', 'くろいくも'], '今': ['いま', 2, 'movement', 'dash', 'いまだ！'],
+  '才': ['さい', 2, 'support', 'power', 'さいのう'], '細': ['ほそい', 2, 'weapon', 'arrow', 'ほそいや'], '作': ['つくる', 2, 'object', 'stone', 'つくったいし'],
+  '算': ['さん', 2, 'weapon', 'beam', 'けいさんビーム'], '止': KANJI_META['止'] ? undefined : ['とまる', 2, 'movement', 'stop'],
+  '市': ['いち', 2, 'location', 'field', 'いちばのかべ'], '姉': ['あね', 2, 'support', 'ally', 'おねえさんのなかま'], '思': ['おもう', 2, 'support', 'eye', 'おもいのちから'],
+  '紙': ['かみ', 2, 'weather', 'wind', 'かみふぶき'], '寺': ['てら', 2, 'location', 'field', 'おてらのまもり'], '自': ['じ', 2, 'support', 'power', 'じぶんのちから'],
+  '時': ['とき', 2, 'movement', 'stop', 'ときをとめる'], '室': ['しつ', 2, 'location', 'field', 'へやのまもり'], '社': ['しゃ', 2, 'location', 'field', 'やしろのまもり'],
+  '弱': ['よわい', 2, 'support', 'shrink', 'よわくする'], '首': ['くび', 2, 'support', 'eye', 'くびをねらう'], '秋': ['あき', 2, 'weather', 'wind', 'あきかぜ'],
+  '週': ['しゅう', 2, 'support', 'power', 'いっしゅうのちから'], '春': ['はる', 2, 'nature', 'tree', 'はるのめぶき'], '書': ['かく', 2, 'support', 'eye', 'かきしるす'],
+  '少': ['すこし', 2, 'support', 'shrink', 'すこしちいさく'], '場': ['ば', 2, 'location', 'field', 'ばしょのちから'], '色': ['いろ', 2, 'support', 'grow', 'いろのちから'],
+  '食': ['たべる', 2, 'support', 'heal', 'ごはんでかいふく'], '心': ['こころ', 2, 'support', 'power', 'こころのちから'], '新': ['あたらしい', 2, 'support', 'heal', 'あたらしいちから'],
+  '親': ['おや', 2, 'support', 'heal', 'おやのやさしさ'], '図': ['ず', 2, 'support', 'eye', 'ちずをみる'], '数': ['かず', 2, 'weapon', 'beam', 'かずのビーム'],
+  '西': ['にし', 2, 'weather', 'sun', 'にしのゆうひ'], '声': ['こえ', 2, 'support', 'roar', 'おおごえ'], '切': ['きる', 2, 'weapon', 'sword', 'きりさく'],
+  '船': ['ふね', 2, 'water', 'stream', 'ふねのなみ'], '線': ['せん', 2, 'weapon', 'beam', 'いっせん'], '前': ['まえ', 2, 'movement', 'walk', 'まえへすすむ'],
+  '組': ['くみ', 2, 'support', 'ally', 'くみのなかま'], '多': ['おおい', 2, 'weapon', 'beam', 'たくさんビーム'], '太': ['ふとい', 2, 'support', 'grow', 'ふとくなる'],
+  '体': ['からだ', 2, 'support', 'heal', 'からだのかいふく'], '台': ['だい', 2, 'location', 'mountain', 'たかだい'], '地': ['ち', 2, 'location', 'field', 'だいちのちから'],
+  '池': ['いけ', 2, 'water', 'water', 'いけのみず'], '知': ['しる', 2, 'support', 'eye', 'しるちから'], '茶': ['ちゃ', 2, 'water', 'stream', 'おちゃのながれ'],
+  '昼': ['ひる', 2, 'weather', 'sun', 'まひるのたいよう'], '長': ['ながい', 2, 'weapon', 'beam', 'ながいビーム'], '朝': ['あさ', 2, 'weather', 'sunny', 'あさひ'],
+  '直': ['なおす', 2, 'support', 'heal', 'なおす'], '通': ['とおる', 2, 'location', 'road', 'とおりみち'], '弟': ['おとうと', 2, 'support', 'ally', 'おとうとのなかま'],
+  '店': ['みせ', 2, 'location', 'field', 'みせのまもり'], '点': ['てん', 2, 'weapon', 'arrow', 'いってん'], '冬': ['ふゆ', 2, 'weather', 'snow', 'ふゆのさむさ'],
+  '当': ['あたる', 2, 'weapon', 'arrow', 'あてる'], '東': ['ひがし', 2, 'weather', 'sunny', 'ひがしのあさひ'], '答': ['こたえ', 2, 'weapon', 'light', 'こたえのひかり'],
+  '頭': ['あたま', 2, 'support', 'eye', 'あたまをねらう'], '同': ['おなじ', 2, 'support', 'ally', 'おなじなかま'], '読': ['よむ', 2, 'support', 'eye', 'よみとる'],
+  '内': ['うち', 2, 'support', 'ally', 'うちのなかま'], '南': ['みなみ', 2, 'fire', 'fire', 'みなみのあつさ'], '肉': ['にく', 2, 'animal', 'cow', 'にくのちから'],
+  '売': ['うる', 2, 'object', 'stone', 'うりもの'], '買': ['かう', 2, 'object', 'stone', 'かいもの'], '麦': ['むぎ', 2, 'nature', 'bamboo', 'むぎのほ'],
+  '半': ['はん', 2, 'weapon', 'sword', 'はんぶんぎり'], '番': ['ばん', 2, 'support', 'eye', 'ばんをする'], '父': ['ちち', 2, 'support', 'power', 'おとうさんのちから'],
+  '分': ['わける', 2, 'weapon', 'sword', 'わけるいちげき'], '聞': ['きく', 2, 'support', 'eye', 'ききとる'], '米': ['こめ', 2, 'nature', 'tree', 'おこめのめぐみ'],
+  '母': ['はは', 2, 'support', 'heal', 'おかあさんのやさしさ'], '方': ['かた', 2, 'movement', 'walk', 'ほうこうをきめる'], '北': ['きた', 2, 'weather', 'snow', 'きたのふゆ'],
+  '毎': ['まい', 2, 'support', 'power', 'まいにちのちから'], '妹': ['いもうと', 2, 'support', 'ally', 'いもうとのなかま'], '万': ['まん', 2, 'weapon', 'light', 'まんのひかり'],
+  '明': ['あかるい', 2, 'weapon', 'light', 'あかるいひかり'], '鳴': ['なく', 2, 'support', 'roar', 'なきごえ'], '毛': ['け', 2, 'animal', 'dog', 'けのちから'],
+  '門': ['もん', 2, 'location', 'field', 'もんのまもり'], '夜': ['よる', 2, 'weather', 'moon', 'よるのつき'], '野': ['の', 2, 'location', 'field', 'のはら'],
+  '友': ['とも', 2, 'support', 'ally', 'ともだちのなかま'], '用': ['よう', 2, 'support', 'power', 'ようい'], '曜': ['よう', 2, 'weather', 'star', 'ようびのほし'],
+  '来': ['くる', 2, 'movement', 'run', 'やってくる'], '里': ['さと', 2, 'location', 'road', 'さとのみち'], '理': ['り', 2, 'support', 'eye', 'りかいのめ'],
+  '話': ['はなす', 2, 'support', 'roar', 'はなしのちから']
+};
+// 既存エントリと重複するキー（undefined にしたもの）を除去
+Object.keys(KANJI_META_EXTRA).forEach(function (k) { if (KANJI_META_EXTRA[k] === undefined || KANJI_META[k]) delete KANJI_META_EXTRA[k]; });
+
+if (typeof module !== 'undefined' && module.exports) module.exports = Object.assign({}, KANJI_META, KANJI_META_EXTRA);

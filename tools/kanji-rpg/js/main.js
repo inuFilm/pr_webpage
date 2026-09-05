@@ -4,6 +4,8 @@
   function boot() {
     root.SaveData.load();
     root.KanjiDB.init();
+    // 追加エリア（固定ステージに出てこない2年生漢字をカテゴリ別に自動生成）
+    if (root.buildExtraStages) root.STAGES.push.apply(root.STAGES, root.buildExtraStages(root.KanjiDB.all()));
     root.SFX.init();
     root.Screens.init();
     root.Battle.init();

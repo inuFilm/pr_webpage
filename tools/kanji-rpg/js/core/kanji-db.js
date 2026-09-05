@@ -18,8 +18,37 @@
   }
   function saveCustomStore() { localStorage.setItem(CUSTOM_KEY, JSON.stringify(custom)); cache = null; }
 
+  /* ability 別の技名テンプレート（{k} = 漢字） */
+  var SPELL_TPL = {
+    fire: '{k}のほのお', water: '{k}のみず', stream: '{k}のながれ', sea: '{k}のおおなみ', tree: '{k}のめぐみ', bamboo: '{k}のやり',
+    wind: '{k}のかぜ', snow: '{k}のゆき', rain: '{k}のあめ', star: '{k}のほし', cloud: '{k}のくも', sunny: '{k}のひざし', sun: '{k}のたいよう', moon: '{k}のつき', lightning: '{k}のいかずち',
+    dog: '{k}しょうかん', cow: '{k}しょうかん', horse: '{k}しょうかん', bird: '{k}しょうかん', fish: '{k}しょうかん', bug: '{k}しょうかん',
+    dash: '{k}ダッシュ', run: '{k}ダッシュ', walk: '{k}のあゆみ', stop: '{k}ストップ',
+    beam: '{k}ビーム', light: '{k}のひかり', sword: '{k}ぎり', arrow: '{k}のや', bow: '{k}のゆみ', hand: '{k}のて',
+    power: '{k}パワー', ally: '{k}のなかま', grow: '{k}きょだいか', shrink: '{k}しゅくしょう', roar: '{k}のひびき', eye: '{k}のめ', heal: '{k}のいやし',
+    stone: '{k}なげ', rock: '{k}おとし', mountain: '{k}のやま', field: '{k}のだいち', road: '{k}のみち'
+  };
+  var PROMPT_TPL = {
+    support: '「{k}」をかいて ちからを かせ！', animal: '「{k}」をかいて なかまを よびだせ！', movement: '「{k}」をかいて うごけ！',
+    weapon: '「{k}」をかいて こうげきしろ！', object: '「{k}」をかいて なげろ！', location: '「{k}」をかいて だいちを うごかせ！'
+  };
+  function fill(tpl, k) { return tpl.replace(/\{k\}/g, k); }
+  /** コンパクト形式 [読み, 学年, カテゴリ, ability, 技名?, 指示文?] をオブジェクトへ */
+  function expandMeta(k, m) {
+    if (!Array.isArray(m)) return m;
+    var grade = m[1] || 2, ability = m[3] || 'generic';
+    return {
+      reading: m[0] || '', grade: grade, category: m[2] || 'object', ability: ability,
+      spell: m[4] || fill(SPELL_TPL[ability] || '{k}のまほう', k),
+      prompt: m[5] || fill(PROMPT_TPL[m[2]] || '「{k}」をかいて {s}を はなて！', k).replace('{s}', m[4] || fill(SPELL_TPL[ability] || '{k}のまほう', k)),
+      starter: grade === 1, tutorial: false, meaning: m[0] || ''
+    };
+  }
+
   function build() {
-    var meta = root.KANJI_META || {};
+    var meta = {};
+    var rawMeta = Object.assign({}, root.KANJI_META_EXTRA || {}, root.KANJI_META || {});
+    Object.keys(rawMeta).forEach(function (k) { meta[k] = expandMeta(k, rawMeta[k]); });
     var strokes = root.KANJI_STROKES || {};
     var out = {};
     var keys = {};

@@ -63,7 +63,8 @@ var SITUATIONS = {
     sun: 'くらい！ たいようを よべ！',
     field: 'だいちの ちからを かりろ！',
     bamboo: 'たけを はやして つきさせ！',
-    road: 'みちが ない！ みちを つくれ！'
+    road: 'みちが ない！ みちを つくれ！',
+    heal: 'きずが いたい… かいふくの まほうだ！'
   },
   category: {
     fire: 'ほのおの まほうを つかおう！',
@@ -170,12 +171,59 @@ var STAGES = [
     id: 'boss', name: '漢字の魔王', subtitle: 'ボス — すべての まほうを つかえ！', kind: 'boss', theme: 'boss',
     kanjiList: [],
     waves: [
-      { enemy: { name: 'まおうの てさき', shape: 'ghost', color: '#a03a5a', hp: 300, attack: 16 }, intro: 'まおうの しろだ！ てさきが たちふさがる！',
-        events: [{ review: 'any' }, { review: 'any' }, { review: 'any' }] },
-      { enemy: { name: '漢字の魔王', shape: 'dragon', color: '#ff3a5a', hp: 480, attack: 18, boss: true }, intro: 'ついに まおうが あらわれた！ おぼえた 漢字を すべて つかえ！',
-        events: [{ review: 'any' }, { review: 'grade2' }, { review: 'any' }, { review: 'grade2' }, { review: 'any' }, { review: 'any' }] }
+      // loop: true → 用意した漢字で倒しきれなければ復習漢字を追加して戦闘が続く（ミスありは与ダメージ半減）
+      { enemy: { name: 'まおうの てさき', shape: 'ghost', color: '#a03a5a', hp: 300, attack: 25 }, intro: 'まおうの しろだ！ ここでは 1回の ミスが おおきな ダメージになる！',
+        loop: true, events: [{ review: 'any' }, { review: 'any' }, { review: 'any' }] },
+      { enemy: { name: '漢字の魔王', shape: 'dragon', color: '#ff3a5a', hp: 480, attack: 50, boss: true }, intro: 'ついに まおうが あらわれた！ ミスは ゆるされない… おぼえた 漢字を すべて つかえ！',
+        loop: true, events: [{ review: 'any' }, { review: 'grade2' }, { review: 'any' }, { review: 'grade2' }, { review: 'any' }, { review: 'any' }] }
     ]
   }
 ];
 
-if (typeof module !== 'undefined' && module.exports) module.exports = { STAGES: STAGES, STAGE_THEMES: STAGE_THEMES, SITUATIONS: SITUATIONS };
+/* ===== 追加エリア（自動生成） =====
+ * 上のステージに出てこない2年生漢字を、カテゴリごとに5字ずつのステージにする。
+ * ボスの後に並び、順番に解放される。main.js が KanjiDB 初期化後に STAGES へ追加する。
+ */
+var EXTRA_CATEGORY = {
+  fire:     { name: 'ほのおの国', theme: 'boss',    enemies: [['マグマスライム', 'slime', '#ff6b2b'], ['ほのおのトリ', 'bat', '#ff9f2e']] },
+  water:    { name: 'みずの国',   theme: 'sea',     enemies: [['みずのゴースト', 'ghost', '#3fb8ff'], ['おおガニ', 'golem', '#4a8ad6']] },
+  nature:   { name: 'しぜんの国', theme: 'forest',  enemies: [['はっぱムシ', 'slime', '#5ed36a'], ['もりのオオカミ', 'wolf', '#3a7a4a']] },
+  weather:  { name: 'てんきの国', theme: 'sky',     enemies: [['くものクラゲ', 'ghost', '#b9d9ff'], ['かみなりドリ', 'bat', '#ffe94a']] },
+  animal:   { name: 'どうぶつの国', theme: 'savanna', enemies: [['あばれウシ', 'boar', '#8a5a3a'], ['そらのタカ', 'bat', '#c9a27a']] },
+  movement: { name: 'うごきの国', theme: 'road',    enemies: [['はやあしドロボウ', 'knight', '#6a6a9a'], ['かげのキシ', 'knight', '#4a4a7a']] },
+  weapon:   { name: 'ぶきの国',   theme: 'tower',   enemies: [['てつのゴーレム', 'golem', '#9a9ab0'], ['はがねのキシ', 'knight', '#b0b0c0']] },
+  support:  { name: 'ちからの国', theme: 'tutorial', enemies: [['まほうのゴースト', 'ghost', '#c56bff'], ['やみのキシ', 'knight', '#7a4aa0']] },
+  object:   { name: 'ものの国',   theme: 'cave',    enemies: [['いわスライム', 'slime', '#c9a27a'], ['いわゴーレム', 'golem', '#8a7a6a']] },
+  location: { name: 'ばしょの国', theme: 'forest',  enemies: [['まよいのゴースト', 'ghost', '#a3c47c'], ['だいちのゴーレム', 'golem', '#6a8a5a']] }
+};
+function buildExtraStages(entries) {
+  var covered = {};
+  STAGES.forEach(function (s) { (s.kanjiList || []).forEach(function (k) { covered[k] = 1; }); });
+  var order = ['weather', 'nature', 'water', 'fire', 'animal', 'movement', 'weapon', 'location', 'object', 'support'];
+  var byCat = {};
+  entries.filter(function (e) { return e.grade === 2 && !covered[e.kanji] && e.strokes && e.strokes.length; })
+    .sort(function (a, b) { return a.strokeCount - b.strokeCount; })
+    .forEach(function (e) { (byCat[e.category] = byCat[e.category] || []).push(e.kanji); });
+  var out = [];
+  var stageNo = 0;
+  order.forEach(function (cat) {
+    var list = byCat[cat] || [];
+    var info = EXTRA_CATEGORY[cat] || EXTRA_CATEGORY.object;
+    for (var i = 0, n = 1; i < list.length; i += 5, n++) {
+      var chunk = list.slice(i, i + 5);
+      stageNo++;
+      var hp = 200 + Math.min(120, stageNo * 6), atk = 10 + Math.min(8, Math.floor(stageNo / 3));
+      var e1 = info.enemies[0], e2 = info.enemies[1];
+      var w1 = chunk.slice(0, Math.ceil(chunk.length / 2)).map(function (k) { return { kanji: k }; });
+      var w2 = chunk.slice(Math.ceil(chunk.length / 2)).map(function (k) { return { kanji: k }; });
+      w1.splice(Math.min(2, w1.length), 0, { review: 'grade1' });
+      w2.push({ review: 'any' });
+      var waves = [{ enemy: { name: e1[0], shape: e1[1], color: e1[2], hp: hp, attack: atk }, intro: info.name + ' ' + n + ' — あたらしい 漢字の ちからを さがせ！', events: w1 }];
+      if (w2.length > 1) waves.push({ enemy: { name: e2[0], shape: e2[1], color: e2[2], hp: hp + 40, attack: atk + 2 }, intro: 'つぎの てきだ！', events: w2 });
+      out.push({ id: 'extra-' + cat + '-' + n, name: info.name + ' ' + n, subtitle: '追加エリア — ' + chunk.join(' '), kind: 'extra', theme: info.theme, kanjiList: chunk, waves: waves });
+    }
+  });
+  return out;
+}
+
+if (typeof module !== 'undefined' && module.exports) module.exports = { STAGES: STAGES, STAGE_THEMES: STAGE_THEMES, SITUATIONS: SITUATIONS, buildExtraStages: buildExtraStages };

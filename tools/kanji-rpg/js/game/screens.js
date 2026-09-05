@@ -96,7 +96,7 @@
       list.appendChild(card);
     });
   }
-  function kindLabel(k) { return { tutorial: 'TUTORIAL', basic: '初級', main: '本編', boss: 'BOSS' }[k] || k; }
+  function kindLabel(k) { return { tutorial: 'TUTORIAL', basic: '初級', main: '本編', boss: 'BOSS', extra: '追加エリア' }[k] || k; }
 
   /* ---------- 漢字図鑑 ---------- */
   function renderCollection() {

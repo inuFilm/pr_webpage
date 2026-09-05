@@ -76,8 +76,9 @@
   BattleFX.prototype.enemyHit = function (dmg, crit) {
     var e = this.enemyPos();
     if (this.enemy) { this.enemy.hitT = 0.25; this.enemy.kb = 1; }
-    this.shakeFx(crit ? 14 : 8);
+    this.shakeFx(crit ? 16 : 8);
     this.numbers.push({ x: e.x, y: e.y - this.unit() * 0.9, text: String(dmg), t: 0, dur: 1.0, color: crit ? '#ffd75e' : '#ffffff', big: !!crit });
+    if (crit) { this.numbers.push({ x: e.x, y: e.y - this.unit() * 1.7, text: 'CRITICAL!', t: 0, dur: 1.1, color: '#ff8e5b', big: false }); this.flash('#ffd75e', 0.35); }
     root.Events.emit('enemy:hit', { damage: dmg, enemy: this.enemy });
   };
   BattleFX.prototype.enemyDefeat = function () {
@@ -90,6 +91,11 @@
       root.Events.emit('enemy:defeat', { enemy: self.enemy });
       setTimeout(function () { self.enemy = null; res(); }, 900);
     });
+  };
+  /** 回復数値の表示 */
+  BattleFX.prototype.playerHeal = function (amount) {
+    var p = this.playerPos();
+    this.numbers.push({ x: p.x, y: p.y - this.unit() * 1.6, text: '+' + amount, t: 0, dur: 1.0, color: '#7cf29a', big: false });
   };
   BattleFX.prototype.enemyAttack = function (dmg) {
     var self = this;
@@ -314,7 +320,8 @@
 
       /* ---- weapon ---- */
       case 'beam': case 'light': {
-        var beams = kanji === '二' ? 2 : kanji === '三' ? 3 : 1; var wide = ability === 'light';
+        var NUM = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '多': 5, '数': 4, '算': 3, '長': 1, '線': 1 };
+        var beams = NUM[kanji] || 1; var wide = ability === 'light' || kanji === '長' || kanji === '線';
         impact = 300;
         this.fx(0.55, function (ctx, k) {
           ctx.save(); ctx.globalAlpha = k < 0.6 ? 1 : (1 - k) / 0.4; ctx.strokeStyle = '#fff'; ctx.shadowColor = st.color; ctx.shadowBlur = 24; ctx.lineCap = 'round';
@@ -358,6 +365,20 @@
           ctx.restore();
         });
         setTimeout(function () { hit(1.5); self.shakeFx(14); }, impact); break;
+      }
+
+      /* ---- support: heal（回復） ---- */
+      case 'heal': {
+        impact = 500;
+        var hs = { color: '#7cf29a', color2: '#ffffff', shape: 'circle', gravity: -0.6 };
+        this.fx(1.2, function (ctx, k) {
+          var pp = self.playerPos(); ctx.save(); ctx.globalAlpha = (1 - k) * 0.8; ctx.strokeStyle = '#7cf29a'; ctx.lineWidth = 4; ctx.shadowColor = '#7cf29a'; ctx.shadowBlur = 16;
+          for (var i = 0; i < 3; i++) { var yy = pp.y - k * u * 2.2 - i * u * 0.5; ctx.beginPath(); ctx.ellipse(pp.x, yy, u * 0.9, u * 0.25, 0, 0, Math.PI * 2); ctx.stroke(); }
+          ctx.fillStyle = '#7cf29a'; ctx.font = 'bold ' + u * 0.7 + 'px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('+', pp.x, pp.y - u * 2.3 - k * u); ctx.restore();
+          if (Math.random() < 0.6) self.emit(pp.x + (Math.random() - 0.5) * u * 1.4, pp.y, hs, 2, { speed: 0.5, life: 0.9, size: 0.08, angle: -Math.PI / 2, spread: 0.6 });
+        });
+        this.player.aura = '#7cf29a'; this.player.auraT = 1.5;
+        setTimeout(function () { self.flash('#7cf29a', 0.25); hit(0.6, '#7cf29a'); }, impact); break;
       }
 
       /* ---- support ---- */

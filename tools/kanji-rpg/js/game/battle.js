@@ -55,6 +55,24 @@
     } else {
       root.SaveData.recordStroke(e.kanji, r.index, false);
       root.Events.emit('stroke:ng', { kanji: e.kanji, index: r.index, total: r.total, reasons: r.result.reasons });
+      enemyPunish(); // 書き順ミス → 敵の攻撃
+    }
+  }
+
+  /* ---------- 敵の攻撃（書き順をミスした時だけ） ---------- */
+  function enemyPunish() {
+    if (!S || !S.enemy || S.dead || S.stage.kind === 'tutorial') return;
+    if (fx.enemy && fx.enemy.frozen > 0) { notice(S.enemy.name + 'は こおっていて うごけない！', 900); return; }
+    var atk = S.enemy.attack || 10;
+    if (S.buff.speed > 0) { atk = Math.round(atk * 0.5); S.buff.speed--; }
+    S.playerHp = Math.max(0, S.playerHp - atk);
+    setHp('#player-hp', S.playerHp, 100);
+    notice(S.enemy.name + 'の こうげき！', 800);
+    fx.enemyAttack(atk);
+    if (S.playerHp <= 0) {
+      S.dead = true;
+      pad.setEnabled(false);
+      if (S.resolveWrite) { var f = S.resolveWrite; S.resolveWrite = null; f({ dead: true, mistakes: pad.totalMistakes }); }
     }
   }
 
@@ -119,19 +137,36 @@
     });
   }
 
-  function computeDamage(entry, mistakes, isLast) {
-    var e = S.enemy; if (!e) return 0;
+  /**
+   * ダメージ計算
+   *  ノーミス完成 → クリティカル（×1.6）。ミスありは通常。
+   *  通常ステージ: 敵はウェーブ最後の漢字で倒れる（全部の漢字を練習させる）
+   *  ボス（wave.loop）: 上限なし。ミスありは半減 → ミスすると戦闘が長引き、その間ミスするたびに大ダメージを受ける
+   */
+  function computeDamage(entry, mistakes, isLast, loop) {
+    var e = S.enemy; if (!e) return { dmg: 0, crit: false };
     var share = Math.ceil(e.maxHp / Math.max(1, S.waveAttackCount));
-    var dmg = share;
     var crit = mistakes === 0;
-    if (crit) dmg = Math.round(dmg * 1.3);
+    var dmg = share;
+    if (crit) dmg = Math.round(dmg * 1.6);
+    else if (loop) dmg = Math.round(dmg * 0.5);
     var mode = difficulty();
     if (mode === 'hard') dmg = Math.round(dmg * 1.2); else if (mode === 'expert') dmg = Math.round(dmg * 1.5);
     if (S.buff.power) { dmg = Math.round(dmg * 1.5); S.buff.power = false; }
-    if (entry.category === 'support') dmg = Math.round(share * 0.5);
-    if (!isLast && e.hp - dmg < 1) dmg = e.hp - 1; // 最後の漢字で倒す（残りの漢字も練習できるように）
-    if (isLast) dmg = Math.max(dmg, e.hp);
+    if (entry.category === 'support') dmg = Math.round(dmg * 0.5);
+    if (!loop) {
+      if (!isLast && e.hp - dmg < 1) dmg = e.hp - 1; // 最後の漢字で倒す
+      if (isLast) dmg = Math.max(dmg, e.hp);
+    }
     return { dmg: Math.max(1, dmg), crit: crit };
+  }
+  function heal(amount, label) {
+    if (!S || amount <= 0 || S.playerHp >= 100) return;
+    var before = S.playerHp;
+    S.playerHp = Math.min(100, S.playerHp + amount);
+    setHp('#player-hp', S.playerHp, 100);
+    fx.playerHeal(S.playerHp - before);
+    if (label) notice(label, 900);
   }
 
   /* ---------- ステージ進行 ---------- */
@@ -149,6 +184,7 @@
       updateEnemyHud();
       var events = resolveEvents(stage, wave);
       S.waveAttackCount = events.length;
+      S.dead = false;
       if (wave.intro) { instruction(''); await notice(wave.intro, 2000); }
       if (!alive(t)) return;
 
@@ -164,6 +200,20 @@
         var result = await writeKanji(entry);
         if (!alive(t)) return;
         pad.setEnabled(false);
+
+        // ミスで HP が 0 になった
+        if (result.dead) {
+          await wait(700);
+          await notice(wave.enemy && wave.enemy.boss ? 'まおうに やられた…' : 'たおれてしまった…', 1200);
+          var choice = await root.Screens.gameOver();
+          if (!alive(t)) return;
+          if (choice === 'map') { stop(); root.Screens.show('stages'); return; }
+          S.playerHp = 100; setHp('#player-hp', 100, 100); S.dead = false;
+          S.enemy.hp = S.enemy.maxHp; fx.setEnemy(S.enemy); updateEnemyHud();
+          events = resolveEvents(stage, wave); S.waveAttackCount = events.length;
+          ei = -1; // このウェーブを最初から
+          continue;
+        }
         // 完成したら隠していた漢字を見せる
         S.completed = true; clearTimeout(S.revealTimer);
         $('#cur-kanji').textContent = entry.kanji; $('#cur-kanji').classList.remove('secret');
@@ -185,11 +235,14 @@
 
         var isLast = ei === events.length - 1;
         if (S.enemy) {
-          var d = computeDamage(entry, result.mistakes, isLast);
+          var d = computeDamage(entry, result.mistakes, isLast, !!wave.loop);
           S.enemy.hp -= d.dmg;
           fx.enemyHit(d.dmg, d.crit);
           updateEnemyHud();
         }
+        // 回復: 回復魔法 +30 / ノーミス完成 +8（ボス戦は回復なし）
+        if (entry.ability === 'heal') heal(wave.loop ? 15 : 30, 'HPかいふく！');
+        else if (result.mistakes === 0 && !wave.loop) heal(8);
         await wait(500);
         hideBigKanji();
         if (!alive(t)) return;
@@ -198,6 +251,11 @@
           await notice(S.enemy.name + 'を たおした！', 1200);
           await fx.enemyDefeat();
           S.enemy = null; updateEnemyHud();
+        }
+        // ボス: 用意した漢字を使い切っても倒せていなければ、復習漢字を追加して戦闘を続ける
+        if (wave.loop && S.enemy && isLast && events.length < 14) {
+          var more = resolveEvents(stage, { events: [{ review: 'any' }] });
+          if (more.length) events.push(more[0]);
         }
 
         // 2年生漢字の新規取得
@@ -208,32 +266,11 @@
         }
         if (!alive(t)) return;
 
-        // 敵の反撃（チュートリアル以外・敵が生きている時）
-        if (S.enemy && stage.kind !== 'tutorial') {
-          var atk = S.enemy.attack || 10;
-          if (S.buff.speed) { atk = Math.round(atk * 0.5); S.buff.speed--; }
-          if (fx.enemy && fx.enemy.frozen > 0) atk = 0;
-          if (atk > 0) {
-            await notice(S.enemy.name + 'の こうげき！', 900);
-            await fx.enemyAttack(atk);
-            S.playerHp = Math.max(0, S.playerHp - atk);
-            setHp('#player-hp', S.playerHp, 100);
-            if (S.playerHp <= 0) {
-              var choice = await root.Screens.gameOver();
-              if (!alive(t)) return;
-              if (choice === 'map') { stop(); root.Screens.show('stages'); return; }
-              S.playerHp = 70; setHp('#player-hp', 70, 100);
-              S.enemy.hp = S.enemy.maxHp; fx.setEnemy(S.enemy); updateEnemyHud();
-              ei = -1; // このウェーブをやり直し
-              continue;
-            }
-          }
-        }
         await wait(250);
       }
       if (S.enemy) { S.enemy.hp = 0; updateEnemyHud(); await fx.enemyDefeat(); S.enemy = null; }
-      S.playerHp = Math.min(100, S.playerHp + 15);
-      setHp('#player-hp', S.playerHp, 100);
+      // ウェーブ突破で回復
+      if (wi < stage.waves.length - 1) heal(20);
     }
     if (!alive(t)) return;
     await stageClear(stage);
@@ -271,7 +308,7 @@
     if (!stage) return;
     token++;
     var t = token;
-    S = { stage: stage, waveIdx: 0, playerHp: 100, enemy: null, usedKanji: [], newKanji: [], buff: { power: false, speed: 0 }, running: true, kanjiHistory: [], entry: null, resolveWrite: null };
+    S = { stage: stage, waveIdx: 0, playerHp: 100, enemy: null, usedKanji: [], newKanji: [], buff: { power: false, speed: 0 }, running: true, kanjiHistory: [], entry: null, resolveWrite: null, dead: false };
     root.SaveData.get().lastStage = stageId; root.SaveData.save();
     root.Screens.show('battle');
     ensureViews();
