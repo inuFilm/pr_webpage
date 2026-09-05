@@ -36,6 +36,15 @@
       <h2>ぼうけんの地図</h2>
       <button class="btn btn-ghost" data-nav="collection">漢字図鑑</button>
     </header>
+    <div class="mode-bar">
+      <span class="mode-title">むずかしさ</span>
+      <div class="filter-group mode-group">
+        <button class="btn btn-chip" data-mode="normal">ふつう</button>
+        <button class="btn btn-chip hard" data-mode="hard">上級</button>
+        <button class="btn btn-chip expert" data-mode="expert">超上級</button>
+      </div>
+      <span class="mode-desc"></span>
+    </div>
     <div id="stage-list" class="stage-list"></div>
   </section>
 
@@ -213,6 +222,15 @@
         <label class="toggle"><input id="set-sfx" type="checkbox" checked> 効果音</label>
         <label class="toggle"><input id="set-voice" type="checkbox" checked> 読み上げ</label>
         <label class="toggle volume"><span>🔈</span><input id="set-volume" type="range" min="0" max="100" step="5" value="60"><span>🔊</span><span id="set-volume-val" class="volume-val">60%</span></label>
+        <div class="mode-bar in-panel">
+          <span class="mode-title">むずかしさ</span>
+          <div class="filter-group mode-group">
+            <button class="btn btn-chip" data-mode="normal">ふつう</button>
+            <button class="btn btn-chip hard" data-mode="hard">上級</button>
+            <button class="btn btn-chip expert" data-mode="expert">超上級</button>
+          </div>
+          <span class="mode-desc"></span>
+        </div>
       </div>
       <div class="panel-actions">
         <button id="pause-resume" class="btn btn-primary btn-xl">つづける</button>

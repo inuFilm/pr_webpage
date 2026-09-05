@@ -78,11 +78,13 @@
     this.completedAt = 0;
     this.hintLevel = o.hintLevel || 1;
     this.strokeHints = o.strokeHints || [];
+    // assist: 'full' = ミスするたびに段階的に補助を強める / 'minimal' = 3回ミスで始点だけ / 'none' = 何も出さない
+    this.assist = o.assist || 'full';
     this.color = o.color || '#62e6ff';
     this.enabled = true;
     this.container.classList.remove('perfect');
   };
-  InputPad.prototype.clear = function () { this.setKanji(this.entry, { hintLevel: this.hintLevel, strokeHints: this.strokeHints, color: this.color }); };
+  InputPad.prototype.clear = function () { this.setKanji(this.entry, { hintLevel: this.hintLevel, strokeHints: this.strokeHints, color: this.color, assist: this.assist }); };
   /** やり直し: 今の漢字を最初から（ミスには数えない） */
   InputPad.prototype.redo = function () {
     if (!this.entry || this.completedAt) return;
@@ -96,6 +98,8 @@
     var now = performance.now();
     var lvl = this.strokeHints[this.strokeIndex] || this.hintLevel;
     if (now < this.hintBoostUntil) return 1;
+    if (this.assist === 'none') return lvl;
+    if (this.assist === 'minimal') return this.mistakesOnCurrent >= 3 ? Math.min(lvl, 3) : lvl;
     if (this.mistakesOnCurrent >= 3) lvl = Math.min(lvl, 1);
     else if (this.mistakesOnCurrent >= 2) lvl = Math.min(lvl, 2);
     else if (this.mistakesOnCurrent >= 1) lvl = Math.min(lvl, 3);

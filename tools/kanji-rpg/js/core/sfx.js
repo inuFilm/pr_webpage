@@ -5,16 +5,68 @@
   'use strict';
   var ctx = null;
   var master = null;
+  var keepAlive = null;
+  var lastCtxTime = 0, lastWallTime = 0, stalled = false;
+  var recreations = 0;
 
-  function ensure() {
-    if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return true; }
+  /* ---- AudioContext の生成・復帰・監視 ----
+   * ブラウザ（特に iOS Safari / Android Chrome）は、タブ切替・読み上げ・他アプリの音などで
+   * AudioContext を suspended / interrupted にする。復帰はユーザー操作の中で resume() する必要が
+   * あるため、pointerdown 等を常時監視して kick() する。currentTime が進まない（黙って死んでいる）
+   * ケースは stall として検出し、コンテキストを作り直す。
+   */
+  function createContext() {
+    var AC = root.AudioContext || root.webkitAudioContext;
+    if (!AC) return false;
     try {
-      var AC = root.AudioContext || root.webkitAudioContext;
-      if (!AC) return false;
+      if (ctx && ctx.state !== 'closed') { try { ctx.close(); } catch (e) { /* ignore */ } }
       ctx = new AC();
       master = ctx.createGain(); master.gain.value = masterGain(); master.connect(ctx.destination);
-    } catch (e) { return false; }
+      // 無音のループ音源で音声セッションを維持（iOS の自動停止対策）
+      var buf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+      keepAlive = ctx.createBufferSource(); keepAlive.buffer = buf; keepAlive.loop = true;
+      var kg = ctx.createGain(); kg.gain.value = 0.0001; keepAlive.connect(kg); kg.connect(ctx.destination);
+      keepAlive.start();
+      ctx.onstatechange = function () { if (ctx && ctx.state !== 'running') setTimeout(kick, 50); };
+      lastCtxTime = ctx.currentTime; lastWallTime = performance.now(); stalled = false;
+      if (recreations > 0) console.info('[SFX] AudioContext recreated (#' + recreations + ')');
+      return true;
+    } catch (e) { console.warn('[SFX] AudioContext creation failed', e); ctx = null; master = null; return false; }
+  }
+
+  /** 止まっていれば起こす。ユーザー操作のハンドラ内から呼ぶのが最も確実。 */
+  function kick() {
+    if (!ctx) return createContext();
+    if (ctx.state === 'closed' || stalled) { recreations++; return createContext(); }
+    if (ctx.state !== 'running') {
+      try { var p = ctx.resume(); if (p && p.catch) p.catch(function () { /* ジェスチャ外では拒否されることがある */ }); } catch (e) { /* ignore */ }
+    }
     return true;
+  }
+
+  /** 音を鳴らす直前に呼ぶ。stall 検出も行う。 */
+  function ensure() {
+    if (!ctx) return createContext();
+    var now = performance.now();
+    if (ctx.state === 'running') {
+      // 実時間が 1.5 秒以上進んでいるのにオーディオ時計が止まっている → 黙って死んでいる
+      if (now - lastWallTime > 1500) {
+        if (ctx.currentTime <= lastCtxTime + 0.001) { stalled = true; }
+        lastCtxTime = ctx.currentTime; lastWallTime = now;
+      }
+      if (stalled) { recreations++; return createContext(); }
+      return true;
+    }
+    lastWallTime = now; lastCtxTime = ctx.currentTime;
+    return kick();
+  }
+
+  function installRecoveryHooks() {
+    var opts = { passive: true, capture: true };
+    ['pointerdown', 'touchend', 'mousedown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { kick(); }, opts); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') setTimeout(kick, 100); });
+    root.addEventListener('focus', function () { setTimeout(kick, 100); });
+    root.addEventListener('pageshow', function () { setTimeout(kick, 100); });
   }
   function enabled() { return root.SaveData ? root.SaveData.getSetting('sfx') : true; }
   /** 音量 0..1（セーブ設定）→ マスターゲイン */
@@ -51,9 +103,8 @@
 
   var SFX = {
     init: function () {
-      // 最初のユーザー操作で AudioContext を作る
-      var unlock = function () { ensure(); document.removeEventListener('pointerdown', unlock); };
-      document.addEventListener('pointerdown', unlock);
+      // ユーザー操作のたびに AudioContext を起こす（初回生成 + 途中で止まった時の復帰）
+      installRecoveryHooks();
 
       root.Events.on('stroke:ok', function (p) {
         var step = p ? p.index : 0;
@@ -74,7 +125,11 @@
       root.Events.on('stage:clear', function () { [523, 659, 784, 1046, 1318].forEach(function (f, i) { tone(f, 0.4, 'triangle', 0.3, null, i * 0.12); }); });
       root.Events.on('ui:click', function () { tone(880, 0.06, 'square', 0.12); });
     },
-    tone: tone, noise: noise, setVolume: setVolume, volume: volume,
+    tone: tone, noise: noise, setVolume: setVolume, volume: volume, kick: kick,
+    /** デバッグ用: 内部 AudioContext（開発者コンソール用） */
+    _ctx: function () { return ctx; },
+    /** デバッグ用: 現在の状態 */
+    status: function () { return ctx ? { state: ctx.state, currentTime: ctx.currentTime, stalled: stalled, recreations: recreations, gain: master ? master.gain.value : null } : { state: 'none' }; },
     /** 音量スライダー用の試し鳴らし */
     preview: function () { tone(660, 0.12, 'triangle', 0.5, 990); }
   };
@@ -87,6 +142,8 @@
         root.speechSynthesis.cancel();
         var u = new SpeechSynthesisUtterance(text);
         u.lang = 'ja-JP'; u.rate = 0.95; u.pitch = 1.1; u.volume = volume();
+        // iOS では読み上げ中に AudioContext が interrupted になることがあるので、終わったら起こす
+        u.onend = function () { setTimeout(kick, 50); }; u.onerror = u.onend;
         var voices = root.speechSynthesis.getVoices();
         var ja = voices.filter(function (v) { return /ja/i.test(v.lang); });
         if (ja.length) u.voice = ja[0];

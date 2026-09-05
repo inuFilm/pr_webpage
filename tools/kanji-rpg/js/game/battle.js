@@ -75,16 +75,44 @@
     }).filter(Boolean);
   }
 
+  /* ---------- むずかしさ ---------- */
+  // 'normal' | 'hard'（書き順ガイドなし） | 'expert'（漢字も隠す）。チュートリアルは常に normal
+  function difficulty() { if (!S || S.stage.kind === 'tutorial') return 'normal'; return root.Screens.currentMode(); }
+  /** 超上級で漢字を隠すか。まだ手に入れていない漢字は形を見せる */
+  function isSecret(entry) { return difficulty() === 'expert' && root.SaveData.isAcquired(entry.kanji); }
+  /** 隠しモード用: 文中の漢字を読みに置き換える */
+  function maskText(text, entry) { if (!text || !isSecret(entry)) return text; return text.split(entry.kanji).join(entry.reading); }
+  function revealKanji(ms) {
+    if (!S || !S.entry) return;
+    var el = $('#cur-kanji');
+    el.textContent = S.entry.kanji; el.classList.remove('secret'); el.classList.remove('reveal'); void el.offsetWidth; el.classList.add('reveal');
+    clearTimeout(S.revealTimer);
+    S.revealTimer = setTimeout(function () { if (S && S.secret && !S.completed) { el.textContent = '？'; el.classList.add('secret'); } }, ms || 3500);
+  }
+  function updateStageTitle() {
+    var m = difficulty();
+    $('#stage-title').innerHTML = S.stage.name + (m !== 'normal' ? '<span class="hud-mode ' + m + '">' + root.Screens.modeLabel(m) + '</span>' : '');
+  }
+
   /* ---------- 漢字を書かせる ---------- */
   function writeKanji(entry) {
     return new Promise(function (res) {
       S.resolveWrite = res;
-      // チュートリアルは書き方を覚える場なので常にフルガイド
-      var base = S.stage.kind === 'tutorial' ? 1 : root.Scheduler.hintLevelFor(entry.kanji);
+      var mode = difficulty();
       var color = root.BattleFX.styleOf(entry.category, entry.ability).color;
-      pad.setKanji(entry, { hintLevel: base, strokeHints: root.Scheduler.strokeHintLevels(entry.kanji, base), color: color });
+      if (mode === 'normal') {
+        // チュートリアルは書き方を覚える場なので常にフルガイド
+        var base = S.stage.kind === 'tutorial' ? 1 : root.Scheduler.hintLevelFor(entry.kanji);
+        pad.setKanji(entry, { hintLevel: base, strokeHints: root.Scheduler.strokeHintLevels(entry.kanji, base), color: color, assist: 'full' });
+      } else {
+        // 上級・超上級: ガイドなし。3回ミスでやっと始点だけ
+        pad.setKanji(entry, { hintLevel: 4, strokeHints: [], color: color, assist: 'minimal' });
+      }
       pad.setEnabled(true);
-      $('#cur-kanji').textContent = entry.kanji; $('#cur-reading').textContent = entry.reading;
+      S.secret = isSecret(entry); S.completed = false;
+      var ck = $('#cur-kanji');
+      ck.textContent = S.secret ? '？' : entry.kanji; ck.classList.toggle('secret', S.secret); ck.classList.remove('reveal');
+      $('#cur-reading').textContent = entry.reading;
       $('#cur-stroke').textContent = 1; $('#cur-total').textContent = entry.strokeCount;
       $('#mana-fill').style.width = '0%';
       fx.charge = 0; fx.chargeStyle = root.BattleFX.styleOf(entry.category, entry.ability);
@@ -97,6 +125,8 @@
     var dmg = share;
     var crit = mistakes === 0;
     if (crit) dmg = Math.round(dmg * 1.3);
+    var mode = difficulty();
+    if (mode === 'hard') dmg = Math.round(dmg * 1.2); else if (mode === 'expert') dmg = Math.round(dmg * 1.5);
     if (S.buff.power) { dmg = Math.round(dmg * 1.5); S.buff.power = false; }
     if (entry.category === 'support') dmg = Math.round(share * 0.5);
     if (!isLast && e.hp - dmg < 1) dmg = e.hp - 1; // 最後の漢字で倒す（残りの漢字も練習できるように）
@@ -107,7 +137,7 @@
   /* ---------- ステージ進行 ---------- */
   async function runStage(stage, t) {
     fx.setTheme(stage.theme);
-    $('#stage-title').textContent = stage.name;
+    updateStageTitle();
     S.playerHp = S.playerHp || 100;
     setHp('#player-hp', S.playerHp, 100);
 
@@ -128,12 +158,15 @@
         if (!entry || !root.KanjiDB.playable(ev.kanji)) { console.warn('stroke data missing:', ev.kanji); continue; }
         S.entry = entry; S.usedKanji.push(entry.kanji);
         root.SaveData.markSeen(entry.kanji);
-        if (ev.situation) { notice(ev.situation, 2200); }
-        instruction(ev.text || entry.prompt);
+        if (ev.situation) { notice(maskText(ev.situation, entry), 2200); }
+        instruction(maskText(ev.text || entry.prompt, entry));
 
         var result = await writeKanji(entry);
         if (!alive(t)) return;
         pad.setEnabled(false);
+        // 完成したら隠していた漢字を見せる
+        S.completed = true; clearTimeout(S.revealTimer);
+        $('#cur-kanji').textContent = entry.kanji; $('#cur-kanji').classList.remove('secret');
         var rec = root.SaveData.recordComplete(entry.kanji, result.mistakes);
         S.kanjiHistory.push(entry.kanji);
         checkCombo();
@@ -252,7 +285,12 @@
   function stop() { if (S) S.running = false; token++; if (pad) { pad.setKanji(null); pad.setEnabled(false); } if (fx) { fx.setEnemy(null); fx.effects = []; fx.env = []; fx.numbers = []; fx.particles = []; fx.player.dashX = 0; fx.player.scale = 1; fx.player.aura = null; fx.player.allyT = 0; } }
 
   function init() {
-    $('#btn-hint').addEventListener('click', function () { root.Events.emit('ui:click'); if (pad) pad.showHint(3500); });
+    $('#btn-hint').addEventListener('click', function () {
+      root.Events.emit('ui:click');
+      if (!pad) return;
+      pad.showHint(3500);
+      if (S && S.secret) revealKanji(3500); // 超上級: 隠している漢字も少しだけ見せる
+    });
     $('#btn-redo').addEventListener('click', function () { root.Events.emit('ui:click'); if (pad) pad.redo(); });
     $('#btn-pause').addEventListener('click', async function () {
       root.Events.emit('ui:click');
@@ -264,5 +302,8 @@
     });
   }
 
-  root.Battle = { init: init, start: start, stop: stop, state: function () { return S; } };
+  /** ポーズ中にむずかしさを変えたとき: 次の漢字から反映。HUD は即時更新 */
+  function onModeChanged() { if (S && S.running) updateStageTitle(); }
+
+  root.Battle = { init: init, start: start, stop: stop, state: function () { return S; }, onModeChanged: onModeChanged, difficulty: difficulty };
 })(window);

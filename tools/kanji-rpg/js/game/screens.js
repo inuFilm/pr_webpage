@@ -64,6 +64,7 @@
       $('#set-voice').checked = root.SaveData.getSetting('voice');
       var vol = Math.round(root.SaveData.getSetting('volume') * 100);
       $('#set-volume').value = vol; $('#set-volume-val').textContent = vol + '%';
+      refreshModeChips();
       overlay('overlay-pause', true);
       var a, b;
       a = once($('#pause-resume'), function () { $('#pause-map').removeEventListener('click', b); overlay('overlay-pause', false); res('resume'); });
@@ -123,8 +124,35 @@
   }
   function catLabel(c) { return { fire: 'ほのお', water: '水', nature: 'しぜん', weather: 'てんき', animal: 'どうぶつ', movement: 'うごき', weapon: 'ぶき', support: 'サポート', object: 'もの', location: 'ばしょ' }[c] || c; }
 
+  /* ---------- むずかしさ ---------- */
+  var MODE_LABEL = { normal: 'ふつう', hard: '上級', expert: '超上級' };
+  var MODE_DESC = {
+    normal: '習熟度に合わせて 書き順の ガイドが 出ます。',
+    hard: '書き順の ガイドが 出ません。漢字の形だけ 見て 書きます。',
+    expert: '漢字も 隠れます。「よみ」だけを 見て 書きます。（はじめての漢字は 形が 見えます）'
+  };
+  function modeLabel(m) { return MODE_LABEL[m] || MODE_LABEL.normal; }
+  function currentMode() { var m = root.SaveData.getSetting('difficulty'); return MODE_LABEL[m] ? m : 'normal'; }
+  function refreshModeChips() {
+    var m = currentMode();
+    $all('[data-mode]').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-mode') === m); });
+    $all('.mode-desc').forEach(function (d) { d.textContent = MODE_DESC[m]; });
+  }
+  function bindModeChips() {
+    $all('[data-mode]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        root.Events.emit('ui:click');
+        root.SaveData.setSetting('difficulty', b.getAttribute('data-mode'));
+        refreshModeChips();
+        if (root.Battle && root.Battle.onModeChanged) root.Battle.onModeChanged();
+      });
+    });
+    refreshModeChips();
+  }
+
   /* ---------- 初期化 ---------- */
   function init() {
+    bindModeChips();
     $all('[data-nav]').forEach(function (b) {
       b.addEventListener('click', function () {
         root.Events.emit('ui:click');
@@ -158,5 +186,5 @@
     show('title', true);
   }
 
-  root.Screens = { init: init, show: show, back: back, message: message, newKanjiCard: newKanjiCard, stageClear: stageClear, gameOver: gameOver, pause: pause, renderStages: renderStages, renderCollection: renderCollection, current: function () { return current; } };
+  root.Screens = { init: init, show: show, back: back, message: message, newKanjiCard: newKanjiCard, stageClear: stageClear, gameOver: gameOver, pause: pause, renderStages: renderStages, renderCollection: renderCollection, current: function () { return current; }, modeLabel: modeLabel, currentMode: currentMode, refreshModeChips: refreshModeChips };
 })(window);

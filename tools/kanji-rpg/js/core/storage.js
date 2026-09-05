@@ -111,7 +111,8 @@
   function hasProgress() { var s = get(); return s.clearedStages.length > 0 || Object.keys(s.kanji).length > 0; }
 
   function setSetting(k, v) { get().settings[k] = v; save(); }
-  var SETTING_DEFAULTS = { sfx: true, voice: true, volume: 0.6 };
+  // difficulty: 'normal' | 'hard'（書き順ガイドなし） | 'expert'（漢字も隠す）
+  var SETTING_DEFAULTS = { sfx: true, voice: true, volume: 0.6, difficulty: 'normal' };
   function getSetting(k) { var s = get().settings; return s[k] !== undefined ? s[k] : (SETTING_DEFAULTS[k] !== undefined ? SETTING_DEFAULTS[k] : true); }
 
   function reset() { state = defaults(); save(); }
