@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#203744">
+<meta name="description" content="ゲームのリアルタイム VFX を、エンジンに依存しない原則と数学で学ぶ教材。UV・流す＋抜く・歪み・ディゾルブ・極座標・ブレンド・パーティクルの寿命と力・フリップブック・タイミング・可読性まで、全部ブラウザ内で動く図とシェーダーで理解する。">
+<title>ゲームVFXの原則を、動く図で。 | makeinufilm</title>
+<link rel="shortcut icon" href="../../img/favicons/favicon.ico">
+<link rel="stylesheet" href="style.css?v=20260906-2">
+</head>
+<body>
+<div class="app">
+<nav>
+  <div class="site-links"><a href="../../index.html">makeinufilm.com</a><span>/</span><a href="../../tech/articles/tools.html">ツールまとめ</a></div>
+  <h1>ゲームVFXの原則を、動く図で。</h1>
+  <p class="sub">エンジンに依存しない「形・動き・時間」の入門</p>
+  <ul id="nav-list"></ul>
+  <div class="progress"><span id="prog-text">0 / 0 完了</span><div class="bar"><i id="prog-bar"></i></div></div>
+</nav>
+
+<main>
+
+<!-- ============ 0 ============ -->
+<section class="lesson" data-part="Part 1　1枚の板から始まる" data-title="はじめに：原則だけを学ぶ理由">
+<h2><span class="chap">CHAPTER</span>はじめに：エンジンの手順ではなく、原則を学ぶ</h2>
+<p class="lead">ゲームのエフェクト（リアルタイム VFX）は、突き詰めると <span class="hl">「板に絵を描く」「板をたくさん飛ばす」「時間で見せる」</span> の 3 つでできています。この教材は、その 3 つをエンジンの名前を出さずに説明します。</p>
+
+<h3>なぜエンジンの手順を書かないのか</h3>
+<p>Unity / Unreal / Godot のどれで作っても、爆発は「一瞬のフラッシュ → 広がるリング → 飛ぶ火花 → 残る煙」です。変わるのはボタンの場所とノードの名前だけで、それは数年で入れ替わります。逆に、ここで扱う原則は 2016 年のフォーラム投稿でも今でも同じことが書かれています。</p>
+<div class="callout green">
+  <div class="t">「なぜそうするか」はここで学び、「どのボタンを押すか」は使うエンジンの現行ドキュメントで確認する。</div>
+  この教材の各章は、そのまま Shader Graph / マテリアルエディタ / VFX Graph / Niagara の 1 ノードや 1 モジュールに対応します。対応の付け方は最終章にまとめました。
+</div>
+
+<h3>この教材の書き方ルール</h3>
+<ul class="plain">
+  <li>Part 1 のシェーダーは <span class="hl">GLSL</span>（WebGL のシェーダー言語）で書きます。図の下にあるコードは <span class="g">図で実際に動いているコードそのもの</span> です。飾りの疑似コードではありません。</li>
+  <li>Part 2〜3 は JavaScript で、<a href="../cgmath/">CGの数学を、数式なしで。</a> と同じ書き方（<code>{x, y}</code> の矢印、<code>lerp()</code>、<code>noise()</code>）です。</li>
+  <li>数学が出てくる所には <span class="v">数学</span> の印を付けて、数学アプリの該当章にリンクします。先にそちらを読んでも、後回しでも構いません。</li>
+  <li>画像素材は一切使いません。炎も煙もフリップブックも、<span class="hl">全部ブラウザの中で計算して作ります</span>。だから「テクスチャの中身がどうなっているか」まで見えます。</li>
+  <li>図はクリックで一時停止 / 再開できます。</li>
+</ul>
+
+<pre class="code"><span class="c">// Part 1 のコードはこの形。uv（板の上の住所）から色を決める関数です</span>
+<span class="k">void</span> <span class="f">main</span>() {
+  <span class="k">vec2</span> uv = v_uv;                         <span class="c">// 左下 (0,0) 〜 右上 (1,1)</span>
+  <span class="k">float</span> n = <span class="f">fbm</span>(uv * <span class="n">4.0</span> - u_time);      <span class="c">// ノイズを時間で流す</span>
+  outColor = <span class="k">vec4</span>(<span class="f">fireRamp</span>(n), <span class="n">1.0</span>);      <span class="c">// 白黒に色を着ける</span>
+}</pre>
+
+<h3>全体の地図</h3>
+<div class="grid2">
+  <div class="card"><div class="t">Part 1：1枚の板から始まる</div>UV → 流す＋抜く → 歪み → ディゾルブ → 極座標 → ランプ → ブレンド → フレネルとソフトパーティクル → 頂点オフセット → ループ → 全部つなぐサンドボックス → 光を受ける板。エフェクトの「見た目」はほぼこの組み合わせ。</div>
+  <div class="card"><div class="t">Part 2：パーティクル</div>発生と寿命 → 寿命カーブ → 速度と力 → ビルボードとリボン → リボンの UV → フリップブック → オーバードロー。板を「たくさん飛ばす」側の原則。</div>
+  <div class="card"><div class="t">Part 3：演出</div>タイミング → 可読性 → 色の階層 → 要素の役割。技術より先に効いてくる、良し悪しを決める側の原則。</div>
+  <div class="card"><div class="t">Part 4：レシピ</div>炎・煙・雷・斬撃・回復・衝撃波。新しい仕組みは出てこない。Part 1〜3 の部品を「何を、どの順で、どの数字で」組むか。</div>
+  <div class="card"><div class="t">Part 5：対応表</div>この教材の章 → 数学アプリの章、GLSL / HLSL / VEX の関数名、ノード式エディタでの読み替え。</div>
+</div>
+
+<div class="callout principle">
+  <div class="t">原則 0：見た目が違うエフェクトの多くは、同じ部品の組み合わせでできている。</div>
+  炎・煙・オーラ・魔法陣は「ノイズを流して、マスクで抜いて、ランプで色を着ける」の 3 手順で全部作れます。部品を知ると、他人のエフェクトの構造が読めるようになります。それがこの教材の目標です。
+</div>
+</section>
+
+<!-- ============ 1 ============ -->
+<section class="lesson" data-title="UV：板の上の住所">
+<h2><span class="chap">CHAPTER</span>UV：板の上の「住所」から色を決める</h2>
+<p class="lead">シェーダーは「このピクセルは板のどこか？」を受け取って「なら何色か」を返す関数です。その「どこか」が <span class="hl">UV</span>。左下が <code>{u: 0, v: 0}</code>、右上が <code>{u: 1, v: 1}</code> です。</p>
+
+<div class="viz">
+  <p class="hint">左の図は UV をそのまま色にしたもの（横 = 赤、縦 = 緑）。「流す速さ」を動かすと、板は動かないのに絵だけが流れます。それが「UV スクロール」です。</p>
+  <canvas id="g-uv"></canvas>
+  <div class="controls">
+    <label>流す速さ 横 <input type="range" id="s-uv-sx" min="-1" max="1" step="0.05" value="0.2"><span id="s-uv-sx-v"></span></label>
+    <label>流す速さ 縦 <input type="range" id="s-uv-sy" min="-1" max="1" step="0.05" value="0"><span id="s-uv-sy-v"></span></label>
+    <span id="m-uv"><button class="btn active" data-mode="0">座標を色で</button><button class="btn" data-mode="1">チェッカー</button></span>
+  </div>
+</div>
+<pre class="code" id="code-uv"></pre>
+
+<h3>覚えることは 2 つだけ</h3>
+<ul class="plain">
+  <li><span class="b">絵を動かす = UV に足す。</span>テクスチャは動かさず、読む場所をずらす。<code>uv + speed * time</code> が「スクロール」の全部です。</li>
+  <li><span class="b">1 を超えたら 0 に戻す = <code>fract()</code>。</span>これで無限に流れます。テクスチャ側が「リピート」設定なら自動で同じことが起きます。</li>
+</ul>
+<p>この後の章で出てくる「歪み」「極座標」「フリップブック」は、全部 <span class="hl">UV をどう加工してから読むか</span> の話です。UV を加工する → 加工した UV で絵を読む。この順番を頭に入れておいてください。</p>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  <code>fract()</code> と繰り返しは <a href="../cgmath/#ch13">数学アプリ 13 章「mod と fract」</a>。UV は 2 次元のベクトルなので <a href="../cgmath/#ch1">1 章「ベクトル」</a> の足し算そのものです。
+</div>
+
+<div class="quiz" data-answer="1" data-why="UV に「時間 × 速さ」を足すと、読む場所がずれて絵が流れます。板の頂点は動いていません。">
+  <div class="q">「炎のテクスチャを上に流す」を実現しているのはどれ？</div>
+  <div class="opts">
+    <button class="opt">板そのものを上に動かしている</button>
+    <button class="opt">UV の v に時間を足して（引いて）、読む場所をずらしている</button>
+    <button class="opt">テクスチャ画像を毎フレーム描き直している</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section class="lesson" data-title="流す＋抜く：いちばん基本の組み合わせ">
+<h2><span class="chap">CHAPTER</span>流す＋抜く：炎も煙もオーラも、この 3 手順</h2>
+<p class="lead">ノイズを <span class="hl">流し</span>、マスクで <span class="hl">抜き</span>、しきい値で <span class="hl">切る</span>。リアルタイム VFX で最初に覚えるべき組み合わせで、見た目がまったく違うエフェクトの多くがこの構造です。</p>
+
+<div class="viz">
+  <p class="hint">「表示」で途中経過を見てください。ノイズだけ → マスクだけ → 掛けて切ったもの。マスクを丸に変えると同じノイズが「玉」になります。</p>
+  <canvas id="g-flow"></canvas>
+  <div class="controls">
+    <label>細かさ <input type="range" id="s-flow-scale" min="1" max="10" step="0.5" value="4"><span id="s-flow-scale-v"></span></label>
+    <label>速さ <input type="range" id="s-flow-speed" min="0" max="2" step="0.05" value="0.6"><span id="s-flow-speed-v"></span></label>
+    <label>しきい値 <input type="range" id="s-flow-cut" min="0" max="1" step="0.01" value="0.35"><span id="s-flow-cut-v"></span></label>
+    <label>柔らかさ <input type="range" id="s-flow-soft" min="0.01" max="1" step="0.01" value="0.35"><span id="s-flow-soft-v"></span></label>
+  </div>
+  <div class="controls">
+    <span>マスク <span id="m-flow-mask"><button class="btn active" data-v="0">炎</button><button class="btn" data-v="1">丸</button><button class="btn" data-v="2">なし</button></span></span>
+    <span>色 <span id="m-flow-ramp"><button class="btn active" data-v="0">炎</button><button class="btn" data-v="1">煙</button></span></span>
+    <span>表示 <span id="m-flow-show"><button class="btn active" data-v="0">完成</button><button class="btn" data-v="1">ノイズだけ</button><button class="btn" data-v="2">マスクだけ</button></span></span>
+  </div>
+</div>
+<pre class="code" id="code-flow"></pre>
+
+<h3>3 つの手順を分けて考える</h3>
+<table class="sheet">
+  <tr><th>手順</th><th>やっていること</th><th>変えると何が変わるか</th></tr>
+  <tr><td>1. 流す</td><td>ノイズの UV に時間を足す</td><td>速さ・向き。炎は上、滝は下、渦は回転（5 章）</td></tr>
+  <tr><td>2. 抜く</td><td>「どこを残すか」の白黒（マスク）を掛ける</td><td>形。炎は下が濃い縦長、玉は中心が濃い丸、リングは輪</td></tr>
+  <tr><td>3. 切る</td><td><code>smoothstep(cut, cut + soft, v)</code> でしきい値の下を捨てる</td><td>密度と縁の硬さ。柔らかさ 0 に近づけると「切り絵」、大きくすると「もや」</td></tr>
+</table>
+<p>色は最後です。白黒で形が良ければ、色を変えるだけで炎にも毒霧にも氷にもなります（6 章「ランプ」）。<span class="hl">まず白黒で作る</span>、はこの先ずっと使う癖です。</p>
+
+<div class="callout principle">
+  <div class="t">原則 1：白黒で形を作り、色は最後に着ける。</div>
+  実務でも、テクスチャは白黒のマスクとして描き、色はシェーダー側のランプで着けるのが基本です。1 枚の白黒素材が、色違いで何種類ものエフェクトに化けます。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  ノイズと fbm は <a href="../cgmath/#ch12">12 章「ノイズ」</a>。マスクの「中心からの距離で薄くする」は <a href="../cgmath/#ch15">15 章「フォールオフ」</a>。<code>smoothstep</code> は <a href="../cgmath/#ch8">8 章「補間とイージング」</a> の仲間です。
+</div>
+
+<div class="quiz" data-answer="2" data-why="マスクは「どこを残すか」の白黒です。ノイズを流しても、マスクが変わらなければ形（輪郭）は同じままです。">
+  <div class="q">炎の「形」（下が太くて上が細い）を決めているのはどれ？</div>
+  <div class="opts">
+    <button class="opt">ノイズの細かさ</button>
+    <button class="opt">流す速さ</button>
+    <button class="opt">マスク</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section class="lesson" data-title="歪み：UV をノイズでずらす">
+<h2><span class="chap">CHAPTER</span>歪み：絵を変えずに、読む場所をゆがめる</h2>
+<p class="lead">熱のゆらぎ、水面越しの景色、魔法の空間の歪み。これらは絵を加工していません。<span class="hl">UV にノイズを足してから読む</span> だけです。</p>
+
+<div class="viz">
+  <p class="hint">「ずらしベクトルを見る」を入れると、各ピクセルがどの方向に読みに行っているかが色で見えます（赤 = 右、緑 = 上）。市松は「本来の絵」の代わりです。</p>
+  <canvas id="g-dist"></canvas>
+  <div class="controls">
+    <label>ずらす量 <input type="range" id="s-dist-str" min="0" max="0.3" step="0.005" value="0.08"><span id="s-dist-str-v"></span></label>
+    <label>細かさ <input type="range" id="s-dist-scale" min="1" max="8" step="0.5" value="3"><span id="s-dist-scale-v"></span></label>
+    <label>速さ <input type="range" id="s-dist-speed" min="0" max="1.5" step="0.05" value="0.4"><span id="s-dist-speed-v"></span></label>
+    <label><input type="checkbox" id="k-dist-center"> 中心だけ歪める</label>
+    <label><input type="checkbox" id="k-dist-show"> ずらしベクトルを見る</label>
+  </div>
+</div>
+<pre class="code" id="code-dist"></pre>
+
+<h3>ポイント</h3>
+<ul class="plain">
+  <li><span class="b">ノイズは 0〜1 なので 0.5 を引く。</span>引かないと全体が右上にずれるだけになります。「ずらす」は矢印なので、正負が要ります。</li>
+  <li><span class="b">量は小さく。</span>0.05〜0.1 で十分「ゆらぎ」に見えます。大きくすると絵が壊れます（それはそれで「空間の裂け目」に使えます）。</li>
+  <li><span class="b">歪みにもマスクを。</span>「中心だけ歪める」の通り、歪みの量にマスクを掛けると、板の縁が歪んでいないので板の四角が見えません。</li>
+  <li><span class="b">2 章と組み合わせる。</span>流した炎の UV をさらに歪めると、炎の「ゆらめき」になります。歪み用のノイズも流しておくのがコツです。</li>
+</ul>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  「位置に矢印を足す」は <a href="../cgmath/#ch1">1 章「ベクトル」</a> の足し算そのもの。ノイズを 2 枚使って矢印を作るのは <a href="../cgmath/#ch28">28 章「ベクトル場」</a> の考え方です。
+</div>
+
+<div class="quiz" data-answer="0" data-why="ノイズは 0〜1 なので、そのまま足すと全ピクセルが同じ方向（右上）に寄ります。0.5 を引いて -0.5〜0.5 にすると、四方にばらけて「ゆがみ」になります。">
+  <div class="q">歪み用ノイズから 0.5 を引かないとどうなる？</div>
+  <div class="opts">
+    <button class="opt">絵全体が片方向に寄る（ずれるだけで歪まない）</button>
+    <button class="opt">何も変わらない</button>
+    <button class="opt">絵が反転する</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section class="lesson" data-title="ディゾルブ：しきい値を動かして消す">
+<h2><span class="chap">CHAPTER</span>ディゾルブ：ノイズとしきい値で「燃えて消える」</h2>
+<p class="lead">キャラが灰になる、弾が霧散する、盾が砕ける。<span class="hl">ノイズより「しきい値」を上げていく</span> だけで、暗い所から順に消えていきます。しきい値のすぐ上に色を乗せると、燃えている縁になります。</p>
+
+<div class="viz">
+  <p class="hint">しきい値を左右に動かしてください。ノイズは動いていません。動いているのは「どこまで消すか」の数字だけです。</p>
+  <canvas id="g-diss"></canvas>
+  <div class="controls">
+    <label>しきい値 <input type="range" id="s-diss-th" min="0" max="1" step="0.005" value="0.45"><span id="s-diss-th-v"></span></label>
+    <label>縁の幅 <input type="range" id="s-diss-w" min="0" max="0.3" step="0.005" value="0.08"><span id="s-diss-w-v"></span></label>
+    <label>細かさ <input type="range" id="s-diss-scale" min="2" max="16" step="1" value="6"><span id="s-diss-scale-v"></span></label>
+    <label><input type="checkbox" id="k-diss-auto"> 自動で往復</label>
+    <label>縁の色 <input type="color" id="c-diss-glow" value="#ff9926"></label>
+  </div>
+</div>
+<pre class="code" id="code-diss"></pre>
+
+<h3>2 つの関数が全部</h3>
+<ul class="plain">
+  <li><code>step(th, n)</code>：n が th 以上なら 1、未満なら 0。<span class="b">残すか消すか</span>。</li>
+  <li><code>1 - smoothstep(th, th + w, n)</code>：th のすぐ上だけ 1 に近い。<span class="b">燃えている縁</span>。w が縁の幅。</li>
+</ul>
+<p>ノイズの「細かさ」が消え方の性格です。粗いと「大きく崩れる」、細かいと「砂になる」。ノイズを 2 章の要領で流しておくと、消えながらゆらぎます。</p>
+<div class="callout green">
+  <div class="t">同じ仕組みの別名</div>
+  「エロージョン（侵食）」「アルファエロージョン」「バーン」はだいたいこれ。パーティクルの寿命でしきい値を動かせば、煙が「薄くなる」のではなく「ちぎれて消える」ようになります（Part 2 の寿命カーブと組み合わせる）。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  しきい値で 0 / 1 にするのは <a href="../cgmath/#ch14">14 章「距離関数」</a> の「距離が 0 より上か下か」と同じ判定。縁の幅は <a href="../cgmath/#ch15">15 章「フォールオフ」</a>。
+</div>
+
+<div class="quiz" data-answer="1" data-why="step(th, n) は n ≥ th の所だけ残します。しきい値を上げると、ノイズの暗い所（値の小さい所）から順に消えます。">
+  <div class="q">しきい値を 0.3 から 0.6 に上げると、先に消えるのはどこ？</div>
+  <div class="opts">
+    <button class="opt">ノイズが明るい（値が大きい）所</button>
+    <button class="opt">ノイズが暗い（値が小さい）所</button>
+    <button class="opt">板の縁から順に</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section class="lesson" data-title="極座標：リング・渦・放射">
+<h2><span class="chap">CHAPTER</span>極座標：UV を「角度と距離」に変えると丸いものが作れる</h2>
+<p class="lead">衝撃波のリング、渦巻き、光の筋、魔法陣。丸いエフェクトは <span class="hl">UV を「中心からの角度」と「中心からの距離」に変換してから</span> 2 章の手順を使います。</p>
+
+<div class="viz">
+  <p class="hint">まず「極座標を色で」を見てください。横方向（赤）が角度、縦方向（緑）が距離になっています。この新しい UV に対して「流す」を行うと、渦や放射になります。</p>
+  <canvas id="g-polar"></canvas>
+  <div class="controls">
+    <span id="m-polar"><button class="btn active" data-v="0">極座標を色で</button><button class="btn" data-v="1">衝撃波リング</button><button class="btn" data-v="2">渦</button><button class="btn" data-v="3">放射</button></span>
+  </div>
+  <div class="controls">
+    <label>角度の繰り返し <input type="range" id="s-polar-rep" min="1" max="12" step="1" value="4"><span id="s-polar-rep-v"></span></label>
+    <label>ねじれ <input type="range" id="s-polar-twist" min="0" max="8" step="0.5" value="2"><span id="s-polar-twist-v"></span></label>
+    <label>速さ <input type="range" id="s-polar-speed" min="0" max="3" step="0.1" value="1"><span id="s-polar-speed-v"></span></label>
+  </div>
+</div>
+<pre class="code" id="code-polar"></pre>
+
+<h3>変換したら、あとは 2 章と同じ</h3>
+<table class="sheet">
+  <tr><th>作りたいもの</th><th>極座標での操作</th></tr>
+  <tr><td>衝撃波リング</td><td>距離 r 方向に「細い帯」を走らせる。<code>abs(r - t)</code> が小さい所だけ光る</td></tr>
+  <tr><td>渦</td><td>角度 a に距離 r を足してから（ねじれ）、r 方向にノイズを流す</td></tr>
+  <tr><td>放射（光の筋）</td><td>角度 a 方向だけのノイズ。r 方向には変化させない</td></tr>
+  <tr><td>回転する魔法陣</td><td>角度 a に時間を足す（a 方向のスクロール = 回転）</td></tr>
+</table>
+<div class="callout pink">
+  <div class="t">角度には「つなぎ目」がある</div>
+  角度は 0 と 1 が同じ場所です。普通のノイズをそのまま角度に使うと、真左に縦の線（つなぎ目）が出ます。この図では <code>fbmP</code>（周期ノイズ）で「繰り返し回数」ぴったりで一周するようにしています。10 章「ループ」でもう一度出てきます。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  <a href="../cgmath/#ch16">16 章「極座標」</a> そのもの。<code>atan()</code> と <code>length()</code> は <a href="../cgmath/#ch5">5 章「sin / cos」</a> と <a href="../cgmath/#ch2">2 章「長さ」</a>。
+</div>
+
+<div class="quiz" data-answer="2" data-why="極座標では、横（角度）方向のスクロールが「回転」になります。距離方向に流すと「広がる / 縮む」です。">
+  <div class="q">極座標に変換した後、角度 a に時間を足すと何が起きる？</div>
+  <div class="opts">
+    <button class="opt">外側へ広がる</button>
+    <button class="opt">上に流れる</button>
+    <button class="opt">中心のまわりを回転する</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section class="lesson" data-title="ランプ：白黒に色を着ける">
+<h2><span class="chap">CHAPTER</span>ランプ：0〜1 の数字を色に変える</h2>
+<p class="lead">ここまでの図の「白黒」は、最後に <span class="hl">ランプ（グラデーション）</span> を通して色になっています。ランプは「0 なら黒、0.5 なら橙、1 なら白」のような対応表です。同じ素材でも、ランプを変えるだけで別のエフェクトになります。</p>
+
+<div class="viz">
+  <p class="hint">下端の帯がランプです。色を変えたり、プリセットを切り替えたりしてください。「白黒で見る」で着色前の素材に戻ります。</p>
+  <canvas id="g-ramp"></canvas>
+  <div class="controls">
+    <label>0 <input type="color" id="c-ramp-0" value="#000000"></label>
+    <label>0.33 <input type="color" id="c-ramp-1" value="#c81400"></label>
+    <label>0.66 <input type="color" id="c-ramp-2" value="#ff8c0d"></label>
+    <label>1 <input type="color" id="c-ramp-3" value="#ffffff"></label>
+    <label><input type="checkbox" id="k-ramp-gray"> 白黒で見る</label>
+  </div>
+  <div class="controls">
+    <span id="m-ramp">
+      <button class="btn active" data-c="#000000,#c81400,#ff8c0d,#ffffff">炎</button>
+      <button class="btn" data-c="#000000,#0a2a6a,#3fa0ff,#e8f6ff">氷 / 魔法</button>
+      <button class="btn" data-c="#000000,#1a4a10,#5fdc30,#e0ffc0">毒</button>
+      <button class="btn" data-c="#000000,#3a0a4a,#c040ff,#ffe0ff">呪い</button>
+      <button class="btn" data-c="#000000,#404040,#909090,#ffffff">煙</button>
+    </span>
+  </div>
+</div>
+<pre class="code" id="code-ramp"></pre>
+
+<h3>ランプの設計で決まること</h3>
+<ul class="plain">
+  <li><span class="b">明るさの並び。</span>炎は「黒 → 赤 → 橙 → 黄 → 白」で、数字が大きいほど明るい。これは「中心（コア）が一番明るい」という 22 章の色の階層と同じことです。</li>
+  <li><span class="b">色数は 2〜3 色 + 白。</span>「氷」プリセットは紺・水色・白だけ。増やすほど濁ります。</li>
+  <li><span class="b">位置は等間隔でなくてよい。</span>この図は 0 / 0.33 / 0.66 / 1 に固定していますが、実際のツールでは位置も動かせます。炎の「白」は 0.85 以降だけ、のように狭く取るとコアが締まります。</li>
+</ul>
+<div class="callout green">
+  <div class="t">実装の形</div>
+  多くのエンジンで、ランプは「グラデーションのテクスチャを 1 本読む」か「カラーカーブのノード」です。ここでは <code>mix</code> と <code>smoothstep</code> で書きましたが、やっていることは 1 次元テクスチャの読み取りと同じです。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  <code>mix</code>（lerp）と <code>smoothstep</code> は <a href="../cgmath/#ch8">8 章「補間とイージング」</a>。色を 3 つの数字で扱うのは <a href="../cgmath/#ch1">1 章「ベクトル」</a> と同じです。
+</div>
+
+<div class="quiz" data-answer="0" data-why="素材（白黒）は同じで、ランプだけ変えればよいのがランプ方式の利点です。テクスチャを描き直す必要はありません。">
+  <div class="q">炎のエフェクトを「青い炎」に変えたい。一番少ない変更は？</div>
+  <div class="opts">
+    <button class="opt">ランプの色を青系に変える</button>
+    <button class="opt">ノイズテクスチャを青で描き直す</button>
+    <button class="opt">マスクを変える</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section class="lesson" data-title="ブレンド：光は足す、煙は混ぜる">
+<h2><span class="chap">CHAPTER</span>ブレンド：板を重ねるときの「足し算」と「混ぜ算」</h2>
+<p class="lead">半透明の板を重ねるとき、後ろの色と新しい色をどう合成するかが <span class="hl">ブレンドモード</span> です。光るものは <span class="b">加算</span>、煙や埃は <span class="b">通常（アルファ）</span>。この使い分けが、エフェクトの「発光感」をほぼ決めます。</p>
+
+<div class="viz">
+  <p class="hint">同じ 5 枚の板を、合成方式だけ変えて重ねています。「明るい背景」にして加算を見てください。「順番を逆に」して、通常だけ結果が変わることも確かめてください。</p>
+  <canvas id="g-blend"></canvas>
+  <div class="controls">
+    <span id="m-blend"><button class="btn active" data-v="0">通常（アルファ）</button><button class="btn" data-v="1">加算</button><button class="btn" data-v="2">乗算</button></span>
+    <label><input type="checkbox" id="k-blend-bg"> 明るい背景</label>
+    <label><input type="checkbox" id="k-blend-rev"> 描く順番を逆に</label>
+    <label>不透明度 <input type="range" id="s-blend-alpha" min="0" max="1" step="0.05" value="0.8"><span id="s-blend-alpha-v"></span></label>
+  </div>
+</div>
+<pre class="code" id="code-blend"></pre>
+
+<h3>3 つの性格</h3>
+<table class="sheet">
+  <tr><th>方式</th><th>式</th><th>向いているもの</th><th>弱点</th></tr>
+  <tr><td>通常（アルファ）</td><td><code>mix(dst, src, a)</code></td><td>煙・埃・水しぶき・破片。「物」</td><td>描く順番で結果が変わる（ソートが要る）</td></tr>
+  <tr><td>加算</td><td><code>dst + src * a</code></td><td>炎・光・火花・魔法。「光」</td><td>明るい背景では見えない。重ねると白飛びする</td></tr>
+  <tr><td>乗算</td><td><code>dst * mix(1, src, a)</code></td><td>影・焦げ跡・暗い霧</td><td>明るくはできない</td></tr>
+</table>
+<div class="callout principle">
+  <div class="t">原則 2：光は加算、物は通常。迷ったら「それは光っているか、光を遮っているか」で決める。</div>
+  加算は順番を気にしなくてよい（足し算は順序で変わらない）ので、パーティクルが大量にあるとき扱いやすい方式です。一方で、加算だけで組むと昼間の空で全部消えます。実務では「通常で下地の煙、加算で光」の 2 層が定番です。
+</div>
+<details><summary>もう少し詳しく：事前乗算アルファ（premultiplied）</summary>
+<p>1 枚のテクスチャで「加算っぽい所」と「通常っぽい所」を混在させたいとき、色にあらかじめアルファを掛けておく方式（事前乗算）を使います。式は <code>dst * (1 - a) + src</code>。src のアルファを 0 にして色だけ残すと、その部分は純粋な加算になります。炎（加算）と煙（通常）を 1 枚に描けるので、フリップブックでよく使われます。</p></details>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  <code>mix(dst, src, a)</code> は <a href="../cgmath/#ch8">8 章「補間」</a> の lerp。「足し算は順番で変わらない」は <a href="../cgmath/#ch1">1 章「ベクトル」</a> の足し算の性質です。
+</div>
+
+<div class="quiz" data-answer="1" data-why="加算は「背景に足す」なので、背景がすでに白に近いと足しても白のまま。昼の空や雪原では加算の光が消えます。通常（アルファ）の下地を入れておくのが対策です。">
+  <div class="q">加算ブレンドだけで作った炎が、昼のシーンで見えなくなった。理由は？</div>
+  <div class="opts">
+    <button class="opt">昼は光が強くて炎が薄く見える演出のため</button>
+    <button class="opt">背景が明るいと、足しても白に近いままで差が出ないため</button>
+    <button class="opt">加算は暗い背景でしか描画されない仕様のため</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section class="lesson" data-title="フレネルとソフトパーティクル：縁の扱い">
+<h2><span class="chap">CHAPTER</span>フレネルとソフトパーティクル：「縁」をどう見せるか</h2>
+<p class="lead">シールドやオーラは <span class="hl">縁だけ光る</span>（フレネル）。煙の板は <span class="hl">地面と交わる線を消す</span>（ソフトパーティクル）。どちらも「縁」を扱う定番で、これがあるかないかでエフェクトの品質が一段変わります。</p>
+
+<div class="viz">
+  <p class="hint">左の球はフレネル。「鋭さ」を上げると縁だけになります。右の煙の板は地面に刺さっていて、「フェード距離」が 0 だと交線がくっきり見えます。上げると消えます。</p>
+  <canvas id="g-fres"></canvas>
+  <div class="controls">
+    <label>フレネルの鋭さ <input type="range" id="s-fres-pow" min="0.5" max="8" step="0.1" value="3"><span id="s-fres-pow-v"></span></label>
+    <label>フェード距離 <input type="range" id="s-fres-fade" min="0" max="1.5" step="0.02" value="0"><span id="s-fres-fade-v"></span></label>
+    <span id="m-fres"><button class="btn active" data-v="0">両方</button><button class="btn" data-v="1">球だけ</button><button class="btn" data-v="2">板だけ</button></span>
+  </div>
+</div>
+<pre class="code" id="code-fres"></pre>
+
+<h3>フレネル：視線と面の向きの角度</h3>
+<p>面の向き（法線）と視線がまっすぐ向き合っていれば <code>dot = 1</code>、直角なら <code>dot = 0</code>。<code>1 - dot</code> で「縁ほど 1」になり、<code>pow()</code> で鋭くします。シールド・ホログラム・ゴーストの「縁が光る」は全部これです。</p>
+<pre class="code"><span class="k">float</span> fres = <span class="f">pow</span>(<span class="n">1.0</span> - <span class="f">max</span>(<span class="f">dot</span>(normal, toCamera), <span class="n">0.0</span>), power);
+<span class="c">// power 1: なだらか   3: 標準   6 以上: 縁の線だけ</span></pre>
+
+<h3>ソフトパーティクル：奥行きの差で薄くする</h3>
+<p>煙の板が地面や壁に刺さると、交線が「板です」と白状してしまいます。<span class="hl">板の奥行きと、その後ろにある物の奥行きの差</span> が小さい所を薄くすると、交線が消えます。エンジンでは「Soft Particles」「Depth Fade」という名前で用意されています。</p>
+<pre class="code"><span class="k">float</span> fade = <span class="f">clamp</span>((sceneDepth - particleDepth) / fadeDistance, <span class="n">0.0</span>, <span class="n">1.0</span>);
+alpha *= fade;   <span class="c">// 後ろの物とほぼ同じ距離 → 0 に近づく</span></pre>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  フレネルの <code>dot(normal, view)</code> は <a href="../cgmath/#ch3">3 章「内積」</a>、法線は <a href="../cgmath/#ch4">4 章「外積」</a>。奥行きは <a href="../cgmath/#ch7">7 章「3D と投影」</a>。この図の球と地面は <a href="../cgmath/#ch14">14 章「距離関数」</a> の考え方で計算で描いています。
+</div>
+
+<div class="quiz" data-answer="2" data-why="フレネルは「視線と法線の角度」で決まります。真正面（dot = 1）で 0、縁（dot = 0）で 1。だから縁だけ光ります。">
+  <div class="q">フレネルが一番強く（1 に近く）なるのは、面のどこ？</div>
+  <div class="opts">
+    <button class="opt">カメラに正対している中心</button>
+    <button class="opt">光源に近い側</button>
+    <button class="opt">視線に対して面が横を向く縁</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section class="lesson" data-title="頂点オフセット：板そのものを動かす">
+<h2><span class="chap">CHAPTER</span>頂点オフセット：色ではなく、形を動かす</h2>
+<p class="lead">ここまでは「色を決める」側（フラグメントシェーダー）でした。もう 1 つ、<span class="hl">頂点を動かす</span> 側（頂点シェーダー）があります。旗、水面、揺れる草、脈打つ盾、衝撃波で歪む地面。形そのものが動くエフェクトです。</p>
+
+<div class="viz wide">
+  <p class="hint">板を 36 × 36 に割って、各頂点の高さを関数で決めています。「旗」は根元（左）が動かないように、x で重み付けしています。</p>
+  <canvas id="g-vert"></canvas>
+  <div class="controls">
+    <span id="m-vert"><button class="btn active" data-v="0">波</button><button class="btn" data-v="1">旗</button><button class="btn" data-v="2">ノイズ</button></span>
+    <label>動かす量 <input type="range" id="s-vert-amp" min="0" max="0.6" step="0.01" value="0.25"><span id="s-vert-amp-v"></span></label>
+    <label>細かさ <input type="range" id="s-vert-freq" min="0.5" max="3" step="0.1" value="1"><span id="s-vert-freq-v"></span></label>
+    <label>カメラ <input type="range" id="s-vert-rot" min="-1.5" max="1.5" step="0.01" value="0.4"><span id="s-vert-rot-v"></span></label>
+  </div>
+</div>
+<pre class="code" id="code-vert"></pre>
+
+<h3>覚えておくこと</h3>
+<ul class="plain">
+  <li><span class="b">頂点の数だけしか動かない。</span>板が 2 枚の三角形（4 頂点）だと、波打たせても平らなままです。細かく割った板が要ります。</li>
+  <li><span class="b">「動かさない場所」を決めるのが設計。</span>旗の根元、草の根元、盾の縁。マスク（重み）を掛けて固定します。2 章のマスクと同じ発想です。</li>
+  <li><span class="b">法線は自動では直らない。</span>形を動かしてもライティング用の向きは元のままなので、ライトを受けるメッシュでは法線も計算し直す必要があります。この図は線だけなので省いています。</li>
+  <li><span class="b">パーティクルにも使える。</span>板を「速度の方向に引き伸ばす」「風で傾ける」も頂点オフセットです（16 章）。</li>
+</ul>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  頂点の位置を動かすのは <a href="../cgmath/#ch1">1 章「ベクトル」</a>、カメラの回転と遠近は <a href="../cgmath/#ch6">6 章「行列」</a> と <a href="../cgmath/#ch7">7 章「3D と投影」</a>。波は <a href="../cgmath/#ch5">5 章「sin / cos」</a>。
+</div>
+
+<div class="quiz" data-answer="1" data-why="頂点オフセットは「頂点」しか動かせません。頂点が 4 つの板は、4 隅が動くだけで面は平らなままです。">
+  <div class="q">4 頂点の板に「波打つ」頂点シェーダーを付けたら、平らなまま傾くだけだった。理由は？</div>
+  <div class="opts">
+    <button class="opt">波の振幅が小さすぎた</button>
+    <button class="opt">頂点が 4 つしかなく、面の途中は動かせないから</button>
+    <button class="opt">頂点シェーダーは板には効かないから</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="lesson" data-title="ループ：つなぎ目を消す">
+<h2><span class="chap">CHAPTER</span>ループ：時間と空間の「つなぎ目」を消す</h2>
+<p class="lead">環境のアンビエントエフェクト（たいまつ、湯気、オーラ）は何分でも回り続けます。<span class="hl">時間のループ</span>（何秒かで同じ絵に戻る）と <span class="hl">空間のタイル</span>（並べても境目が出ない）は、どちらも「一周して元に戻る」を数学で保証する話です。</p>
+
+<div class="viz">
+  <p class="hint">「ただ流す」は下のバーが一周しても同じ絵に戻りません。「円を回ってループ」は戻ります。「タイルの比較」は左が普通のノイズ、右が周期ノイズを 2 × 2 に並べたものです。</p>
+  <canvas id="g-loop"></canvas>
+  <div class="controls">
+    <span id="m-loop"><button class="btn" data-v="0">ただ流す</button><button class="btn active" data-v="1">円を回ってループ</button><button class="btn" data-v="2">タイルの比較</button></span>
+    <label>ループの長さ <input type="range" id="s-loop-T" min="1" max="6" step="0.5" value="3"><span id="s-loop-T-v"></span></label>
+    <label>円の半径 <input type="range" id="s-loop-R" min="0.2" max="3" step="0.1" value="1"><span id="s-loop-R-v"></span></label>
+  </div>
+</div>
+<pre class="code" id="code-loop"></pre>
+
+<h3>時間のループ：「直線」ではなく「円」で時間を進める</h3>
+<p>時間をそのまま UV に足すと、時間は一直線に進むので戻ってきません。時間を <span class="hl">角度</span> にして、円の上の点 <code>{cos, sin}</code> を UV に足すと、一周で必ず元の場所に戻ります。半径が「一周の間にどれだけ変化するか」です。</p>
+<h3>空間のタイル：ノイズの格子点を「割った余り」で選ぶ</h3>
+<p>普通のノイズは格子点ごとに違う乱数を引くので、4 マス目と 0 マス目は別物です。<code>mod(i, period)</code> で格子点の番号を折り返すと、4 マス目 = 0 マス目になって境目が消えます。ノイズを重ねる（fbm）ときは、周期も一緒に 2 倍にしていくのがポイントです。</p>
+<div class="callout green">
+  <div class="t">フリップブックと「往復」</div>
+  連番（18 章）のループも同じで、最後のコマが最初のコマにつながる素材を作るか、最後まで行ったら逆再生する「ピンポン」で誤魔化します。ピンポンは折り返しで動きが一瞬止まるので、ゆっくりした素材にだけ向きます。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  「時間を円の上の点にする」は <a href="../cgmath/#ch5">5 章「sin / cos」</a>。周期ノイズの <code>mod</code> は <a href="../cgmath/#ch13">13 章「mod と fract」</a>、ノイズの中身は <a href="../cgmath/#ch12">12 章「ノイズ」</a>。
+</div>
+
+<div class="quiz" data-answer="0" data-why="円の上の点は一周で元に戻るので、UV に足す量も元に戻り、絵も同じになります。直線的に足す方式は戻りません。">
+  <div class="q">「T 秒で必ず同じ絵に戻る」を保証するのはどれ？</div>
+  <div class="opts">
+    <button class="opt">時間を角度にして、円の上の点を UV に足す</button>
+    <button class="opt">時間をそのまま UV に足す</button>
+    <button class="opt">ノイズの細かさを上げる</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 11 サンドボックス ============ -->
+<section class="lesson" data-title="サンドボックス：部品を全部つなぐ">
+<h2><span class="chap">CHAPTER</span>サンドボックス：Part 1 の部品を 1 画面でつなぐ</h2>
+<p class="lead">ここまでの部品（座標・歪み・流す・抜く・切る・ランプ・ブレンド）を <span class="hl">1 本のシェーダーに直列につないだ</span> 図です。プリセットで炎・煙・オーラ・魔法陣・毒霧を呼び出して、どの数字が何を変えるか触ってください。</p>
+
+<div class="viz">
+  <p class="hint">まずプリセットを切り替えて、同じ 1 本のコードで全部できていることを確かめてください。そのあと 1 つずつ数字を動かすと、各章で学んだことがどこに効いているか分かります。</p>
+  <canvas id="g-sb"></canvas>
+  <div class="controls">
+    <span>レシピ <span id="m-sb-preset"><button class="btn active" data-v="fire">炎</button><button class="btn" data-v="smoke">煙</button><button class="btn" data-v="aura">オーラ</button><button class="btn" data-v="circle">魔法陣</button><button class="btn" data-v="poison">毒霧</button></span></span>
+  </div>
+  <div class="controls">
+    <label>細かさ <input type="range" id="s-sb-scale" min="0.5" max="10" step="0.5" value="4"><span id="s-sb-scale-v"></span></label>
+    <label>流す 横 <input type="range" id="s-sb-spx" min="-1" max="1" step="0.05" value="0"><span id="s-sb-spx-v"></span></label>
+    <label>流す 縦 <input type="range" id="s-sb-spy" min="-1" max="1" step="0.05" value="0.6"><span id="s-sb-spy-v"></span></label>
+    <label>歪み <input type="range" id="s-sb-dist" min="0" max="0.4" step="0.01" value="0.05"><span id="s-sb-dist-v"></span></label>
+    <label>しきい値 <input type="range" id="s-sb-cut" min="0" max="1" step="0.01" value="0.35"><span id="s-sb-cut-v"></span></label>
+    <label>柔らかさ <input type="range" id="s-sb-soft" min="0.01" max="1" step="0.01" value="0.35"><span id="s-sb-soft-v"></span></label>
+  </div>
+  <div class="controls">
+    <span>マスク <span id="m-sb-mask"><button class="btn active" data-v="0">炎</button><button class="btn" data-v="1">丸</button><button class="btn" data-v="2">リング</button><button class="btn" data-v="3">なし</button></span></span>
+    <label><input type="checkbox" id="k-sb-polar"> 極座標</label>
+    <label>繰り返し <input type="range" id="s-sb-rep" min="1" max="16" step="1" value="6"><span id="s-sb-rep-v"></span></label>
+  </div>
+  <div class="controls">
+    <span>ブレンド <span id="m-sb-blend"><button class="btn" data-v="0">通常</button><button class="btn active" data-v="1">加算</button></span></span>
+    <label><input type="checkbox" id="k-sb-bg"> 明るい背景</label>
+    <label>ランプ <input type="color" id="c-sb-0" value="#000000"><input type="color" id="c-sb-1" value="#c81400"><input type="color" id="c-sb-2" value="#ff8c0d"><input type="color" id="c-sb-3" value="#ffffff"></label>
+  </div>
+</div>
+<pre class="code" id="code-sb"></pre>
+
+<h3>数字を変えるときの順番</h3>
+<ol class="plain" style="padding-left:24px">
+  <li><span class="b">マスクと座標</span>を先に決める。形はここで決まる（炎なら縦長、玉なら丸、輪ならリング + 極座標）。</li>
+  <li><span class="b">細かさと流す速さ</span>で「素材の性格」を決める。粗くゆっくり = 重い煙、細かく速く = 激しい炎。</li>
+  <li><span class="b">しきい値と柔らかさ</span>で密度と縁を決める。ここが一番効くので、他が決まってから触る。</li>
+  <li><span class="b">歪み</span>は最後に少しだけ。0.05〜0.1 で「生きている感じ」が出る。</li>
+  <li><span class="b">ランプとブレンド</span>は形が決まってから。光るものは加算、物は通常（原則 2）。</li>
+</ol>
+<div class="callout green">
+  <div class="t">実務のツールに置き換えると</div>
+  このシェーダーの各ブロックが、ノード式エディタの 1 ノードずつに対応します。「座標 → 歪み → ノイズ → マスク → しきい値 → ランプ → ブレンド」の直列は、そのままノードの並びです。エンジンに移るときは、この順番だけ覚えていれば迷いません。
+</div>
+
+<div class="quiz" data-answer="0" data-why="形を決めるのはマスクと座標（極座標かどうか）です。ノイズやランプを変えても、どこが残るかは変わりません。">
+  <div class="q">「炎」プリセットから「輪の中を回るオーラ」に変えたい。最初に触るのは？</div>
+  <div class="opts">
+    <button class="opt">マスクをリングにして、極座標を入れる</button>
+    <button class="opt">ランプの色を青にする</button>
+    <button class="opt">歪みを最大にする</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 12 光を受ける板 ============ -->
+<section class="lesson" data-title="光を受ける板：煙に法線を持たせる">
+<h2><span class="chap">CHAPTER</span>光を受ける板：自己発光ではない「物」の描き方</h2>
+<p class="lead">ここまでの板は全部「自分で光る」前提でした。でも煙・埃・破片は光を <span class="hl">受ける</span> 側です。板に <span class="hl">面の向き（法線）</span> の情報を持たせると、シーンの光の向きと色に合わせて明暗が付き、背景になじみます。</p>
+
+<div class="viz">
+  <p class="hint">光源（黄色い点）が回ります。「自己発光」に切り替えると、光がどこにあっても明るさが同じ = 板が浮いて見えるのが分かります。「法線を色で」は板が持っている向きの情報そのものです。</p>
+  <canvas id="g-lit"></canvas>
+  <div class="controls">
+    <span id="m-lit"><button class="btn active" data-v="0">光を受ける</button><button class="btn" data-v="1">自己発光（法線なし）</button><button class="btn" data-v="2">法線を色で</button></span>
+    <label><input type="checkbox" id="k-lit-orbit" checked> 光を回す</label>
+  </div>
+  <div class="controls">
+    <label>光の方位 <input type="range" id="s-lit-az" min="0" max="6.28" step="0.01" value="0.8"><span id="s-lit-az-v"></span></label>
+    <label>光の高さ <input type="range" id="s-lit-el" min="0.1" max="1.5" step="0.01" value="0.7"><span id="s-lit-el-v"></span></label>
+    <label>凹凸 <input type="range" id="s-lit-bump" min="0" max="1" step="0.02" value="0.5"><span id="s-lit-bump-v"></span></label>
+    <label>光の色 <input type="color" id="c-lit-col" value="#ffd9a6"></label>
+    <span id="m-lit-preset"><button class="btn" data-c="#ffd9a6">昼</button><button class="btn" data-c="#ff7a30">夕方</button><button class="btn" data-c="#6a8cff">夜</button><button class="btn" data-c="#ff3030">赤い警告灯</button></span>
+  </div>
+</div>
+<pre class="code" id="code-lit"></pre>
+
+<h3>仕組みは 3 章「内積」1 つ</h3>
+<ul class="plain">
+  <li><span class="b">法線を用意する。</span>板は平らなので本来は向きが 1 つしかありません。そこで「厚み」の画像（この図はノイズ、実務では法線マップのテクスチャ）から、ピクセルごとの向きを作ります。</li>
+  <li><span class="b">光の向きと内積を取る。</span><code>max(dot(N, L), 0)</code>。面が光を向いていれば 1、横向きなら 0。これがランバートの陰影で、3D モデルの陰影と同じ式です。</li>
+  <li><span class="b">環境光を足す。</span>直接光だけだと影側が真っ黒になるので、空の色を薄く足します。夜のプリセットで、煙が青くなるのはこのためです。</li>
+</ul>
+<div class="callout principle">
+  <div class="t">原則 11：光るものは自分の色、光を受けるものはシーンの色。</div>
+  煙が昼でも夜でも同じ灰色なら、板が浮きます。逆に炎が夜に青くなったら嘘です。「これは光っているか、照らされているか」を決めてから色を付けます（原則 2 と同じ問いです）。
+</div>
+<details><summary>もう少し詳しく：フリップブックの煙を照らす「6 方向ライティング」</summary>
+<p>連番の煙（18 章）に法線マップを持たせるのは難しいので、代わりに「上下左右前後の 6 方向から照らしたときの明るさ」を 6 枚（RGB × 2 テクスチャ）に焼いておき、実行時に光の向きで混ぜる方法があります。法線の代わりに「各方向からの照らされ具合」を持つ、という考え方です。原理はこの章と同じ「光の向きで明るさを決める」で、内積の代わりに 6 方向の重み付き和になります。</p></details>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  陰影の <code>dot(N, L)</code> は <a href="../cgmath/#ch3">3 章「内積」</a>。厚みの傾きから法線を作るのは <a href="../cgmath/#ch4">4 章「外積と法線」</a> と <a href="../cgmath/#ch28">28 章「ベクトル場」</a> の勾配。厚みそのものは <a href="../cgmath/#ch12">12 章「ノイズ」</a>。
+</div>
+
+<div class="quiz" data-answer="1" data-why="煙は光を受ける「物」なので、シーンの光（夕方なら橙）で照らされた色になります。自分の色を持つのは炎のような発光体です。">
+  <div class="q">夕方のシーンに置いた煙は、どう見えるのが正しい？</div>
+  <div class="opts">
+    <button class="opt">昼と同じ灰色（煙の色は変わらない）</button>
+    <button class="opt">光を受ける側が橙っぽく、影側が青っぽい灰色</button>
+    <button class="opt">全体が均一に橙</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 11 ============ -->
+<section class="lesson" data-part="Part 2　パーティクル" data-title="発生と寿命：数を管理する">
+<h2><span class="chap">CHAPTER</span>発生と寿命：「いつ生まれて、いつ消えるか」</h2>
+<p class="lead">パーティクルシステムは、板を <span class="hl">いつ何個出して</span>、<span class="hl">何秒で消すか</span> を管理する仕組みです。設定項目は多く見えますが、根っこは「レート or バースト」と「寿命」の 2 つです。</p>
+
+<div class="viz">
+  <p class="hint">「一定レート」は毎秒決まった数を出し続けます。「バースト」は一度にまとめて出します。右のグラフで「生きている数」がどう落ち着くかを見てください。</p>
+  <canvas id="c-emit"></canvas>
+  <div class="controls">
+    <span id="m-emit"><button class="btn active" data-v="rate">一定レート</button><button class="btn" data-v="burst">バースト</button></span>
+    <label>レート <input type="range" id="s-emit-rate" min="1" max="80" step="1" value="20"><span id="s-emit-rate-v"></span></label>
+    <label>バースト数 <input type="range" id="s-emit-burst" min="5" max="150" step="5" value="40"><span id="s-emit-burst-v"></span></label>
+    <label>寿命 <input type="range" id="s-emit-life" min="0.3" max="5" step="0.1" value="2"><span id="s-emit-life-v"></span></label>
+    <button class="btn" id="b-emit-burst">もう一度バースト</button>
+  </div>
+  <div class="readout" id="r-emit"></div>
+</div>
+<pre class="code"><span class="c">// 毎フレーム（dt = 前のフレームからの秒数）</span>
+acc += rate * dt;                 <span class="c">// 「1 秒に rate 個」を積み立てる</span>
+<span class="k">while</span> (acc >= <span class="n">1</span>) { <span class="f">spawn</span>(); acc -= <span class="n">1</span>; }
+<span class="k">for</span> (<span class="k">const</span> p <span class="k">of</span> particles) {
+  p.age += dt;
+  <span class="k">const</span> t = p.age / p.life;       <span class="c">// 0（生まれた）〜 1（消える）。次章でこの t を使う</span>
+  <span class="k">if</span> (t >= <span class="n">1</span>) <span class="f">remove</span>(p);
+}</pre>
+
+<h3>2 つの発生モードと、数の見積もり</h3>
+<ul class="plain">
+  <li><span class="b">一定レート</span>：たいまつ、湯気、雨。生きている数は <code>rate × 寿命</code> に落ち着きます。20 個/秒 × 2 秒 = 40 個。これが「このエフェクトは何枚の板を描くか」の見積もりです。</li>
+  <li><span class="b">バースト</span>：爆発、ヒット、着地。一度に出して、寿命が尽きると全員いなくなります。爆発は「バースト 1 回 + 余韻の煙は短いレート」の組み合わせが定番です。</li>
+  <li><span class="b">寿命はばらつかせる。</span>全員同じ寿命だと、同時に消えて「パッ」と不自然に無くなります。この図は ±30% ばらつかせています。</li>
+</ul>
+<div class="callout principle">
+  <div class="t">原則 3：正規化した寿命 t（0〜1）で全部を制御する。</div>
+  「生まれてから何秒」ではなく「寿命のうち何割」で管理すると、寿命を変えても大きさや色の変化がそのまま付いてきます。次章のカーブは全部この t を横軸にします。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  積み立て（acc）は <a href="../cgmath/#ch25">25 章「速度と加速度」</a> の「毎フレーム dt ぶん足す」と同じ考え方。正規化は <a href="../cgmath/#ch2">2 章「長さと正規化」</a> の「1 に揃える」です。
+</div>
+
+<div class="quiz" data-answer="1" data-why="一定レートでは、生きている数は rate × 寿命 に落ち着きます。30 × 1.5 = 45 個。">
+  <div class="q">レート 30 個/秒、寿命 1.5 秒のとき、生きている数はだいたい何個に落ち着く？</div>
+  <div class="opts">
+    <button class="opt">30 個</button>
+    <button class="opt">45 個</button>
+    <button class="opt">増え続ける</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 12 ============ -->
+<section class="lesson" data-title="寿命カーブ：t で大きさ・色・透明度を変える">
+<h2><span class="chap">CHAPTER</span>寿命カーブ：生まれてから消えるまでの「変化」を描く</h2>
+<p class="lead">パーティクルの「らしさ」は、大きさ・透明度・色が寿命の中で <span class="hl">どう変わるか</span> で決まります。全部、前章の t（0〜1）を横軸にしたカーブです。</p>
+
+<div class="viz">
+  <p class="hint">3 つのカーブを切り替えてください。「煙」プリセットは大きさが増えて透明度が減る。「火花」は一瞬で明るくなって減る。同じ粒でも印象が変わります。</p>
+  <canvas id="c-life"></canvas>
+  <div class="controls">
+    <label>大きさ <select id="sel-life-size"><option value="const">一定</option><option value="up" selected>増える</option><option value="down">減る</option><option value="bell">山</option><option value="spike">一瞬で上がって減る</option><option value="easeOut">はじめ速く</option><option value="easeIn">あとで速く</option></select></label>
+    <label>透明度 <select id="sel-life-alpha"><option value="const">一定</option><option value="up">増える</option><option value="down" selected>減る</option><option value="bell">山</option><option value="spike">一瞬で上がって減る</option><option value="easeOut">はじめ速く</option><option value="easeIn">あとで速く</option></select></label>
+    <label>色 <select id="sel-life-color"><option value="const">一定</option><option value="up">増える</option><option value="down" selected>減る</option><option value="bell">山</option><option value="spike">一瞬で上がって減る</option><option value="easeOut">はじめ速く</option><option value="easeIn">あとで速く</option></select></label>
+  </div>
+  <div class="controls">
+    <span id="m-life">
+      <button class="btn" data-size="up" data-alpha="down" data-color="down">煙</button>
+      <button class="btn" data-size="spike" data-alpha="spike" data-color="spike">火花</button>
+      <button class="btn" data-size="bell" data-alpha="bell" data-color="const">ふわっと光る</button>
+      <button class="btn" data-size="easeOut" data-alpha="easeIn" data-color="down">爆発の玉</button>
+    </span>
+  </div>
+</div>
+<pre class="code"><span class="k">const</span> curves = {
+  down:    t => <span class="n">1</span> - t,                                  <span class="c">// 減る</span>
+  up:      t => t,                                      <span class="c">// 増える</span>
+  bell:    t => Math.sin(t * Math.PI),                  <span class="c">// 山（真ん中が最大）</span>
+  spike:   t => t < <span class="n">0.1</span> ? t / <span class="n">0.1</span> : <span class="n">1</span> - (t - <span class="n">0.1</span>) / <span class="n">0.9</span>,   <span class="c">// 一瞬で上がって減る</span>
+  easeOut: t => <span class="n">1</span> - (<span class="n">1</span> - t) * (<span class="n">1</span> - t),                  <span class="c">// はじめ速く</span>
+};
+p.size  = <span class="f">lerp</span>(sizeMin, sizeMax, curves[sizeCurve](t));
+p.alpha = curves[alphaCurve](t);
+p.color = <span class="f">fireRamp</span>(curves[colorCurve](t));   <span class="c">// 色は「ランプの位置」を t で動かす（6 章）</span></pre>
+
+<h3>定番の組み合わせ</h3>
+<table class="sheet">
+  <tr><th>もの</th><th>大きさ</th><th>透明度</th><th>色（ランプ位置）</th><th>理由</th></tr>
+  <tr><td>煙</td><td>増える</td><td>減る</td><td>白 → 灰</td><td>広がりながら薄くなる。「パッと消える」を避けるため透明度はゆっくり</td></tr>
+  <tr><td>火花</td><td>一瞬で最大 → 減る</td><td>同じ</td><td>白 → 橙 → 赤</td><td>生まれた瞬間が一番熱い。冷えて暗くなる</td></tr>
+  <tr><td>爆発の玉</td><td>はじめ速く増える</td><td>あとで速く減る</td><td>白 → 橙</td><td>「ドン」の勢いは最初の 10% に集中させる（20 章のタイミング）</td></tr>
+  <tr><td>ふわっと光る</td><td>山</td><td>山</td><td>一定</td><td>出現も消失も柔らかい。回復・バフ向き</td></tr>
+</table>
+<div class="callout principle">
+  <div class="t">原則 4：「生まれた瞬間」が一番大事。最初の 10% でそのパーティクルの性格が決まる。</div>
+  勢いのあるものは最初に最大、柔らかいものは最初は 0。カーブの左端の形を見れば、そのエフェクトの性格が分かります。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  カーブは全部 <a href="../cgmath/#ch8">8 章「補間とイージング」</a> のイージング関数。もっと自由な形が要るなら <a href="../cgmath/#ch27">27 章「ベジェ曲線」</a>。
+</div>
+
+<div class="quiz" data-answer="2" data-why="火花は生まれた瞬間が一番熱く明るい。だから最初に最大で、あとは減る一方（spike）です。「増える」だと生まれた直後が暗く、火花に見えません。">
+  <div class="q">火花の明るさ（色のランプ位置）に向いているカーブは？</div>
+  <div class="opts">
+    <button class="opt">増える（t）</button>
+    <button class="opt">山（sin）</button>
+    <button class="opt">一瞬で上がって減る（spike）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section class="lesson" data-title="速度と力：扇・重力・抵抗・乱流・渦">
+<h2><span class="chap">CHAPTER</span>速度と力：粒の「動き」は 4 つの力の足し算</h2>
+<p class="lead">パーティクルの動きは、生まれたときの <span class="hl">初速</span> と、毎フレーム足される <span class="hl">力</span> で決まります。重力・抵抗・乱流・渦。この 4 つで、噴水も火の粉も魔法の渦もできます。</p>
+
+<div class="viz">
+  <p class="hint">プリセットを切り替えてから、個別のスライダーを触ってください。「乱流」はノイズのカール（渦を巻く矢印の場）を速度に足しています。</p>
+  <canvas id="c-force"></canvas>
+  <div class="controls">
+    <span id="m-force">
+      <button class="btn active" data-spread="40" data-speed="5" data-grav="-4" data-drag="0.3" data-turb="0" data-vortex="0">噴水</button>
+      <button class="btn" data-spread="360" data-speed="6" data-grav="-6" data-drag="0.8" data-turb="0" data-vortex="0">爆発の火花</button>
+      <button class="btn" data-spread="60" data-speed="2" data-grav="0.8" data-drag="0.5" data-turb="5" data-vortex="0">火の粉（上昇 + 乱流）</button>
+      <button class="btn" data-spread="180" data-speed="1.5" data-grav="0" data-drag="0.2" data-turb="0" data-vortex="6">魔法の渦</button>
+    </span>
+  </div>
+  <div class="controls">
+    <label>扇の角度 <input type="range" id="s-force-spread" min="0" max="360" step="5" value="40"><span id="s-force-spread-v"></span></label>
+    <label>初速 <input type="range" id="s-force-speed" min="0.5" max="8" step="0.1" value="5"><span id="s-force-speed-v"></span></label>
+    <label>重力 <input type="range" id="s-force-grav" min="-8" max="3" step="0.1" value="-4"><span id="s-force-grav-v"></span></label>
+    <label>抵抗 <input type="range" id="s-force-drag" min="0" max="2" step="0.05" value="0.3"><span id="s-force-drag-v"></span></label>
+    <label>乱流 <input type="range" id="s-force-turb" min="0" max="12" step="0.5" value="0"><span id="s-force-turb-v"></span></label>
+    <label>渦 <input type="range" id="s-force-vortex" min="-10" max="10" step="0.5" value="0"><span id="s-force-vortex-v"></span></label>
+    <label><input type="checkbox" id="k-force-trail" checked> 軌跡を表示</label>
+  </div>
+  <div class="readout" id="r-force"></div>
+</div>
+<pre class="code"><span class="c">// 生まれるとき：扇（円錐）の中のランダムな向き</span>
+<span class="k">const</span> a = PI / <span class="n">2</span> + (<span class="f">rand</span>() - <span class="n">0.5</span>) * spread;      <span class="c">// 真上 ± spread/2</span>
+p.vel = { x: Math.cos(a) * speed, y: Math.sin(a) * speed };
+
+<span class="c">// 毎フレーム：力を速度に足し、速度を位置に足す</span>
+p.vel.y += gravity * dt;                          <span class="c">// 重力：下向きの力（正にすると「浮く」）</span>
+p.vel = <span class="f">scale</span>(p.vel, <span class="n">1</span> - drag * dt);              <span class="c">// 抵抗：速度を少しずつ削る</span>
+p.vel = <span class="f">add</span>(p.vel, <span class="f">scale</span>(<span class="f">curl</span>(p.pos), turb * dt)); <span class="c">// 乱流：ノイズのカールを足す</span>
+p.pos = <span class="f">add</span>(p.pos, <span class="f">scale</span>(p.vel, dt));</pre>
+
+<h3>4 つの力の性格</h3>
+<table class="sheet">
+  <tr><th>力</th><th>何をするか</th><th>使いどころ</th></tr>
+  <tr><td>重力</td><td>一定の向きに加速し続ける</td><td>火花・破片・雨は下向き。火の粉・泡・煙は <b>負の重力（上向き）</b> で浮かせる</td></tr>
+  <tr><td>抵抗（ドラッグ）</td><td>速度を毎フレーム少し削る</td><td>「勢いよく出て、すぐ減速する」爆発の定番。抵抗なしだと等速で飛び続けて嘘っぽい</td></tr>
+  <tr><td>乱流</td><td>場所ごとに違う向きの矢印（ノイズのカール）を足す</td><td>火の粉・煙・ホタル。「なんとなく揺れる」はこれ。矢印が渦を巻くので粒が集まりすぎない</td></tr>
+  <tr><td>渦</td><td>中心のまわりを回る向きに加速</td><td>魔法・竜巻・吸い込み。「中心へ向かう力」を少し混ぜると集まりながら回る</td></tr>
+</table>
+<div class="callout principle">
+  <div class="t">原則 5：初速は強く、抵抗で殺す。「速く出て、ゆっくり止まる」が気持ちいい。</div>
+  等速で動くものは機械的に見えます。初速を大きく、抵抗を強くすると、最初の数フレームで勢いを見せてから余韻に入ります。これは 20 章のタイミングと同じ形です。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  「力 → 速度 → 位置」は <a href="../cgmath/#ch25">25 章「速度と加速度」</a>。乱流のカールは <a href="../cgmath/#ch28">28 章「ベクトル場」</a>、扇の向きは <a href="../cgmath/#ch5">5 章「sin / cos」</a>。
+</div>
+
+<div class="quiz" data-answer="0" data-why="重力を負（上向き）にすると、粒は上に加速します。火の粉・泡・湯気は「浮く」ので、上向きの重力が定番です。">
+  <div class="q">火の粉が「ふわふわ上に昇る」ようにしたい。基本の設定は？</div>
+  <div class="opts">
+    <button class="opt">重力を上向き（負）にして、乱流を少し足す</button>
+    <button class="opt">初速を最大にして抵抗を 0 にする</button>
+    <button class="opt">渦を最大にする</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 14 ============ -->
+<section class="lesson" data-title="ビルボード・ストレッチ・リボン：板の向き">
+<h2><span class="chap">CHAPTER</span>ビルボード・ストレッチ・リボン：板を「どちらに向けるか」</h2>
+<p class="lead">パーティクルは板です。板をどう向けるかで、丸い光にも、速度で伸びる火花にも、通った道を残す帯にもなります。<span class="hl">向け方は 4 種類</span> 覚えれば足ります。</p>
+
+<div class="viz">
+  <p class="hint">同じ噴水を 4 通りの描き方で見ています。カメラを回して、ビルボードが常に正面を向くこと、メッシュだけが「3D の向き」を持つことを確認してください。</p>
+  <canvas id="c-bill"></canvas>
+  <div class="controls">
+    <span id="m-bill"><button class="btn active" data-v="billboard">ビルボード</button><button class="btn" data-v="stretch">ストレッチ</button><button class="btn" data-v="ribbon">リボン</button><button class="btn" data-v="mesh">メッシュ</button></span>
+    <label>伸ばす量 <input type="range" id="s-bill-stretch" min="0" max="0.4" step="0.01" value="0.15"><span id="s-bill-stretch-v"></span></label>
+    <label><input type="checkbox" id="k-bill-spin" checked> カメラを回す</label>
+  </div>
+</div>
+<pre class="code"><span class="c">// ビルボード：板をいつもカメラに正対させる（画面上では常に「丸」）</span>
+<span class="f">drawCircle</span>(<span class="f">project</span>(p.pos), radius);
+
+<span class="c">// ストレッチ：速度の向きに伸ばす。画面上の速度ベクトルの向きに楕円を回す</span>
+<span class="k">const</span> head = <span class="f">project</span>(<span class="f">add3</span>(p.pos, <span class="f">scale3</span>(p.vel, stretch)));
+<span class="f">drawEllipse</span>(<span class="f">project</span>(p.pos), angleTo(head), length = radius + <span class="f">dist</span>(head) / <span class="n">2</span>);
+
+<span class="c">// リボン：位置の履歴を帯でつなぐ。先端が太く、後ろほど細く薄く</span>
+<span class="k">for</span> (i = <span class="n">1</span>; i < hist.length; i++) <span class="f">drawSegment</span>(hist[i-<span class="n">1</span>], hist[i], width * i / hist.length);</pre>
+
+<h3>4 種類の使い分け</h3>
+<table class="sheet">
+  <tr><th>向け方</th><th>板の向き</th><th>向いているもの</th><th>注意</th></tr>
+  <tr><td>ビルボード</td><td>常にカメラ正面</td><td>光・煙・玉・粉。ほとんどのパーティクル</td><td>真上から見ても丸のまま。地面に「寝かせたい」ものには向かない</td></tr>
+  <tr><td>ストレッチ</td><td>カメラ正面のまま、速度の向きに伸ばす</td><td>火花・雨・弾・速いもの</td><td>速度 0 だと普通のビルボードに戻る。伸びの量は「速度 × 係数」</td></tr>
+  <tr><td>リボン / トレイル</td><td>位置の履歴をつなぐ帯</td><td>剣の軌跡・ミサイルの煙・魔法の尾</td><td>履歴の長さ = 尾の長さ。テクスチャは帯に沿って流す（2 章の「流す」）</td></tr>
+  <tr><td>メッシュ</td><td>3D の向きを持つ</td><td>破片・葉・氷の欠片・衝撃波のドーナツ</td><td>回転も管理が要る。数は控えめに</td></tr>
+</table>
+<div class="callout green">
+  <div class="t">「平らな UV のメッシュにテクスチャを流す」</div>
+  剣の斬撃や魔法陣の飾りは、パーティクルではなく <b>手で作った帯状のメッシュ</b> に 2 章の「流す」を当てる方法が定番です。UV をまっすぐ平らに展開してあれば、テクスチャがメッシュに沿って流れます。リボンの「手動版」と考えてください。UV の考え方は 17 章で実演します。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  3D → 画面の投影は <a href="../cgmath/#ch7">7 章「3D と投影」</a>。ストレッチの向きは画面上の速度ベクトル、つまり <a href="../cgmath/#ch1">1 章「ベクトル」</a> と <code>atan2</code>（<a href="../cgmath/#ch16">16 章「極座標」</a>）。メッシュの向きを速度から作るのは <a href="../cgmath/#ch4">4 章「外積」</a>。
+</div>
+
+<div class="quiz" data-answer="1" data-why="火花は速く直線的に飛ぶので、速度の向きに伸ばすストレッチが向きます。ビルボードだと点にしか見えず、速さが伝わりません。">
+  <div class="q">「速く飛ぶ火花」に一番向いている板の向け方は？</div>
+  <div class="opts">
+    <button class="opt">ビルボード</button>
+    <button class="opt">ストレッチ（速度方向に伸ばす）</button>
+    <button class="opt">メッシュ</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 17 リボンの UV ============ -->
+<section class="lesson" data-title="リボンの UV：帯に沿って流す">
+<h2><span class="chap">CHAPTER</span>リボンの UV：曲がった帯の上でも、テクスチャは「まっすぐ」流れる</h2>
+<p class="lead">剣の斬撃、ミサイルの煙、魔法の尾。曲がった帯にテクスチャを流すとき、大事なのは帯の形ではなく <span class="hl">UV が平らでまっすぐに展開されていること</span> です。UV さえ平らなら、帯がどう曲がっていてもテクスチャは帯に沿って流れます。</p>
+
+<div class="viz">
+  <p class="hint">制御点（丸）をドラッグして帯を曲げてください。右は「広げた UV」で、帯を平らに伸ばした状態。同じ (u, v) が同じ色になっていることを確かめてください。「UV を色で」で住所そのものが見えます。</p>
+  <canvas id="c-rib"></canvas>
+  <div class="controls">
+    <span id="m-rib"><button class="btn active" data-v="stripe">縞</button><button class="btn" data-v="noise">ノイズ</button><button class="btn" data-v="fire">炎</button></span>
+    <label><input type="checkbox" id="k-rib-uv"> UV を色で</label>
+    <label>速さ <input type="range" id="s-rib-speed" min="-1.5" max="1.5" step="0.05" value="0.5"><span id="s-rib-speed-v"></span></label>
+    <label>繰り返し <input type="range" id="s-rib-tile" min="1" max="8" step="1" value="3"><span id="s-rib-tile-v"></span></label>
+    <label>幅 <input type="range" id="s-rib-width" min="0.2" max="2" step="0.05" value="0.9"><span id="s-rib-width-v"></span></label>
+    <label>先細り <input type="range" id="s-rib-taper" min="0" max="1" step="0.05" value="1"><span id="s-rib-taper-v"></span></label>
+  </div>
+</div>
+<pre class="code"><span class="c">// 帯の上の位置 (u, v) → 色。u は根元 0 〜 先端 1、v は幅方向 0 〜 1</span>
+<span class="k">function</span> <span class="f">tex</span>(u, v, time) {
+  <span class="k">const</span> uu = u * tile - time * speed;            <span class="c">// u に時間を引く = 帯に沿って流れる（1 章のスクロール）</span>
+  <span class="k">const</span> edge = <span class="n">1</span> - Math.abs(v - <span class="n">0.5</span>) * <span class="n">2</span>;        <span class="c">// 帯の縁で薄くするマスク（2 章）</span>
+  <span class="k">return</span> <span class="f">fireRamp</span>(<span class="f">fbm</span>(uu, v) * edge);
+}
+<span class="c">// 帯は「曲線に沿った小さな四角」の並び。各四角の (u, v) は曲線上の位置で決まる</span>
+<span class="k">for</span> (i = <span class="n">0</span>; i < N; i++) <span class="k">for</span> (j = <span class="n">0</span>; j < M; j++) <span class="f">fillQuad</span>(quad(i, j), <span class="f">tex</span>(i / N, j / M, time));</pre>
+
+<h3>設計のポイント</h3>
+<ul class="plain">
+  <li><span class="b">UV は帯の長さ方向を u に。</span>u = 0 が根元、u = 1 が先端。テクスチャの「流す」は u 方向にだけ掛けます。横方向（v）に流したいことはほとんどありません。</li>
+  <li><span class="b">帯の端は UV の端に揃える。</span>先端が u = 1 ぴったりで終わっていないと、テクスチャの端で切れて見えます。</li>
+  <li><span class="b">先細りは形（メッシュ）で、消え方はテクスチャで。</span>幅は帯の頂点で、透明度は v のマスクとディゾルブ（4 章）で作ると、両方を独立に調整できます。</li>
+  <li><span class="b">手で作るか、自動で作るか。</span>この図は曲線から帯を「自動で」作っています（トレイル、16 章のリボン）。斬撃や魔法陣の飾りは、モデリングツールで帯のメッシュを「手で」作り、UV を平らに展開して使うのが定番です。どちらも UV の考え方は同じです。</li>
+</ul>
+<div class="callout green">
+  <div class="t">27 章「斬撃」でこの帯を使います</div>
+  斬撃は「弧の帯に沿って白いコアと色の縁を流し、走り終わったらディゾルブで消す」だけです。この章と 4 章・22 章を足すとできます。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  曲線は <a href="../cgmath/#ch27">27 章「ベジェ曲線」</a>、帯の幅方向の向き（接線を 90° 回す）は <a href="../cgmath/#ch4">4 章「外積」</a> の 2D 版、UV のスクロールは <a href="../cgmath/#ch13">13 章「mod と fract」</a>。
+</div>
+
+<div class="quiz" data-answer="2" data-why="流れる向きは UV の u 方向で決まります。帯が曲がっていても、u が根元→先端に並んでいれば、テクスチャは帯に沿って流れます。">
+  <div class="q">曲がった帯の上でテクスチャが「帯に沿って」流れるための条件は？</div>
+  <div class="opts">
+    <button class="opt">帯がまっすぐであること</button>
+    <button class="opt">テクスチャが正方形であること</button>
+    <button class="opt">UV の u が根元から先端へ平らに並んでいること</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 15 ============ -->
+<section class="lesson" data-title="フリップブック：連番を 1 枚に並べる">
+<h2><span class="chap">CHAPTER</span>フリップブック：形が変わるものは「連番」で持つ</h2>
+<p class="lead">爆発や煙のように <span class="hl">形そのものが時間で変わる</span> ものは、ノイズを流すだけでは作れません。シミュレーションで作った連番を 1 枚のテクスチャに並べ、UV で「今のコマ」を切り出して見せます。これがフリップブック（スプライトシート）です。</p>
+
+<div class="viz">
+  <p class="hint">左のアトラスは、ブラウザ内で計算した「広がる火球」の 64 コマです。黄色い枠が今のコマ。fps を下げてカクつきを見てから「次のコマと混ぜる」を入れてください。</p>
+  <canvas id="c-flip"></canvas>
+  <div class="controls">
+    <span id="m-flip"><button class="btn" data-n="4">4 × 4</button><button class="btn active" data-n="8">8 × 8</button></span>
+    <label>再生速度 <input type="range" id="s-flip-fps" min="4" max="60" step="1" value="24"><span id="s-flip-fps-v"></span></label>
+    <label><input type="checkbox" id="k-flip-blend"> 次のコマと混ぜる</label>
+    <label><input type="checkbox" id="k-flip-packed"> チャンネルに詰める（R/G/B 別の連番）</label>
+  </div>
+  <div class="readout" id="r-flip"></div>
+</div>
+<pre class="code"><span class="c">// 今のコマ番号と、アトラス上の位置</span>
+<span class="k">const</span> frame = Math.floor(time * fps) % (cols * rows);
+<span class="k">const</span> col = frame % cols, row = Math.floor(frame / cols);
+<span class="c">// 板の uv（0〜1）を 1 コマぶんに縮めて、そのコマの位置へずらす（1 章の UV 加工）</span>
+<span class="k">const</span> u = (uv.x + col) / cols;
+<span class="k">const</span> v = (uv.y + row) / rows;
+
+<span class="c">// なめらかにする：次のコマと混ぜる（frame blending）</span>
+<span class="k">const</span> f = time * fps, mixT = f - Math.floor(f);
+color = <span class="f">lerp</span>(<span class="f">sample</span>(frame), <span class="f">sample</span>(frame + <span class="n">1</span>), mixT);</pre>
+
+<h3>フリップブックの原則</h3>
+<ul class="plain">
+  <li><span class="b">コマ数と解像度はトレードオフ。</span>1 枚のテクスチャの中で、8 × 8 なら 1 コマは 1/8 の解像度です。動きが速いものはコマ数、静かなものは解像度に振ります。</li>
+  <li><span class="b">コマ間の補間で少ないコマを誤魔化す。</span>「次のコマと混ぜる」は最も単純な方法（クロスフェード）。さらに「モーションベクター」（各ピクセルが次のコマでどこへ動くかの矢印）を持たせると、混ぜるのではなく <b>歪めて</b> つなぐので、コマを大きく減らせます。3 章の歪みの応用です。</li>
+  <li><span class="b">チャンネルに詰める。</span>白黒の連番なら、R・G・B・A の 4 チャンネルに別々の連番を入れられます。8 × 8 × 4 = 256 コマが 1 枚に入ります。この図の「チャンネルに詰める」は R = 火球、G = 煙、B = 衝撃波です。アトラス自体は色が混ざって見えますが、シェーダーで 1 チャンネルだけ読めば元に戻ります。</li>
+  <li><span class="b">最後のコマは透明に。</span>寿命の終わりでコマが最後に達したとき、絵が残っていると「パッ」と消えます。連番の最後は必ず空にします。</li>
+</ul>
+<div class="callout green">
+  <div class="t">素材はどこから来るか</div>
+  実務では Houdini / Blender / EmberGen などでシミュレーションし、連番でレンダーして並べます。この教材では原則に集中するため、ブラウザ内の fbm で計算しています。Houdini の COP で焼く方法は技術メモの「COP でフリップブックを焼く」系の記事を参照してください。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  コマ番号の <code>floor</code> と <code>%</code> は <a href="../cgmath/#ch13">13 章「mod と fract」</a>。コマ間の混ぜ合わせは <a href="../cgmath/#ch8">8 章「補間」</a>。
+</div>
+
+<div class="quiz" data-answer="2" data-why="8 × 8 = 64 コマ。R・G・B・A の 4 チャンネルに別々の連番を入れれば 64 × 4 = 256 コマになります。">
+  <div class="q">8 × 8 のアトラスで、RGBA 4 チャンネルすべてに白黒の連番を詰めると、1 枚に何コマ入る？</div>
+  <div class="opts">
+    <button class="opt">64 コマ</button>
+    <button class="opt">128 コマ</button>
+    <button class="opt">256 コマ</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 16 ============ -->
+<section class="lesson" data-title="オーバードロー：なぜ半透明は重いのか">
+<h2><span class="chap">CHAPTER</span>オーバードロー：「何枚描くか」より「何回塗るか」</h2>
+<p class="lead">リアルタイム VFX が重くなる一番の理由は、ポリゴン数でもテクスチャの大きさでもなく、<span class="hl">同じピクセルを何回も塗り直すこと</span>（オーバードロー）です。半透明の板は後ろを隠せないので、重なった分だけ全部塗ります。</p>
+
+<div class="viz">
+  <p class="hint">ヒートマップは「そのピクセルを何回塗ったか」（青 1 回 → 赤 8 回以上）。「大きく少なく」と「小さく多く」で、塗った総量がどう変わるか比べてください。</p>
+  <canvas id="c-over"></canvas>
+  <div class="controls">
+    <span id="m-over"><button class="btn active" data-n="30" data-size="120">標準</button><button class="btn" data-n="8" data-size="260">大きく少なく</button><button class="btn" data-n="120" data-size="50">小さく多く</button></span>
+    <label>板の数 <input type="range" id="s-over-n" min="1" max="200" step="1" value="30"><span id="s-over-n-v"></span></label>
+    <label>大きさ <input type="range" id="s-over-size" min="20" max="320" step="10" value="120"><span id="s-over-size-v"></span></label>
+    <label><input type="checkbox" id="k-over-heat" checked> ヒートマップ</label>
+    <label><input type="checkbox" id="k-over-cut"> 八角形に切る</label>
+  </div>
+  <div class="readout" id="r-over"></div>
+</div>
+<pre class="code"><span class="c">// 塗るコスト ≈ 各板の面積の合計（重なっていても、そのたびに塗る）</span>
+fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h);   <span class="c">// 画面の何倍塗ったか</span>
+<span class="c">// 板の数を 2 倍にしても、大きさを半分にすれば面積は 1/4 → 合計は半分</span></pre>
+
+<h3>軽くする手はだいたい 4 つ</h3>
+<ul class="plain">
+  <li><span class="b">板を小さくする。</span>面積は「大きさの 2 乗」なので、大きさ半分で面積は 1/4。数を減らすより効きます。</li>
+  <li><span class="b">透明な角を切る。</span>丸い絵の入った四角い板は、角の 20〜30% が「透明なのに塗っている」領域です。八角形に切るとその分が消えます（カットアウトメッシュ）。</li>
+  <li><span class="b">画面に近づけない。</span>カメラの目の前で爆発すると、1 枚の板が画面全体を覆います。同じエフェクトでも距離で 100 倍重くなり得ます。</li>
+  <li><span class="b">数を減らして、1 枚を「頑張らせる」。</span>フリップブック（18 章）や歪み（3 章）で 1 枚の情報量を増やし、板の数を減らします。</li>
+</ul>
+<div class="callout principle">
+  <div class="t">原則 6：面積で数える。「何個出しているか」ではなく「画面の何倍を塗ったか」。</div>
+  「重い」と言われたら、まず一番大きい板を探します。小さい板 100 枚より、大きい板 3 枚が重いことはよくあります。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  「大きさ半分で面積 1/4」は <a href="../cgmath/#ch6">6 章「行列」</a> のスケールと面積の関係。ヒートマップは <a href="../cgmath/#ch23">23 章「セルオートマトン」</a> と同じ「格子に数を溜める」計算です。
+</div>
+
+<div class="quiz" data-answer="1" data-why="面積は大きさの 2 乗。板を 2 倍にすると 1 枚あたり 4 倍、数を半分にしても合計は 2 倍になり、重くなります。">
+  <div class="q">板の数を半分にして、代わりに 1 枚の大きさを 2 倍にした。塗る量は？</div>
+  <div class="opts">
+    <button class="opt">同じ</button>
+    <button class="opt">2 倍（重くなる）</button>
+    <button class="opt">半分（軽くなる）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 17 ============ -->
+<section class="lesson" data-part="Part 3　演出" data-title="タイミング：溜め・衝撃・余韻">
+<h2><span class="chap">CHAPTER</span>タイミング：技術より先に効いてくるもの</h2>
+<p class="lead">手法を覚えれば作れますが、良し悪しを決めるのはタイミングです。ヒットも爆発も魔法も、時間の形は <span class="hl">溜め → 衝撃 → 余韻</span>。この 3 つの長さと、要素をいつ出すかで、ほとんどが決まります。</p>
+
+<div class="viz">
+  <p class="hint">右上のグラフは「画面の明るさ」の時間変化です。良いヒットは「急に上がって、なだらかに下がる」形。プリセットで極端な例と比べてください。時間スライダーで 1 フレームずつ送れます。</p>
+  <canvas id="c-timing"></canvas>
+  <div class="timeline" id="tl-timing"></div>
+  <div class="controls">
+    <button class="btn" id="b-timing-play">❚❚ 停止</button>
+    <button class="btn" id="b-timing-step">＋1 フレーム</button>
+    <label>時間 <input type="range" id="s-timing-t" min="0" max="3" step="0.005" value="0"></label>
+    <label>再生速度 <input type="range" id="s-timing-speed" min="0.1" max="1" step="0.05" value="1"><span id="s-timing-speed-v"></span></label>
+  </div>
+  <div class="controls">
+    <span id="m-timing"><button class="btn active" data-a="0.25" data-i="0.12" data-d="1.2">標準</button><button class="btn" data-a="0.6" data-i="0.12" data-d="1.2">溜めが長い</button><button class="btn" data-a="0.25" data-i="0.5" data-d="1.2">衝撃が長い（ぼやける）</button><button class="btn" data-a="0.25" data-i="0.12" data-d="0.3">余韻が無い（突然消える）</button></span>
+  </div>
+  <div class="controls">
+    <label>溜め <input type="range" id="s-timing-A" min="0" max="0.8" step="0.01" value="0.25"><span id="s-timing-A-v"></span></label>
+    <label>衝撃 <input type="range" id="s-timing-I" min="0.03" max="0.6" step="0.01" value="0.12"><span id="s-timing-I-v"></span></label>
+    <label>余韻 <input type="range" id="s-timing-D" min="0.2" max="2.5" step="0.05" value="1.2"><span id="s-timing-D-v"></span></label>
+    <label>残り火の遅れ <input type="range" id="s-timing-ember" min="0" max="0.8" step="0.01" value="0.25"><span id="s-timing-ember-v"></span></label>
+    <label><input type="checkbox" id="k-timing-keep"> 火花を出し続ける（悪い例）</label>
+  </div>
+</div>
+
+<h3>3 つの区間</h3>
+<table class="sheet">
+  <tr><th>区間</th><th>長さの目安</th><th>やること</th><th>間違えると</th></tr>
+  <tr><td>溜め（予備動作）</td><td>0.1〜0.4 秒。強い技ほど長い</td><td>外から中心へ集める。小さく暗く。「来るぞ」を知らせる</td><td>無いと唐突。長すぎると間延び</td></tr>
+  <tr><td>衝撃</td><td>2〜4 フレーム（0.05〜0.15 秒）</td><td>フラッシュ・リング・火花を <b>同時に、一番大きく明るく</b>。一番情報量が多い瞬間</td><td>長いと「ぼやけたヒット」。一瞬だから強く見える</td></tr>
+  <tr><td>余韻</td><td>0.5〜2 秒。衝撃の 5〜10 倍</td><td>煙・残り火・破片が <b>減速しながら</b> 消えていく。要素ごとに消える時刻をずらす</td><td>短いと「突然消える」。全部同時に消えると「パッ」と無くなる</td></tr>
+</table>
+
+<div class="callout principle">
+  <div class="t">原則 7：足すより、延ばす。勢いが途切れるなら、要素を増やすのではなく既にあるものの寿命を延ばす。</div>
+  「火花を出し続ける（悪い例）」を入れてみてください。にぎやかにはなりますが、衝撃の「ドン」が薄まり、いつ終わったのか分からなくなります。初学者がやりがちな「情報を足して豪華にする」の逆で、既存の火花の寿命を延ばすほうがまとまります。
+</div>
+<div class="callout green">
+  <div class="t">間隔は「口で音を出して」測る</div>
+  要素と要素の間隔をどれくらい空けるか迷ったら、そのエフェクトの音を口で出してみます。「スッ…ドン！…ジュワァ」。息を吸うのにかかる時間、口の形を変えるのにかかる時間が、要素間に最低限必要な間隔にかなり近い。「残り火の遅れ」はそのための「ひと息」です。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  各要素の減衰は <a href="../cgmath/#ch8">8 章「イージング」</a>（衝撃は easeOut、煙は easeOutCubic）。明るさのグラフは各要素の「強さ × 残り」の足し算です。
+</div>
+
+<div class="quiz" data-answer="0" data-why="衝撃は「一瞬だから強く見える」。長くするとフラッシュが持続して、ぼやけた印象になります。強さは長さではなく、明るさの落差で出します。">
+  <div class="q">ヒットの「衝撃」を強く見せたい。正しいのは？</div>
+  <div class="opts">
+    <button class="opt">衝撃の区間は短いまま（2〜4 フレーム）、明るさの落差を大きくする</button>
+    <button class="opt">衝撃の区間を長くする</button>
+    <button class="opt">溜めを無くして、すぐ衝撃を出す</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 18 ============ -->
+<section class="lesson" data-title="可読性：ゲームプレイが王様">
+<h2><span class="chap">CHAPTER</span>可読性：きれいなエフェクトと、ゲームとして成立するエフェクトは別</h2>
+<p class="lead">対戦ゲームの VFX 担当者が繰り返し言うのは、<span class="hl">プレイヤーが状況を読めなくなるエフェクトは、どれだけ美しくても採用されない</span> ということです。「派手すぎず、コントラストが強すぎない」が実務の基準になります。</p>
+
+<div class="viz">
+  <p class="hint">ゲーム画面の中にヒットを置いています。「シルエット」「ぼかし」「白黒」は可読性のチェック方法です。これで何が起きているか分かれば、本番でも分かります。「全部同じ大きさ」で悪い例を見てください。</p>
+  <canvas id="c-read"></canvas>
+  <div class="controls">
+    <label><input type="checkbox" id="k-read-sil"> シルエット</label>
+    <label><input type="checkbox" id="k-read-blur"> ぼかし（目を細める）</label>
+    <label><input type="checkbox" id="k-read-gray"> 白黒</label>
+    <label><input type="checkbox" id="k-read-bright"> 明るい背景</label>
+    <label><input type="checkbox" id="k-read-same"> 全部同じ大きさ（悪い例）</label>
+    <label>再生速度 <input type="range" id="s-read-speed" min="0.1" max="1" step="0.05" value="0.5"><span id="s-read-speed-v"></span></label>
+  </div>
+  <div class="controls">
+    <label>主役の大きさ <input type="range" id="s-read-primary" min="0.3" max="1.6" step="0.05" value="1"><span id="s-read-primary-v"></span></label>
+    <label>火花の数 <input type="range" id="s-read-sec" min="0" max="60" step="1" value="14"><span id="s-read-sec-v"></span></label>
+    <label>残り火の数 <input type="range" id="s-read-ter" min="0" max="80" step="1" value="24"><span id="s-read-ter-v"></span></label>
+  </div>
+</div>
+
+<h3>可読性を作る 3 つの道具</h3>
+<ul class="plain">
+  <li><span class="b">大・中・小。</span>主役（フラッシュとリング）は 1 つ大きく、脇役（火花）は中くらいを十数個、粒（残り火）は小さく多く。「全部同じ大きさ」にすると、目がどこを見ればいいか分からなくなります。面積の目安は 6 : 3 : 1。</li>
+  <li><span class="b">シルエットで読める形。</span>塗りつぶしにしても「何が起きたか」が分かる形にします。丸いリング = 衝撃、放射状の線 = 爆発、上に伸びる形 = 上昇、と形だけで意味が伝わります。</li>
+  <li><span class="b">明るさの差は、背景との差。</span>暗い背景で作った加算エフェクトは、明るい背景で消えます（7 章）。どちらの背景でも読めるように、通常ブレンドの下地（暗い煙や縁取り）を持たせます。</li>
+</ul>
+<div class="callout principle">
+  <div class="t">原則 8：焦点は 1 つ。エフェクトの中で「一番見せたいもの」を決めて、他はそれを邪魔しない。</div>
+  展開の速い場面で、副次的な要素はノイズになって焦点を奪います。「これを足したら主役が見えにくくならないか」を毎回問い直します。
+</div>
+<div class="callout green">
+  <div class="t">チェックの仕方</div>
+  ぼかす（目を細める）、白黒にする、シルエットにする、再生速度を落とす、そして <b>実際のゲーム画面に置く</b>。単体のプレビューで良く見えても、地面・キャラ・UI の上に置くと読めないことは多い。この図に「プレイヤー」と「敵」を置いているのはそのためです。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  「大・中・小」は面積の比なので <a href="../cgmath/#ch6">6 章「行列」</a> のスケール。ぼかしと白黒は画像処理ですが、白黒化の式（<code>0.299 R + 0.587 G + 0.114 B</code>）は <a href="../cgmath/#ch3">3 章「内積」</a> の重み付き和です。
+</div>
+
+<div class="quiz" data-answer="2" data-why="可読性は「ゲーム画面の中で状況が読めるか」です。単体で美しくても、プレイヤーや敵が見えなくなるなら採用されません。まず焦点を 1 つに絞り、副次要素を減らします。">
+  <div class="q">ヒットエフェクトが「派手すぎて敵の位置が分からない」と言われた。最初にやることは？</div>
+  <div class="opts">
+    <button class="opt">もっと色数を増やして敵と区別する</button>
+    <button class="opt">火花の数を増やして敵を囲む</button>
+    <button class="opt">焦点を 1 つに絞り、副次要素（火花・残り火）を減らすか小さくする</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 19 ============ -->
+<section class="lesson" data-title="色の階層：コアは白、縁は暗く">
+<h2><span class="chap">CHAPTER</span>色の階層：明るさの順番で「光っている」に見せる</h2>
+<p class="lead">光るエフェクトの色は 3 段でできています。<span class="hl">コア（ほぼ白）→ 中（一番鮮やかな色）→ 縁（暗い色 or 補色）</span>。この順番が守られていれば、どんな色相でも「光」に見えます。逆だと「塗った丸」になります。</p>
+
+<div class="viz">
+  <p class="hint">「明るさだけ」を入れて、コアが一番明るいことを確かめてください。プリセットの「逆（悪い例）」はコアが暗く縁が明るい。同じ形なのに光って見えません。</p>
+  <canvas id="g-value"></canvas>
+  <div class="controls">
+    <label>コア <input type="color" id="c-val-core" value="#fff6d5"></label>
+    <label>中 <input type="color" id="c-val-mid" value="#ff9a1f"></label>
+    <label>縁 <input type="color" id="c-val-edge" value="#7a1a3a"></label>
+    <label><input type="checkbox" id="k-val-add"> 加算で重ねる</label>
+    <label><input type="checkbox" id="k-val-gray"> 明るさだけ</label>
+    <label>枚数 <input type="range" id="s-val-n" min="1" max="6" step="1" value="3"><span id="s-val-n-v"></span></label>
+  </div>
+  <div class="controls">
+    <span id="m-value">
+      <button class="btn active" data-core="#fff6d5" data-mid="#ff9a1f" data-edge="#7a1a3a">炎</button>
+      <button class="btn" data-core="#ffffff" data-mid="#4fc3ff" data-edge="#1a2a7a">氷</button>
+      <button class="btn" data-core="#f4ffe0" data-mid="#7dff3a" data-edge="#1a4a10">毒</button>
+      <button class="btn" data-core="#fff0ff" data-mid="#c060ff" data-edge="#30104a">魔法</button>
+      <button class="btn" data-core="#7a1a3a" data-mid="#ff9a1f" data-edge="#fff6d5">逆（悪い例）</button>
+    </span>
+  </div>
+</div>
+<pre class="code" id="code-value"></pre>
+
+<h3>色を決める順番</h3>
+<ol class="plain" style="padding-left:24px">
+  <li><span class="b">明るさの並びを先に決める。</span>コア &gt; 中 &gt; 縁。「明るさだけ」で見て、この順になっていなければ色相をいじっても直りません。</li>
+  <li><span class="b">色相は 1〜2 色。</span>「中」の色がそのエフェクトの色です。縁は「中」を暗くした色か、その補色（橙に対して紫、水色に対して紺）。3 色目を足すと濁ります。</li>
+  <li><span class="b">コアは白に寄せる。</span>真っ白でなくてよいが、彩度を落として明るく。加算で重ねると自然に白くなるので、コアの色は「中」の薄い版でも足ります。</li>
+  <li><span class="b">ランプ（6 章）に落とす。</span>この 3 色を 6 章のランプに並べれば、白黒素材に着けられます。ランプの右端がコア、左端が縁です。</li>
+</ol>
+<div class="callout principle">
+  <div class="t">原則 9：色より先に明るさ。明るさの順番が正しければ、色相は後からいくらでも変えられる。</div>
+  白黒で作って色は最後（原則 1）と同じことを、色の設計の側から言っています。
+</div>
+
+<div class="callout math">
+  <div class="t">使っている数学</div>
+  中心からの距離で 3 段に分けるのは <a href="../cgmath/#ch15">15 章「フォールオフ」</a>、色の混ぜ合わせは <a href="../cgmath/#ch8">8 章「補間」</a>。明るさの計算は <a href="../cgmath/#ch3">3 章「内積」</a>。
+</div>
+
+<div class="quiz" data-answer="1" data-why="光っているものは中心（コア）が一番明るく、縁に向かって暗くなります。この明るさの順番が「発光」の印象を作ります。色相は二の次です。">
+  <div class="q">青い光のエフェクトが「塗った丸」に見える。まず確認することは？</div>
+  <div class="opts">
+    <button class="opt">青の色相がずれていないか</button>
+    <button class="opt">コアが一番明るく、縁が一番暗くなっているか</button>
+    <button class="opt">板の大きさが足りているか</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 20 ============ -->
+<section class="lesson" data-title="要素の役割：ヒットを組み立てる">
+<h2><span class="chap">CHAPTER</span>要素の役割：1 つのヒットは 8 つの部品でできている</h2>
+<p class="lead">ここまでの部品を全部使って、ヒットエフェクトを組み立てます。要素を 1 つずつ入れたり切ったりして、<span class="hl">それぞれが何を担当しているか</span> を確かめてください。</p>
+
+<div class="viz">
+  <p class="hint">「全部切る」から 1 つずつ足していくのがおすすめです。フラッシュだけ、リングだけ、では何が足りないか。煙を切ると「終わり」が無くなることに気づくはずです。</p>
+  <canvas id="c-compose"></canvas>
+  <div class="controls" id="k-compose">
+    <label><input type="checkbox" data-el="antic"> 溜め</label>
+    <label><input type="checkbox" data-el="flash"> フラッシュ</label>
+    <label><input type="checkbox" data-el="ring"> 衝撃波リング</label>
+    <label><input type="checkbox" data-el="sparks"> 火花</label>
+    <label><input type="checkbox" data-el="smoke"> 煙</label>
+    <label><input type="checkbox" data-el="embers"> 残り火</label>
+    <label><input type="checkbox" data-el="light"> 周囲の光</label>
+    <label><input type="checkbox" data-el="debris"> 破片</label>
+    <label><input type="checkbox" data-el="decal"> 焦げ跡</label>
+  </div>
+  <div class="controls">
+    <button class="btn" id="b-compose-none">全部切る</button>
+    <button class="btn" id="b-compose-all">全部入れる</button>
+    <button class="btn" id="b-compose-replay">もう一度</button>
+    <label>再生速度 <input type="range" id="s-compose-speed" min="0.1" max="1" step="0.05" value="1"><span id="s-compose-speed-v"></span></label>
+  </div>
+</div>
+
+<h3>要素と役割</h3>
+<table class="sheet">
+  <tr><th>要素</th><th>役割</th><th>区間</th><th>使った部品</th></tr>
+  <tr><td>溜め</td><td>予告。「来る」を知らせる</td><td>溜め</td><td>内向きの速度（15 章）、小さく暗い光</td></tr>
+  <tr><td>フラッシュ</td><td>主役。衝撃の瞬間そのもの</td><td>衝撃（2〜4 フレーム）</td><td>加算の丸（7 章）、コアが白（22 章）</td></tr>
+  <tr><td>衝撃波リング</td><td>衝撃の「大きさ」と「方向」を伝える</td><td>衝撃〜余韻のはじめ</td><td>極座標のリング（5 章）、急速に広がって薄くなる（14 章）</td></tr>
+  <tr><td>火花</td><td>勢い。エネルギーが飛び散る</td><td>衝撃〜余韻</td><td>バースト（13 章）、重力と抵抗（15 章）、ストレッチ（16 章）</td></tr>
+  <tr><td>煙</td><td>余韻。「終わり方」を作る</td><td>余韻</td><td>通常ブレンド（7 章）、大きくなって薄くなる（14 章）</td></tr>
+  <tr><td>残り火</td><td>余韻の中の小さな動き。「ひと息」置いてから</td><td>余韻（遅れて）</td><td>小さく多く（21 章）、上向き重力（15 章）</td></tr>
+  <tr><td>周囲の光</td><td>エフェクトを「場所」につなぐ。地面や壁を照らす</td><td>衝撃</td><td>ライト、または加算の大きな薄い板</td></tr>
+  <tr><td>破片 / 焦げ跡</td><td>「物が壊れた」「跡が残った」の説得力</td><td>余韻〜残る</td><td>メッシュ（16 章）、乗算のデカール（7 章）</td></tr>
+</table>
+<div class="callout principle">
+  <div class="t">原則 10：二次要素は「同じ種類を増やす」のではなく「違う性質のもの」を足す。</div>
+  火花が足りないと感じたとき、火花を増やすのではなく、性質の違う要素（渦を巻く煙、遅れて出る残り火）を足すほうが、埋まりつつ独自性が出ます。そして終わり方（煙がどう消えるか）まで設計して初めて完成です。
+</div>
+<div class="callout green">
+  <div class="t">プレースホルダーの作り方</div>
+  実務で最初に作るのは仮のエフェクトです。そのとき「最終的な命名にしておく」「呼び出し元（アニメーションやイベント）に紐づけておく」「向きと大きさを合わせておく」と、後からテクスチャと色を差し替えるだけで完成品にできます。この章の「全部入れる」状態が、その仮組みに相当します。
+</div>
+
+<div class="quiz" data-answer="1" data-why="煙は余韻の「終わり方」を担当します。無いと、衝撃の直後に何もなくなって「突然消えた」印象になります。">
+  <div class="q">「煙」を切ると何が失われる？</div>
+  <div class="opts">
+    <button class="opt">衝撃の強さ</button>
+    <button class="opt">終わり方（余韻）。突然消えたように見える</button>
+    <button class="opt">エフェクトの色</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 24 炎 ============ -->
+<section class="lesson" data-part="Part 4　レシピ：部品を組む" data-title="レシピ 1：炎">
+<h2><span class="chap">CHAPTER</span>レシピ 1：炎 = 本体 + コア + 火花 + 根元の光</h2>
+<p class="lead">ここからは <span class="hl">新しい仕組みは出てきません</span>。前の章の部品を「何を、どの順で、どの数字で」組むかだけです。まず一番よく使う炎から。たき火・たいまつ・燃える瓦礫は全部これの変形です。</p>
+
+<div class="viz">
+  <p class="hint">「表示」で層を 1 つずつ見てください。本体だけでは平たく、コアを加算で足すと「熱さ」が出て、火花で空気感、根元の光で場所につながります。</p>
+  <canvas id="g-fire"></canvas>
+  <div class="controls">
+    <span id="m-fire"><button class="btn active" data-v="0">完成</button><button class="btn" data-v="1">本体だけ</button><button class="btn" data-v="2">コアだけ</button><button class="btn" data-v="3">火花だけ</button></span>
+    <label>高さ <input type="range" id="s-fire-height" min="0.3" max="1.2" step="0.02" value="0.8"><span id="s-fire-height-v"></span></label>
+    <label>揺らぎ <input type="range" id="s-fire-wobble" min="0" max="0.4" step="0.01" value="0.12"><span id="s-fire-wobble-v"></span></label>
+    <label>火花 <input type="range" id="s-fire-sparks" min="0" max="24" step="1" value="12"><span id="s-fire-sparks-v"></span></label>
+    <label>速さ <input type="range" id="s-fire-speed" min="0.3" max="3" step="0.1" value="1.2"><span id="s-fire-speed-v"></span></label>
+  </div>
+</div>
+<pre class="code" id="code-fire"></pre>
+
+<h3>レシピ</h3>
+<table class="sheet">
+  <tr><th>層</th><th>部品</th><th>設定の要点</th><th>章</th></tr>
+  <tr><td>本体</td><td>流す + 抜く、炎ランプ</td><td>縦長マスク、上向きに流す、ノイズは縦に間延び（<code>vec2(4, 2.5)</code>）。しきい値は中くらい</td><td>2, 6</td></tr>
+  <tr><td>コア</td><td>同じノイズ、狭いマスク、高いしきい値</td><td>本体より <b>狭く・短く・少し速く</b>。色はほぼ白。加算で重ねる</td><td>7, 22</td></tr>
+  <tr><td>揺らぎ</td><td>歪み</td><td>上へ行くほど強く（<code>× uv.y</code>）。根元は揺れない</td><td>3, 9</td></tr>
+  <tr><td>火花</td><td>上向き重力の粒、寿命で減光</td><td>少なめ（10 個前後）、寿命 2〜4 秒、横に少し揺れる</td><td>13, 15</td></tr>
+  <tr><td>根元の光</td><td>周囲の光</td><td>橙の柔らかい丸。地面や壁を照らして「場所」につなぐ</td><td>23</td></tr>
+</table>
+<h3>調整のコツ</h3>
+<ul class="plain">
+  <li><span class="b">高さより「しきい値」で勢いを出す。</span>高くすると間延びします。同じ高さでしきい値を下げると密度が上がって「燃えている」感が出ます。</li>
+  <li><span class="b">コアは短く。</span>コアが本体と同じ高さだと、全体が白飛びして「炎」ではなく「光」になります。コアの高さは本体の 6〜7 割。</li>
+  <li><span class="b">実務ではこの層ごとに板を分ける</span>ことが多いです（本体 1 枚、コア 1 枚、火花はパーティクル）。ここでは 1 本のシェーダーにまとめていますが、層の考え方は同じです。</li>
+</ul>
+
+<div class="quiz" data-answer="1" data-why="コアは本体より狭く・短く・明るく（白）。本体と同じ大きさにすると全体が白飛びして、炎の温度差（縁は赤、中は白）が消えます。">
+  <div class="q">炎の「コア」の正しい作り方は？</div>
+  <div class="opts">
+    <button class="opt">本体と同じ大きさで、色だけ白にする</button>
+    <button class="opt">本体より狭く短く、白に近い色で加算する</button>
+    <button class="opt">本体の上に乗せて、上に伸ばす</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 25 煙 ============ -->
+<section class="lesson" data-title="レシピ 2：煙">
+<h2><span class="chap">CHAPTER</span>レシピ 2：煙 = 大きくなる粒 + 通常ブレンド + 光を受ける</h2>
+<p class="lead">煙は炎と正反対の性格です。<span class="hl">遅く、大きくなり、光を受け、通常ブレンド</span>。炎の設定をそのまま使うと「灰色の炎」になります。</p>
+
+<div class="viz">
+  <p class="hint">「消え方」を切り替えてください。薄くなって消えるより、ちぎれて消えるほうが煙らしく見えます。「光の向き」で明暗の側が変わるのは 12 章の話です。</p>
+  <canvas id="c-smoke"></canvas>
+  <div class="controls">
+    <span>消え方 <span id="m-smoke"><button class="btn active" data-v="erode">ちぎれる</button><button class="btn" data-v="fade">薄くなる</button></span></span>
+    <span>光の向き <span id="m-smoke-light"><button class="btn" data-v="-1">左から</button><button class="btn active" data-v="1">右から</button></span></span>
+  </div>
+  <div class="controls">
+    <label>レート <input type="range" id="s-smoke-rate" min="1" max="30" step="1" value="8"><span id="s-smoke-rate-v"></span></label>
+    <label>風 <input type="range" id="s-smoke-wind" min="-1" max="1" step="0.05" value="0.3"><span id="s-smoke-wind-v"></span></label>
+    <label>乱流 <input type="range" id="s-smoke-turb" min="0" max="5" step="0.1" value="1.5"><span id="s-smoke-turb-v"></span></label>
+    <label>寿命 <input type="range" id="s-smoke-life" min="1" max="6" step="0.1" value="3.5"><span id="s-smoke-life-v"></span></label>
+    <label>膨らみ <input type="range" id="s-smoke-grow" min="0" max="4" step="0.1" value="2.2"><span id="s-smoke-grow-v"></span></label>
+  </div>
+  <div class="readout" id="r-smoke"></div>
+</div>
+<pre class="code"><span class="c">// 煙の粒 1 個の描き方：小さな丸を 5 つ束ねて「もくもく」にする</span>
+<span class="k">for</span> (k = <span class="n">0</span>; k < <span class="n">5</span>; k++) {
+  <span class="k">const</span> th = <span class="n">0.45</span> + <span class="f">rand</span>(seed + k) * <span class="n">0.55</span>;     <span class="c">// この丸が消える時刻（寿命の 45〜100%）</span>
+  <span class="k">if</span> (t > th) <span class="k">continue</span>;                        <span class="c">// ちぎれる：丸ごとに別の時刻で消える（4 章のディゾルブ）</span>
+  size  = (<span class="n">0.35</span> + grow * <span class="f">easeOut</span>(t)) * <span class="n">40</span>;      <span class="c">// はじめ速く膨らむ（14 章）</span>
+  alpha = <span class="n">0.55</span> * (<span class="n">1</span> - <span class="f">smoothstep</span>(th - <span class="n">0.15</span>, th, t));
+  <span class="c">// 光側へずらした明るいグラデーション = なんちゃって法線（12 章）</span>
+  <span class="f">drawSoftCircle</span>(pos + offset(k), size, brightSide = lightDir);
+}</pre>
+
+<h3>レシピ</h3>
+<table class="sheet">
+  <tr><th>要素</th><th>部品</th><th>設定の要点</th><th>章</th></tr>
+  <tr><td>発生</td><td>一定レート</td><td>少なめ（5〜10 個/秒）、寿命は長め（3〜5 秒）、ばらつき大きめ</td><td>13</td></tr>
+  <tr><td>動き</td><td>上向きの初速 + 抵抗 + 乱流 + 風</td><td>抵抗を強くして「上がって、止まって、漂う」。乱流は弱め</td><td>15</td></tr>
+  <tr><td>大きさ</td><td>寿命カーブ：はじめ速く増える</td><td>生まれた瞬間から膨らむ。最終的に生まれたときの 3〜5 倍</td><td>14</td></tr>
+  <tr><td>消え方</td><td>ディゾルブ（ちぎれる）</td><td>透明度を下げるのではなく、部分ごとに消す。「薄くなる」は最後の保険</td><td>4</td></tr>
+  <tr><td>色</td><td>通常ブレンド、光を受ける</td><td>灰色の明暗は自分では決めない。光の向きと色で決まる</td><td>7, 12</td></tr>
+  <tr><td>描く順</td><td>奥から手前へソート</td><td>通常ブレンドは順番で結果が変わる（7 章）。この図は奥行きで並べ替えている</td><td>7, 19</td></tr>
+</table>
+<h3>調整のコツ</h3>
+<ul class="plain">
+  <li><span class="b">煙は少なく大きく。</span>小さい粒をたくさん出すと「埃」になります。大きい粒を少なく、はその分オーバードロー（19 章）に注意。</li>
+  <li><span class="b">生まれた直後は薄く。</span>発生源で突然フルサイズの丸が出ると「ポン」と見えます。最初の 10% で透明度を上げます。</li>
+  <li><span class="b">実務ではフリップブック（18 章）と組み合わせる</span>ことが多いです。形の変化は連番に任せ、動きと消え方はこの章の設定で。</li>
+</ul>
+
+<div class="quiz" data-answer="2" data-why="煙は「物」なので通常ブレンド。加算だと明るい背景で消え、重なると白飛びします。灰色の煙が加算で光って見えたら間違いです。">
+  <div class="q">煙のブレンドモードは？</div>
+  <div class="opts">
+    <button class="opt">加算（炎と同じ）</button>
+    <button class="opt">乗算</button>
+    <button class="opt">通常（アルファ）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 26 雷 ============ -->
+<section class="lesson" data-title="レシピ 3：雷">
+<h2><span class="chap">CHAPTER</span>レシピ 3：雷 = ギザギザの線 + 3 段の光 + 一瞬のタイミング</h2>
+<p class="lead">雷はテクスチャではなく <span class="hl">線</span> でできています。線をギザギザにする（中点変位）、線を太さ違いで 3 回重ねる（色の階層）、そして <span class="hl">2〜3 フレームだけ光る</span>。形より時間が効くエフェクトです。</p>
+
+<div class="viz">
+  <p class="hint">「残像」を 0 にすると、光っている時間が本当に 2〜3 フレームしかないことが分かります。それでも「見えた」と感じるのが雷です。「再ストライク間隔」を短くすると連続落雷になります。</p>
+  <canvas id="c-bolt"></canvas>
+  <div class="controls">
+    <label>ギザギザ <input type="range" id="s-bolt-jag" min="0" max="1.2" step="0.05" value="0.5"><span id="s-bolt-jag-v"></span></label>
+    <label>枝 <input type="range" id="s-bolt-branches" min="0" max="10" step="1" value="4"><span id="s-bolt-branches-v"></span></label>
+    <label>光の太さ <input type="range" id="s-bolt-glow" min="0.2" max="2.5" step="0.05" value="1"><span id="s-bolt-glow-v"></span></label>
+    <label>再ストライク間隔 <input type="range" id="s-bolt-gap" min="0.1" max="2" step="0.05" value="0.5"><span id="s-bolt-gap-v"></span></label>
+    <label>残像 <input type="range" id="s-bolt-after" min="0" max="0.8" step="0.02" value="0.2"><span id="s-bolt-after-v"></span></label>
+    <label><input type="checkbox" id="k-bolt-bg" checked> 背景も光らせる</label>
+    <button class="btn" id="b-bolt-strike">今すぐ落とす</button>
+  </div>
+</div>
+<pre class="code"><span class="c">// 中点変位：線分の真ん中をランダムに横へずらし、それを繰り返す（cgmath 20 章のフラクタル）</span>
+<span class="k">function</span> <span class="f">makeBolt</span>(a, b, depth, jag) {
+  <span class="k">let</span> pts = [a, b];
+  <span class="k">for</span> (d = <span class="n">0</span>; d < depth; d++) {
+    <span class="k">const</span> next = [pts[<span class="n">0</span>]];
+    <span class="k">for</span> (i = <span class="n">0</span>; i < pts.length - <span class="n">1</span>; i++) {
+      <span class="k">const</span> mid = <span class="f">midpoint</span>(pts[i], pts[i + <span class="n">1</span>]);
+      <span class="k">const</span> off = (<span class="f">rand</span>() - <span class="n">0.5</span>) * <span class="f">length</span>(pts[i], pts[i + <span class="n">1</span>]) * jag;   <span class="c">// 短い線分ほど小さくずれる</span>
+      next.push(<span class="f">add</span>(mid, <span class="f">scale</span>(<span class="f">normal</span>(pts[i], pts[i + <span class="n">1</span>]), off)), pts[i + <span class="n">1</span>]);
+    }
+    pts = next;
+  }
+  <span class="k">return</span> pts;   <span class="c">// depth 6 で 65 点</span>
+}
+<span class="c">// 描画：太く薄い青 → 中くらいの水色 → 細い白、を加算で重ねる（22 章の色の階層）</span></pre>
+
+<h3>レシピ</h3>
+<table class="sheet">
+  <tr><th>要素</th><th>部品</th><th>設定の要点</th><th>章</th></tr>
+  <tr><td>形</td><td>中点変位（フラクタル）</td><td>深さ 5〜6 回。ずらす量は線分の長さに比例させる（長い所は大きく、短い所は小さく）</td><td>cgmath 20</td></tr>
+  <tr><td>枝</td><td>本線の途中から短い本線</td><td>少なめ（3〜5 本）、細く、本線の向きから ±45° くらい</td><td>—</td></tr>
+  <tr><td>光</td><td>3 段の線 + 加算</td><td>外：太く薄い青 / 中：水色 / 内：細く白。縁が暗い色、コアが白（色の階層）</td><td>7, 22</td></tr>
+  <tr><td>タイミング</td><td>衝撃 = 2〜3 フレーム、残像 = 0.1〜0.3 秒</td><td>光っている時間は極端に短い。残像で「見えた」を補う</td><td>20</td></tr>
+  <tr><td>周囲</td><td>背景のフラッシュ、着地点の光</td><td>雷本体より、まわりが一瞬明るくなるほうが「落ちた」感が出る</td><td>23</td></tr>
+  <tr><td>再ストライク</td><td>ランダムな間隔で作り直す</td><td>同じ形を 2 回見せない。間隔をばらつかせる</td><td>13</td></tr>
+</table>
+<h3>調整のコツ</h3>
+<ul class="plain">
+  <li><span class="b">ギザギザは「長さに比例」が命。</span>全部同じ量でずらすと折れ線グラフになります。長い線分は大きく、細かい線分は小さく。</li>
+  <li><span class="b">光らせる時間を伸ばさない。</span>「見えにくい」と感じたら、時間ではなく残像と背景のフラッシュで補います。時間を伸ばすと「光る棒」になります（原則 7 の応用）。</li>
+  <li><span class="b">実務の形。</span>線をそのままメッシュ化するか、ギザギザのテクスチャを帯（17 章）に流すかの 2 通り。前者は形が自由、後者は軽い。</li>
+</ul>
+
+<div class="quiz" data-answer="0" data-why="中点変位では、ずらす量を線分の長さに比例させます。深い段階ほど線分が短くなるので、ずれも小さくなり、大きな折れ + 細かいギザギザの両方ができます。">
+  <div class="q">雷のギザギザが「折れ線グラフ」に見えてしまう。直すには？</div>
+  <div class="opts">
+    <button class="opt">ずらす量を線分の長さに比例させる（短い線分は小さく）</button>
+    <button class="opt">分割の深さを減らす</button>
+    <button class="opt">線を太くする</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 27 斬撃 ============ -->
+<section class="lesson" data-title="レシピ 4：斬撃">
+<h2><span class="chap">CHAPTER</span>レシピ 4：斬撃 = 弧の帯 + 白いコア + 走ってから消える</h2>
+<p class="lead">斬撃は「帯（17 章）」の代表的な使い方です。弧に沿って <span class="hl">先端が走り、尾が追いかけ、走り終わったらディゾルブで消える</span>。0.3 秒前後の短いエフェクトなので、再生速度を落として見てください。</p>
+
+<div class="viz">
+  <p class="hint">再生速度 ×0.25 で始まります。先端（easeOut で速く出て減速）、尾（先端より遅れて追う）、消え方（走り終わってから）の 3 つの時間を見てください。</p>
+  <canvas id="c-slash"></canvas>
+  <div class="controls">
+    <button class="btn" id="b-slash-replay">もう一度</button>
+    <label>再生速度 <input type="range" id="s-slash-speed" min="0.05" max="1" step="0.05" value="0.25"><span id="s-slash-speed-v"></span></label>
+    <label>長さ（時間） <input type="range" id="s-slash-dur" min="0.1" max="0.8" step="0.02" value="0.3"><span id="s-slash-dur-v"></span></label>
+    <label>幅 <input type="range" id="s-slash-width" min="15" max="110" step="1" value="55"><span id="s-slash-width-v"></span></label>
+    <label>帯の長さ <input type="range" id="s-slash-len" min="0.15" max="0.9" step="0.01" value="0.45"><span id="s-slash-len-v"></span></label>
+    <label>色 <input type="color" id="c-slash-col" value="#7fd0ff"></label>
+  </div>
+</div>
+<pre class="code"><span class="c">// 時間 t（0〜1）から、帯のどこが見えているかを決める</span>
+head  = <span class="f">easeOutCubic</span>(t);                  <span class="c">// 先端：はじめ速く、減速して止まる（14 章）</span>
+tail  = head - length;                     <span class="c">// 尾：先端から一定の長さだけ後ろ</span>
+erode = <span class="f">max</span>(<span class="n">0</span>, t - <span class="n">0.9</span>) * <span class="n">1.2</span>;             <span class="c">// 走り終わったら、しきい値を上げて消す（4 章）</span>
+<span class="k">for</span> (u <span class="k">of</span> 帯の位置) {
+  <span class="k">if</span> (u < tail || u > head) <span class="k">continue</span>;      <span class="c">// 見えている範囲だけ</span>
+  <span class="k">if</span> (<span class="f">fbm</span>(u, v) < erode) <span class="k">continue</span>;         <span class="c">// ディゾルブ</span>
+  width = maxWidth * <span class="f">sin</span>(along * PI);       <span class="c">// 尾と先端で細く、真ん中で太く</span>
+  color = <span class="f">mix</span>(edgeColor, white, centerness); <span class="c">// v = 0.5 が白、縁が色（22 章）</span>
+}</pre>
+
+<h3>レシピ</h3>
+<table class="sheet">
+  <tr><th>要素</th><th>部品</th><th>設定の要点</th><th>章</th></tr>
+  <tr><td>形</td><td>弧の帯（UV は弧に沿って u）</td><td>幅は真ん中で太く両端で細く。実務では手作りの帯メッシュ + 平らな UV</td><td>17</td></tr>
+  <tr><td>動き</td><td>先端 = easeOut、尾 = 先端に追従</td><td>先端は最初の 30% で 70% 進む。尾との差が「帯の長さ」</td><td>14</td></tr>
+  <tr><td>色</td><td>v 方向のランプ：縁は色、中心は白</td><td>2 色 + 白。加算で重ねる</td><td>6, 7, 22</td></tr>
+  <tr><td>消え方</td><td>ディゾルブ（走り終わってから）</td><td>透明度で消すと「薄い帯」が残る。しきい値で消すと「散る」</td><td>4</td></tr>
+  <tr><td>時間</td><td>全体 0.2〜0.4 秒</td><td>攻撃モーションのヒットフレームに先端が来るように合わせる</td><td>20</td></tr>
+  <tr><td>添え物</td><td>先端の火花（少数）</td><td>白い点を 3〜5 個。あくまで脇役</td><td>23</td></tr>
+</table>
+<h3>調整のコツ</h3>
+<ul class="plain">
+  <li><span class="b">帯の長さは「速さ」の表現。</span>速い斬撃は帯が長く（残像が長い）、重い斬撃は帯が短く太い。</li>
+  <li><span class="b">消え始めるのは走り終わってから。</span>走っている途中から消え始めると、先端が薄くなって勢いが消えます。</li>
+  <li><span class="b">実務ではキャラの武器の軌跡に沿って帯を作る</span>ことが多い（トレイル、16 章）。この図の弧はその簡略版です。</li>
+</ul>
+
+<div class="quiz" data-answer="1" data-why="先端は easeOut（はじめ速く減速）。斬撃は「振り抜く」動きなので、最初に一気に進んで止まります。等速や加速だと機械的に見えます。">
+  <div class="q">斬撃の先端の動きに向いているカーブは？</div>
+  <div class="opts">
+    <button class="opt">等速</button>
+    <button class="opt">easeOut（はじめ速く、減速して止まる）</button>
+    <button class="opt">easeIn（ゆっくり始まって加速）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 28 回復 ============ -->
+<section class="lesson" data-title="レシピ 5：回復">
+<h2><span class="chap">CHAPTER</span>レシピ 5：回復 = 衝撃のない、上がって消えるループ</h2>
+<p class="lead">回復・バフ・詠唱は、ヒットと逆の時間構造です。<span class="hl">溜めも衝撃もなく、上昇と減衰だけ</span>。柔らかい山のカーブ、2 色 + 白、ループ。「良い効果」であることを、形と時間で伝えます。</p>
+
+<div class="viz">
+  <p class="hint">「衝撃を付ける（悪い例）」を入れてみてください。同じ緑でも、フラッシュとリングが付いた瞬間に「攻撃を受けた」ように見えます。</p>
+  <canvas id="c-heal"></canvas>
+  <div class="controls">
+    <label>色相 <input type="range" id="s-heal-hue" min="0" max="1" step="0.01" value="0.38"><span id="s-heal-hue-v"></span></label>
+    <label>速さ <input type="range" id="s-heal-speed" min="0.2" max="2" step="0.05" value="1"><span id="s-heal-speed-v"></span></label>
+    <label>粒の数 <input type="range" id="s-heal-count" min="4" max="60" step="1" value="24"><span id="s-heal-count-v"></span></label>
+    <label><input type="checkbox" id="k-heal-bad"> 衝撃を付ける（悪い例）</label>
+  </div>
+</div>
+<pre class="code"><span class="c">// 全部「山」のカーブ（14 章）。急に出ず、急に消えない</span>
+<span class="k">const</span> a = Math.sin(t * Math.PI);           <span class="c">// 透明度・大きさ：0 → 1 → 0</span>
+y = ground - t * t * <span class="n">170</span>;                  <span class="c">// 上昇：あとで速く（上向きの加速 = 負の重力。15 章）</span>
+<span class="c">// 輪：3 本を時間差で。粒：位置を seed で固定し、寿命だけずらす → ループしても同じ絵に戻る（10 章）</span>
+<span class="k">const</span> t = (phase + <span class="f">rand</span>(i)) % <span class="n">1</span>;</pre>
+
+<h3>レシピ</h3>
+<table class="sheet">
+  <tr><th>要素</th><th>部品</th><th>設定の要点</th><th>章</th></tr>
+  <tr><td>足元の光</td><td>周囲の光、sin で明滅</td><td>ゆっくり（1〜2 秒周期）。「ここに効果がある」の目印</td><td>23</td></tr>
+  <tr><td>上がる輪</td><td>極座標のリングを上に移動</td><td>3 本を時間差で。透明度は山のカーブ</td><td>5, 14</td></tr>
+  <tr><td>粒</td><td>上向き重力、山のカーブ、きらめき</td><td>小さく、横にゆらぎ。数個だけ十字のきらめきを混ぜる（大中小の「小」）</td><td>14, 15, 21</td></tr>
+  <tr><td>色</td><td>縁 / 中 / コア、加算</td><td>1 色相 + 白。回復は緑〜黄緑、バフは黄〜橙が定番だが、ゲームの色規則に従う</td><td>7, 22</td></tr>
+  <tr><td>時間</td><td>ループ、衝撃なし</td><td>溜め → 衝撃 → 余韻の「衝撃」を抜く。急な変化は攻撃に見える</td><td>10, 20</td></tr>
+</table>
+<h3>調整のコツ</h3>
+<ul class="plain">
+  <li><span class="b">「上がる」が回復の文法。</span>下に落ちる粒は「失う」、上がる粒は「得る」。ゲーム全体でこの向きを守ると、色を変えても意味が通じます。</li>
+  <li><span class="b">急な変化を入れない。</span>フラッシュ・リングの急拡大・バーストは全部「衝撃」の語彙です。回復に混ぜると攻撃と区別できなくなります（原則 8 の可読性）。</li>
+  <li><span class="b">ループのつなぎ目を消す。</span>粒の位置を seed で固定し、寿命の位相だけずらすと、周期の終わりと始まりが同じ絵になります（10 章）。</li>
+</ul>
+
+<div class="quiz" data-answer="2" data-why="フラッシュや急拡大のリングは「衝撃」の語彙で、攻撃を受けたように見えます。回復は上昇と山のカーブだけで作り、急な変化を入れないのが基本です。">
+  <div class="q">回復エフェクトが「ダメージを受けたように見える」と言われた。原因として一番ありそうなのは？</div>
+  <div class="opts">
+    <button class="opt">色が緑でない</button>
+    <button class="opt">粒の数が少ない</button>
+    <button class="opt">フラッシュや急に広がるリングなど「衝撃」の要素が入っている</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 29 衝撃波 ============ -->
+<section class="lesson" data-title="レシピ 6：衝撃波">
+<h2><span class="chap">CHAPTER</span>レシピ 6：衝撃波 = 広がるリング + 歪み + 土埃 + 跡</h2>
+<p class="lead">着地、爆発、強攻撃のヒット。衝撃波は <span class="hl">極座標のリング</span> を「光」ではなく <span class="hl">歪み</span> として使うのが定番です。空気が押される見た目は、背景の UV をリングの位置で外へ押し出すだけで作れます。</p>
+
+<div class="viz">
+  <p class="hint">「歪みだけ」にすると、光るものが何も無いのに「何かが広がった」と分かります。「リングと土埃だけ」と比べてください。完成は両方の足し算です。</p>
+  <canvas id="g-shock"></canvas>
+  <div class="controls">
+    <span id="m-shock"><button class="btn active" data-v="0">完成</button><button class="btn" data-v="1">歪みだけ</button><button class="btn" data-v="2">リングと土埃だけ</button></span>
+    <label>歪みの強さ <input type="range" id="s-shock-str" min="0" max="0.15" step="0.005" value="0.05"><span id="s-shock-str-v"></span></label>
+    <label>幅 <input type="range" id="s-shock-width" min="0.01" max="0.15" step="0.005" value="0.05"><span id="s-shock-width-v"></span></label>
+    <label>速さ <input type="range" id="s-shock-speed" min="0.2" max="2" step="0.05" value="1"><span id="s-shock-speed-v"></span></label>
+  </div>
+</div>
+<pre class="code" id="code-shock"></pre>
+
+<h3>レシピ</h3>
+<table class="sheet">
+  <tr><th>要素</th><th>部品</th><th>設定の要点</th><th>章</th></tr>
+  <tr><td>リングの位置</td><td>極座標の r、easeOut で広がる</td><td>最初の数フレームで半分以上進む。広がるほど薄く</td><td>5, 14</td></tr>
+  <tr><td>歪み</td><td>UV を中心から外へ押す</td><td>押す量 = リングの断面 × 強さ × 残り。光らせなくても「衝撃」が伝わる</td><td>3</td></tr>
+  <tr><td>光る縁</td><td>加算の細い帯</td><td>一瞬だけ。残りの 2 乗で急に消す</td><td>7, 20</td></tr>
+  <tr><td>土埃</td><td>リングの内側をノイズで抜いた輪</td><td>角度方向は周期ノイズ（つなぎ目なし）。リングより少し遅れる</td><td>2, 10</td></tr>
+  <tr><td>跡</td><td>中心を乗算で暗く</td><td>残る。「何かが起きた場所」を示す</td><td>7, 23</td></tr>
+</table>
+<h3>調整のコツ</h3>
+<ul class="plain">
+  <li><span class="b">歪みは小さく。</span>0.03〜0.06 で十分。大きいと背景が壊れて「バグ」に見えます。</li>
+  <li><span class="b">リングは薄く速く、土埃は厚く遅く。</span>同じ速さで同じ厚さだと 1 本の輪にしか見えません。性質の違う 2 つの輪をずらす（原則 10）。</li>
+  <li><span class="b">実務では「歪みリング」は専用のブレンド（屈折 / スクリーン歪み）で、背景を読んでずらす板として作ります。</span>この図の「背景の UV をずらす」と同じことをエンジンがやってくれます。</li>
+  <li><span class="b">3D で地面に置くなら、板を寝かせる。</span>ビルボードではなく地面に沿ったメッシュ（16 章）にして、カメラが動いても地面に貼り付いているように見せます。</li>
+</ul>
+
+<div class="quiz" data-answer="0" data-why="歪みは「背景の UV をリングの位置でずらす」だけで、光るものは何もありません。それでも空気が押された感じが出るので、衝撃波の主役は歪みです。">
+  <div class="q">衝撃波の「空気が押される」感じを作っている部品は？</div>
+  <div class="opts">
+    <button class="opt">リングの位置で背景の UV を外へずらす歪み</button>
+    <button class="opt">加算の白いリング</button>
+    <button class="opt">中心の焦げ跡</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ 21 ============ -->
+<section class="lesson" data-part="Part 5　対応表" data-title="対応表：数学・言語・ノードへの読み替え">
+<h2><span class="chap">CHAPTER</span>対応表：この教材から、数学アプリと実際のツールへ</h2>
+<p class="lead">ここまでの原則を、<span class="hl">数学アプリの章</span>、<span class="hl">シェーダー言語の関数名</span>、<span class="hl">ノード式エディタの概念</span> に読み替えるための表です。エンジン固有の手順は書きません。ノード名や UI は使うエンジンの現行ドキュメントで確認してください。</p>
+
+<h3>この教材の章 → 数学アプリの章</h3>
+<table class="sheet">
+  <tr><th>この教材</th><th>使っている数学</th><th>数学アプリ</th></tr>
+  <tr><td>1 UV</td><td>ベクトルの足し算、fract</td><td><a href="../cgmath/#ch1">1 ベクトル</a>、<a href="../cgmath/#ch13">13 mod と fract</a></td></tr>
+  <tr><td>2 流す＋抜く</td><td>ノイズ、フォールオフ、smoothstep</td><td><a href="../cgmath/#ch12">12 ノイズ</a>、<a href="../cgmath/#ch15">15 フォールオフ</a>、<a href="../cgmath/#ch8">8 補間</a></td></tr>
+  <tr><td>3 歪み</td><td>位置に矢印を足す、ベクトル場</td><td><a href="../cgmath/#ch1">1 ベクトル</a>、<a href="../cgmath/#ch28">28 ベクトル場</a></td></tr>
+  <tr><td>4 ディゾルブ</td><td>しきい値、距離関数</td><td><a href="../cgmath/#ch14">14 距離関数</a>、<a href="../cgmath/#ch15">15 フォールオフ</a></td></tr>
+  <tr><td>5 極座標</td><td>atan、length、周期</td><td><a href="../cgmath/#ch16">16 極座標</a>、<a href="../cgmath/#ch5">5 sin / cos</a></td></tr>
+  <tr><td>6 ランプ</td><td>lerp、smoothstep</td><td><a href="../cgmath/#ch8">8 補間とイージング</a></td></tr>
+  <tr><td>7 ブレンド</td><td>lerp、足し算の順序</td><td><a href="../cgmath/#ch8">8 補間</a>、<a href="../cgmath/#ch1">1 ベクトル</a></td></tr>
+  <tr><td>8 フレネル / ソフトパーティクル</td><td>内積、法線、奥行き</td><td><a href="../cgmath/#ch3">3 内積</a>、<a href="../cgmath/#ch4">4 外積</a>、<a href="../cgmath/#ch7">7 3D と投影</a></td></tr>
+  <tr><td>9 頂点オフセット</td><td>行列、投影、sin</td><td><a href="../cgmath/#ch6">6 行列</a>、<a href="../cgmath/#ch7">7 3D と投影</a>、<a href="../cgmath/#ch5">5 sin / cos</a></td></tr>
+  <tr><td>10 ループ</td><td>円の上の点、mod</td><td><a href="../cgmath/#ch5">5 sin / cos</a>、<a href="../cgmath/#ch13">13 mod と fract</a></td></tr>
+  <tr><td>11 サンドボックス</td><td>1〜10 章の全部</td><td>上の各行</td></tr>
+  <tr><td>12 光を受ける板</td><td>内積（陰影）、法線、勾配</td><td><a href="../cgmath/#ch3">3 内積</a>、<a href="../cgmath/#ch4">4 外積と法線</a>、<a href="../cgmath/#ch28">28 ベクトル場</a></td></tr>
+  <tr><td>13〜15 発生・寿命・力</td><td>速度と加速度、イージング、カール</td><td><a href="../cgmath/#ch25">25 速度と加速度</a>、<a href="../cgmath/#ch8">8 イージング</a>、<a href="../cgmath/#ch28">28 ベクトル場</a></td></tr>
+  <tr><td>16 ビルボード</td><td>投影、atan2、外積</td><td><a href="../cgmath/#ch7">7 3D と投影</a>、<a href="../cgmath/#ch16">16 極座標</a>、<a href="../cgmath/#ch4">4 外積</a></td></tr>
+  <tr><td>17 リボンの UV</td><td>ベジェ曲線、接線と法線</td><td><a href="../cgmath/#ch27">27 ベジェ曲線</a>、<a href="../cgmath/#ch4">4 外積</a></td></tr>
+  <tr><td>18 フリップブック</td><td>floor、mod、lerp</td><td><a href="../cgmath/#ch13">13 mod と fract</a>、<a href="../cgmath/#ch8">8 補間</a></td></tr>
+  <tr><td>17 リボンの UV</td><td>Ribbon / Trail の UV Mode（Along Length / Stretch）、Panner</td></tr>
+  <tr><td>19 オーバードロー</td><td>面積とスケール</td><td><a href="../cgmath/#ch6">6 行列</a></td></tr>
+  <tr><td>20〜23 演出</td><td>イージング、フォールオフ、内積（明るさ）</td><td><a href="../cgmath/#ch8">8 イージング</a>、<a href="../cgmath/#ch15">15 フォールオフ</a>、<a href="../cgmath/#ch3">3 内積</a></td></tr>
+  <tr><td>24〜29 レシピ</td><td>上の全部 + フラクタル（雷）</td><td><a href="../cgmath/#ch20">20 再帰とフラクタル</a>、<a href="../cgmath/#ch27">27 ベジェ曲線</a></td></tr>
+</table>
+
+<h3>関数名の読み替え（GLSL / HLSL / VEX）</h3>
+<p>この教材は GLSL（WebGL）で書きました。Unity や Unreal のカスタムコードは HLSL、Houdini は VEX です。名前が違うだけで中身は同じ関数です。</p>
+<table class="sheet">
+  <tr><th>やること</th><th>GLSL（この教材）</th><th>HLSL</th><th>VEX</th><th>JavaScript（数学アプリ）</th></tr>
+  <tr><td>小数部分</td><td><code>fract(x)</code></td><td><code>frac(x)</code></td><td><code>frac(x)</code></td><td><code>x - Math.floor(x)</code></td></tr>
+  <tr><td>混ぜる</td><td><code>mix(a, b, t)</code></td><td><code>lerp(a, b, t)</code></td><td><code>lerp(a, b, t)</code></td><td><code>lerp(a, b, t)</code></td></tr>
+  <tr><td>なめらかなしきい値</td><td><code>smoothstep(a, b, x)</code></td><td><code>smoothstep(a, b, x)</code></td><td><code>smooth(a, b, x)</code></td><td><code>smoothstep(a, b, x)</code></td></tr>
+  <tr><td>硬いしきい値</td><td><code>step(edge, x)</code></td><td><code>step(edge, x)</code></td><td><code>x &lt; edge ? 0 : 1</code></td><td>同左</td></tr>
+  <tr><td>範囲に収める</td><td><code>clamp(x, lo, hi)</code></td><td><code>saturate(x)</code>（0〜1）/ <code>clamp</code></td><td><code>clamp(x, lo, hi)</code></td><td><code>clamp(x, lo, hi)</code></td></tr>
+  <tr><td>角度</td><td><code>atan(y, x)</code></td><td><code>atan2(y, x)</code></td><td><code>atan2(y, x)</code></td><td><code>Math.atan2(y, x)</code></td></tr>
+  <tr><td>長さ</td><td><code>length(v)</code></td><td><code>length(v)</code></td><td><code>length(v)</code></td><td><code>length(v)</code></td></tr>
+  <tr><td>ノイズ</td><td>自前の <code>noise</code> / <code>fbm</code>（テクスチャで代用が普通）</td><td>同左</td><td><code>noise(p)</code>、<code>onoise</code>、<code>curlnoise</code> が組み込み</td><td><code>vnoise</code> / <code>fbm</code></td></tr>
+</table>
+<div class="callout pink">
+  <div class="t">注意</div>
+  この表は各言語の標準的な関数名を挙げていますが、細かい引数の順序や境界の扱いは言語のリファレンスで確認してください。とくに VEX の <code>smooth</code> は GLSL の <code>smoothstep</code> と引数の意味が同じでも、追加の引数（ロールオフ）を持ちます。
+</div>
+
+<h3>ノード式エディタでの読み替え</h3>
+<p>Shader Graph・マテリアルエディタ・VFX Graph・Niagara などでは、この教材の各章がそのまま「ノード 1 個」や「モジュール 1 個」に対応します。名前は違っても、探すときの手がかりになります。</p>
+<table class="sheet">
+  <tr><th>この教材</th><th>ノード式エディタで探す言葉</th></tr>
+  <tr><td>1 UV スクロール</td><td>UV / Tiling and Offset / Panner / Time</td></tr>
+  <tr><td>2 流す＋抜く</td><td>Multiply（マスク × ノイズ）/ Smoothstep / Step / Texture Sample</td></tr>
+  <tr><td>3 歪み</td><td>Distortion / UV Distort / Add（UV + ノイズ）/ Flow Map</td></tr>
+  <tr><td>4 ディゾルブ</td><td>Dissolve / Erosion / Alpha Erosion / Step + Emission</td></tr>
+  <tr><td>5 極座標</td><td>Polar Coordinates / Radial Shear / Twirl / Rotate</td></tr>
+  <tr><td>6 ランプ</td><td>Gradient / Color Ramp / Curve / 1D Texture（LUT）</td></tr>
+  <tr><td>7 ブレンド</td><td>Blend Mode: Alpha / Additive / Multiply / Premultiplied（マテリアル設定側）</td></tr>
+  <tr><td>8 フレネル / ソフトパーティクル</td><td>Fresnel / Fresnel Effect、Depth Fade / Soft Particle / Scene Depth</td></tr>
+  <tr><td>9 頂点オフセット</td><td>Vertex Position / World Position Offset / Vertex Displacement</td></tr>
+  <tr><td>12 光を受ける板</td><td>Lit / Unlit（マテリアルの種類）、Normal Map、Six-way lighting（煙のフリップブック用）</td></tr>
+  <tr><td>13 発生と寿命</td><td>Spawn Rate / Burst / Lifetime / Normalized Age（Age over Lifetime）</td></tr>
+  <tr><td>14 寿命カーブ</td><td>Size over Life / Color over Life / Alpha over Life（Curve / Gradient）</td></tr>
+  <tr><td>15 速度と力</td><td>Initial Velocity / Cone、Gravity、Drag、Turbulence（Curl Noise）、Vortex</td></tr>
+  <tr><td>16 板の向き</td><td>Billboard / Stretched Billboard（Velocity Aligned）/ Ribbon / Trail / Mesh Renderer</td></tr>
+  <tr><td>18 フリップブック</td><td>Flipbook / SubUV / Texture Sheet Animation / Motion Vector</td></tr>
+  <tr><td>19 オーバードロー</td><td>Overdraw view（描画デバッグ表示）/ Cutout Mesh / Sprite Cutout</td></tr>
+</table>
+
+<h3>この先に読むもの</h3>
+<ul class="plain">
+  <li>技術メモの「リアルタイム VFX」シリーズ（<a href="../../tech/articles/rtvfx-01-getting-started.html">学び始め</a>、<a href="../../tech/articles/rtvfx-02-textures-flipbooks.html">テクスチャとフリップブック</a>、<a href="../../tech/articles/rtvfx-03-timing-principles.html">タイミングと演出の原則</a>、<a href="../../tech/articles/rtvfx-04-reading-old-posts.html">古い記事の読み替え</a>）。この教材の原則の出どころと、コミュニティの「現在地」。</li>
+  <li><a href="../cgmath/">CGの数学を、数式なしで。</a> の Part 3〜4（模様と動き）と Part 6（Pyro / FLIP の仕組み）。フリップブックの素材がどう作られているかの側。</li>
+</ul>
+<div class="callout green">
+  <div class="t">最後に</div>
+  他人のエフェクトを見たら「どの部品でできているか」を言葉にしてみてください。流す＋抜くはどこか、ランプは何色か、衝撃は何フレームか、何が余韻を担当しているか。それができるようになれば、どのエンジンでも作れます。
+</div>
+</section>
+
+</main>
+</div>
+<script src="app.js?v=20260906-3"></script>
+<script src="ch-shader.js?v=20260906-3"></script>
+<script src="ch-particles.js?v=20260906-3"></script>
+<script src="ch-direction.js?v=20260906-3"></script>
+<script src="ch-extra.js?v=20260906-3"></script>
+<script src="ch-recipes.js?v=20260906-3"></script>
+<script>initNav();</script>
+</body>
+</html>

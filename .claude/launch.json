@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8766", "--bind", "127.0.0.1"],
       "port": 8766
+    },
+    {
+      "name": "pr-webpage-alt",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8771", "--bind", "127.0.0.1"],
+      "port": 8771
     }
   ]
 }
