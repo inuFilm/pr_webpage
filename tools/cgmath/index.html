@@ -7,7 +7,7 @@
 <meta name="description" content="CG の数学を、数学記号を使わずプログラムの書き方だけで学ぶ教材。ベクトル・内積・行列から、ノイズ・L-system・フラクタル・物理まで、触って動かせる図で理解する。">
 <title>CGの数学を、数式なしで。 | makeinufilm</title>
 <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
-<link rel="stylesheet" href="style.css?v=20260905-2">
+<link rel="stylesheet" href="style.css?v=20260906-1">
 </head>
 <body>
 <div class="app">
@@ -53,7 +53,8 @@
   <div class="card"><div class="t">Part 2：空間を変える</div>行列 → 3D と投影 → 補間。「座標をどう変換するか」。</div>
   <div class="card"><div class="t">Part 3：模様をつくる</div>乱数・ノイズ・繰り返し・距離関数・極座標・L-system・フラクタル・黄金角・ボロノイ・セルオートマトン・反応拡散。Houdini / シェーダーの模様の数学。</div>
   <div class="card"><div class="t">Part 4：動きをつくる</div>速度と加速度・バネ・ベジェ・ベクトル場。シミュレーションとアニメーションの骨格。</div>
-  <div class="card"><div class="t">Part 5：AI と付録</div>LLM の中身が同じ数学でできていることを見て、最後に「数学記号 → コード → VEX」の対応表。</div>
+  <div class="card"><div class="t">Part 5：AI と付録</div>LLM の中身が同じ数学でできていることを見て、「数学記号 → コード → VEX」の対応表。</div>
+  <div class="card"><div class="t">Part 6：シミュレーションの中身</div>Pyro の速度場と圧力投影、FLIP の粒子と格子、RBD の撃力と拘束、Vellum の位置ベース、MPM の変形行列。全部 2D で実際に動きます。</div>
 </div>
 </section>
 
@@ -1780,14 +1781,646 @@ v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</p
 </ul>
 
 <div class="callout green">
-  <div class="t">おつかれさまでした</div>
-  「点を動かす」「向きを測る」「大きさを変える」。CG の数学はこの3つの言い換えです。どこかで数式に出会ったら、上の表でコードに翻訳して読んでみてください。
+  <div class="t">ここまでのまとめ</div>
+  「点を動かす」「向きを測る」「大きさを変える」。CG の数学はこの3つの言い換えです。どこかで数式に出会ったら、上の表でコードに翻訳して読んでみてください。<br>
+  Part 6 では、ここまでの道具だけで Houdini のソルバー（Pyro / FLIP / RBD / Vellum / MPM）の中身を読み解きます。
+</div>
+</section>
+
+<!-- ============ S1 共通の骨格 ============ -->
+<section class="lesson" data-part="Part 6　シミュレーションの中身" data-title="ソルバーの共通骨格：粒子と格子">
+<h2><span class="chap">CHAPTER</span>ソルバーの共通骨格：「粒子」で持つか「格子」で持つか</h2>
+<p class="lead">Pyro、FLIP、RBD、Vellum、MPM。名前も見た目も違いますが、中身は全部 <span class="hl">「状態を持つ → 力を足す → 拘束を直す → 進める」を毎ステップ繰り返す</span> だけ。違いは「状態を何で持つか」と「拘束をどう直すか」の2点です。この章でその地図を作ってから、次章以降で1つずつ中を開けます。</p>
+
+<h3>全ソルバー共通のループ</h3>
+<pre class="code"><span class="c">// どのソルバーも、1 フレームの中でこれを substeps 回まわしている</span>
+<span class="k">for</span> (<span class="k">let</span> s = <span class="n">0</span>; s &lt; substeps; s++) {
+  <span class="k">const</span> dt = frameTime / substeps;
+  applyForces(dt);        <span class="c">// 1. 力を足す（重力・風・浮力・バネ …）→ 速度が変わる   Part 4 の update と同じ</span>
+  advance(dt);            <span class="c">// 2. 進める（p += v * dt）。格子なら「場を流す（移流）」</span>
+  solveConstraints(dt);   <span class="c">// 3. 「あってはいけない状態」を直す（めり込み・伸びすぎ・圧縮）← 各ソルバーの個性はここ</span>
+  cleanup(dt);            <span class="c">// 4. 掃除（減衰・拡散・消滅・再配置）</span>
+}</pre>
+
+<h3>状態を「粒子」で持つか「格子」で持つか</h3>
+<div class="viz">
+  <p class="hint">同じ煙の塊を、粒子（ラグランジュ）で見るか、格子（オイラー）で見るか。粒子は「自分の位置と速度」を持って動き回る。格子は「その場所の濃さと速度」を持ち、セル自体は動かない。</p>
+  <canvas id="c-lagr"></canvas>
+  <div class="controls" id="lagr-modes">
+    <button class="btn active" data-m="particles">粒子で見る</button>
+    <button class="btn" data-m="grid">格子で見る</button>
+    <button class="btn" data-m="both">両方</button>
+  </div>
+  <div class="readout" id="r-lagr"></div>
+</div>
+
+<table class="sheet">
+<thead><tr><th>ソルバー</th><th>状態を持つ単位</th><th>拘束の直し方（第3ステップ）</th><th>得意なもの</th></tr></thead>
+<tbody>
+<tr><td>POP</td><td>粒子（p, v）</td><td>直さない（力だけ）</td><td>火花、群れ、ちりの舞い</td></tr>
+<tr><td><b>Pyro</b></td><td>格子（density, temperature, vel）</td><td>圧力で「発散」を 0 にする（非圧縮）</td><td>煙・炎・爆発</td></tr>
+<tr><td><b>FLIP</b></td><td>粒子 + 格子（ハイブリッド）</td><td>格子上で圧力、粒子で運ぶ</td><td>水・液体</td></tr>
+<tr><td><b>RBD</b></td><td>剛体（位置 + 向き + 角速度）</td><td>衝突点で撃力（インパルス）</td><td>破壊、瓦礫</td></tr>
+<tr><td><b>Vellum</b></td><td>粒子 + 拘束のリスト</td><td>位置を直接動かして拘束を満たす（PBD）</td><td>布・髪・ソフトボディ</td></tr>
+<tr><td><b>MPM</b></td><td>粒子 + 格子 + 変形の記憶（行列）</td><td>格子上で応力（材料の反発）</td><td>雪・砂・ゼリー・泥</td></tr>
+</tbody>
+</table>
+
+<h3>粒子と格子、それぞれの得意・不得意</h3>
+<div class="grid2">
+  <div class="card"><div class="t">粒子（ラグランジュ）</div>物が「どこへ行ったか」を追いやすい。質量が消えない。細かいしぶきが出せる。<br>苦手：「隣との関係」（圧力、渦）を計算するには、毎回隣を探す必要がある。</div>
+  <div class="card"><div class="t">格子（オイラー）</div>隣が固定なので「隣との差」（圧力・拡散・渦）の計算が速くて安定。<br>苦手：セルより細かいものは消える（数値拡散）。物が箱の外に出ると消える。</div>
+</div>
+<p>FLIP と MPM が「粒子 + 格子」なのは、両方の得意を取るためです。<b>粒子で運び、格子で隣を見る。</b>次章の Pyro は格子だけ、その次の FLIP はハイブリッド。順に見ると違いがはっきりします。</p>
+
+<div class="callout">
+  <div class="t">substeps と dt：全ソルバー共通の「壊れる理由」</div>
+  Part 4 で見たとおり、「今の速度で dt ぶん進む」は dt が大きいほどウソになります。速い物、硬いバネ、細かい格子ほど dt を小さくしないと、めり込み・爆発・すり抜けが起きる。<b>Substeps を上げる = dt を小さくする</b>。Houdini の全ソルバーにこのパラメータがあり、「まず Substeps を 2 倍にして直るか見る」は万能の切り分けです。
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：ソルバーの見つけ方</div>
+  <ul class="plain">
+    <li><b>SOP レベルのソルバー</b>（<code>pyrosolver</code> / <code>flipsolver</code> / <code>rbdbulletsolver</code> / <code>vellumsolver</code> / <code>mpmsolver</code>）は、中に DOP ネットワークを包んだ HDA。パラメータの名前は次章以降で「コードのどの数字か」と対応させます。</li>
+    <li>共通パラメータ：<b>Substeps</b>（dt の分割）、<b>Timescale</b>（時間の速さ）、<b>Start Frame</b>、キャッシュ（<code>filecache</code>）。</li>
+    <li>自前の簡単なソルバーは <b>Solver SOP</b> + Wrangle で書けます（Part 3 のセルオートマトン・反応拡散、Part 4 のバネがそれ）。</li>
+  </ul>
+</div>
+
+<div class="quiz" data-answer="1" data-why="格子は場所ごとに値を持ち、セルは動かない。隣が固定なので圧力や拡散のような「隣との差」の計算が得意です。">
+  <div class="q">格子（オイラー）で状態を持つ方式の得意なことは？</div>
+  <div class="opts">
+    <button class="opt">物がどこへ行ったかを追いかける</button>
+    <button class="opt">隣との差（圧力・拡散・渦）を速く安定に計算する</button>
+    <button class="opt">セルより細かいしぶきを出す</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ S2 Pyro ============ -->
+<section class="lesson" data-title="Pyro：煙は「速度場」でできている">
+<h2><span class="chap">CHAPTER</span>Pyro：煙と炎は「速度の格子」でできている</h2>
+<p class="lead">Pyro の主役は煙（density）ではなく <span class="hl">速度場（vel）</span> です。密度も温度も、速度場に乗って運ばれる「乗客」にすぎません。この章では、速度場が毎ステップ何をされているかを、実際に動く 2D の Pyro で見ます。</p>
+
+<h3>Pyro が持っている状態：全部「格子」</h3>
+<pre class="code"><span class="c">// 格子の各セルが持っている値（フィールド）。Houdini のボリューム/VDB そのもの</span>
+density[i][j]       <span class="c">// 煙の濃さ（0〜）</span>
+temperature[i][j]   <span class="c">// 温度。浮力の元</span>
+vel[i][j]           <span class="c">// ★ 速度（ベクトル）。すべての動きの正体</span>
+pressure[i][j]      <span class="c">// 圧力。速度を「非圧縮」に直すための一時的な値</span>
+<span class="c">// 炎なら flame / fuel / burn / divergence も</span></pre>
+
+<h3>1 ステップの中身（この順番が大事）</h3>
+<pre class="code"><span class="k">function</span> <span class="f">pyroStep</span>(dt) {
+  <span class="c">// 1. ソース：発生源のセルに density と temperature を足す（Sourcing）</span>
+  addSource(density, temperature);
+
+  <span class="c">// 2. 力：温度が高いセルの速度を上に（浮力）。渦を足す（Turbulence / Disturbance）</span>
+  <span class="k">for</span> (<span class="k">const</span> cell <span class="k">of</span> cells) vel[cell].y += temperature[cell] * buoyancy * dt;
+  vel += curlNoise(p) * turbulence * dt;
+
+  <span class="c">// 3. 移流：速度場に乗せて、密度・温度・そして「速度自身」を運ぶ（Advection）</span>
+  density     = advect(density,     vel, dt);
+  temperature = advect(temperature, vel, dt);
+  vel         = advect(vel,         vel, dt);   <span class="c">// ← 速度が速度を運ぶ。ここが流体の非線形さ</span>
+
+  <span class="c">// 4. 投影：速度場を「湧き出しも吸い込みも無い」状態に直す（Projection / 圧力）</span>
+  vel = project(vel);                             <span class="c">// ← 渦・巻き込み・回り込みは全部ここから生まれる</span>
+
+  <span class="c">// 5. 掃除：濃さを少しずつ減らす（Dissipation）、温度を冷ます（Cooling）</span>
+  density *= (<span class="n">1</span> - dissipation);  temperature *= (<span class="n">1</span> - cooling);
+}</pre>
+
+<div class="viz">
+  <p class="hint">下の発生源から煙と熱が出ています。クリックで煙を足せます。「速度場」表示で矢印を見てください。<b>「投影を切る」</b> にすると渦が生まれず、煙がただ上に伸びるだけになります。これが圧力投影の効果。</p>
+  <canvas id="c-pyro"></canvas>
+  <div class="controls" id="pyro-view">
+    <button class="btn active" data-m="smoke">煙</button>
+    <button class="btn" data-m="vel">速度場</button>
+    <button class="btn" data-m="temp">温度</button>
+    <button class="btn" data-m="div">発散（投影前）</button>
+  </div>
+  <div class="controls">
+    <label>浮力 buoyancy <input type="range" id="s-pyb" min="0" max="6" step="0.1" value="2.5"><span id="s-pyb-v">2.5</span></label>
+    <label>乱流 turbulence <input type="range" id="s-pyt" min="0" max="3" step="0.1" value="0.8"><span id="s-pyt-v">0.8</span></label>
+    <label>減衰 dissipation <input type="range" id="s-pyd" min="0" max="0.05" step="0.001" value="0.006"><span id="s-pyd-v">0.006</span></label>
+    <label>圧力の反復 <input type="range" id="s-pyi" min="1" max="40" step="1" value="20"><span id="s-pyi-v">20</span></label>
+  </div>
+  <div class="controls">
+    <label><input type="checkbox" id="k-pyproj" checked> 投影（圧力）を行う</label>
+    <label><input type="checkbox" id="k-pysrc" checked> 発生源 ON</label>
+    <button class="btn" id="b-pyro-reset">リセット</button>
+  </div>
+  <div class="readout" id="r-pyro"></div>
+</div>
+
+<h3>仕組み1：移流（Advection）＝「どこから来たか」を見に行く</h3>
+<p>格子は動けません。では「密度を速度で運ぶ」とは何をするのか。答えは逆向きです。<span class="hl">各セルが「自分の所に来た煙は、dt 前にどこにいた？」と速度をさかのぼって見に行き、そこの値をコピーしてくる</span>。これを半ラグランジュ法（Semi-Lagrangian）と呼びます。さかのぼった先はセルの真ん中に来ないので、周り4セルを Part 2 の lerp で混ぜます（バイリニア補間）。</p>
+<div class="viz">
+  <p class="hint">ハイライトのセルの速度矢印をドラッグ。「dt 前にいた場所」（黄色）と、そこの値を作るのに使う4セルの重みが変わります。</p>
+  <canvas id="c-advect"></canvas>
+  <div class="readout" id="r-advect"></div>
+</div>
+<pre class="code"><span class="k">function</span> <span class="f">advect</span>(field, vel, dt) {
+  <span class="k">const</span> out = newGrid();
+  <span class="k">for</span> (<span class="k">const</span> cell <span class="k">of</span> cells) {
+    <span class="k">const</span> from = sub(cell.center, scale(vel[cell], dt));   <span class="c">// 速度をさかのぼる：dt 前はここにいた</span>
+    out[cell] = sampleBilinear(field, from);               <span class="c">// その場所の値を、周り 4 セルの lerp で取る</span>
+  }
+  <span class="k">return</span> out;
+}</pre>
+<div class="callout pink">
+  <div class="t">lerp で混ぜるたびに、少しボケる（数値拡散）</div>
+  毎ステップ4セルを平均するので、細かい渦やシャープな縁は勝手にボケていきます。Houdini の Advection Type の <b>BFECC / MacCormack</b> は「行って戻って、ズレた分を補正する」ことでこのボケを減らす方式。それでも解像度（divsize）より細かい模様は原理的に出ません。「細部が欲しければ divsize を小さく」はこのためです。
+</div>
+
+<h3>仕組み2：投影（Projection）＝「発散」を圧力で消す</h3>
+<p>空気は（この速さでは）圧縮されません。つまり <span class="hl">どのセルでも「入ってくる量 = 出ていく量」</span> でなければならない。この「出入りの差」を発散（divergence）と呼びます。浮力や移流のあとの速度場は発散だらけなので、圧力を計算して速度を直し、発散を 0 にする。これが投影です。</p>
+<div class="viz">
+  <p class="hint">1 セルの 4 つの面の速度をドラッグ。発散 = 右から出る − 左から入る + 上から出る − 下から入る。投影はこれを全セルで 0 にします。</p>
+  <canvas id="c-div"></canvas>
+  <div class="readout" id="r-div"></div>
+</div>
+<pre class="code"><span class="k">function</span> <span class="f">project</span>(vel) {
+  <span class="c">// 1. 各セルの発散を測る（出入りの差）</span>
+  <span class="k">for</span> (cell) div[cell] = (vel[right].x - vel[left].x + vel[top].y - vel[bottom].y) * <span class="n">0.5</span>;
+
+  <span class="c">// 2. 「圧力を高くすれば、周りに押し出して発散が減る」— 隣の圧力の平均に近づける反復（ガウス・ザイデル）</span>
+  <span class="k">for</span> (<span class="k">let</span> k = <span class="n">0</span>; k &lt; iterations; k++)
+    <span class="k">for</span> (cell) p[cell] = (p[left] + p[right] + p[top] + p[bottom] - div[cell]) / <span class="n">4</span>;   <span class="c">// Part 3 の拡散と同じ形</span>
+
+  <span class="c">// 3. 圧力の「傾き」ぶんだけ速度を引く。高圧から低圧へ押される</span>
+  <span class="k">for</span> (cell) {
+    vel[cell].x -= (p[right] - p[left]) * <span class="n">0.5</span>;
+    vel[cell].y -= (p[top] - p[bottom]) * <span class="n">0.5</span>;
+  }
+}</pre>
+<ul class="plain">
+  <li><b>渦が生まれる理由</b>：上昇する煙は上の空気を押しのけ、押しのけられた空気はどこかへ行かなければならない（発散 0）。行き場が横〜下しかないので、巻き込む。キノコ雲も、障害物の回り込みも、全部「発散を 0 に保つ」ことの結果。POP に渦の巻き返しが出ないのは、この投影が無いからです。</li>
+  <li><b>反復回数</b>：上のデモの「圧力の反復」を 1〜3 にすると、発散が消えきらず煙がスカスカに膨らむ。Houdini の Pressure Solver は多重格子法（Multigrid）で、荒い格子で大まかに解いてから細かく直すことで、少ない反復で収束させています。</li>
+  <li><b>divergence フィールド</b>：わざと発散をプラスにすると「膨らむ」。爆発の初期膨張は密度を divergence に流し込んで作る（Pyro Solver の Sourcing で density → divergence）。逆に投影で放射状の初速はほぼ削られるので、「爆発の広がりは divergence で、速度で押しても効かない」。</li>
+</ul>
+
+<h3>仕組み3：浮力と乱流＝速度場に足す力</h3>
+<pre class="code"><span class="c">// 浮力：温度が高いほど上向きの速度を足す。密度が重ければ下向き（Density Gravity）</span>
+vel[cell].y += (temperature[cell] * buoyancyLift - density[cell] * densityGravity) * dt;
+
+<span class="c">// 乱流：Part 4 のベクトル場（curl ノイズ）を足す。Turbulence は大きい渦、Disturbance は細かい乱れ</span>
+vel[cell] = add(vel[cell], scale(curlNoise(cell.center * freq + time), amount * dt));
+<span class="c">// Shredding：温度差の縁で速度をちぎる。炎の舌先がギザギザになるのはこれ</span></pre>
+<p>Pyro に「力のノード」は無く、<span class="hl">速度は vel フィールドそのもの</span>。POP の force に当たるものは「vel に足す（Add）」か「目標速度へ近づける（Pull）」で、Sourcing タブから流し込みます。Add は毎フレーム足し込まれて速度が線形に増えるので、持続的な発生源ではほぼ常に Pull。風（Enable Wind）は移流の下駄で vel には乗らないため、Add Wind to Velocity Field を入れないとスパースの活性領域が追いつけず、風下で煙が捨てられます。</p>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：Pyro Solver のパラメータ ↔ コード</div>
+  <table class="sheet">
+    <tr><th>タブ / パラメータ</th><th>コードのどこ</th><th>メモ</th></tr>
+    <tr><td>Division Size (divsize)</td><td>格子 1 セルの大きさ</td><td>細かいほど細部が出るが、コストは 3 乗で増える。<b>Collision Voxel Size (col_divsize) は連動しない</b>ので合わせる。合わせないと粗いコリジョンが発生源を塞ぎ、2 フレーム目で煙が消える</td></tr>
+    <tr><td>Sourcing</td><td><code>addSource()</code></td><td>density は Add だと際限なく溜まる → 形を保つなら <b>Maximum</b>。vel は Pull（目標速度へ）が基本。強さ 1 は遅い、10 で数フレーム</td></tr>
+    <tr><td>Buoyancy Lift / Density Gravity</td><td><code>buoyancyLift</code> / <code>densityGravity</code></td><td>Temperature Diffusion・Cooling Rate は temperature の掃除</td></tr>
+    <tr><td>Advection Type</td><td><code>advect()</code> の方式</td><td>Semi-Lagrangian（ボケる・安定）/ BFECC / MacCormack（シャープ・少し不安定）</td></tr>
+    <tr><td>Projection / Pressure Solver</td><td><code>project()</code> の反復</td><td>Multigrid が既定。Max Iterations が上のデモの「圧力の反復」</td></tr>
+    <tr><td>Dissipation</td><td><code>density *= (1 - dissipation)</code></td><td><b>毎秒でなく毎フレームの割合</b>。0.15 だと 24 フレームで 2% まで消える。煙 0.01、霧 0.003 が目安</td></tr>
+    <tr><td>Shape: Disturbance / Turbulence / Shredding</td><td><code>curlNoise</code> を vel に足す</td><td>Turbulence の Threshold Field 既定は temperature。温度の無いシムでは効かないので density に</td></tr>
+    <tr><td>Sparse（活性領域）</td><td>density のある所だけ計算</td><td>vel は density のある所にしか無い。POP を同じ動きにするなら煙でなく自作の速度場を参照する</td></tr>
+  </table>
+  DOP の中身：<code>gasadvect</code>（移流）、<code>gasprojectnondivergent</code>（投影）、<code>gasbuoyancy</code>、<code>gasturbulence</code>、<code>gasdissipate</code>。Smoke Solver (Sparse) の Forces 入力に <code>gaswind</code> / <code>gasdamp</code> / <code>gasfieldwrangle</code> を足せば、上のコードの「2. 力」を自分で書けます。
+</div>
+
+<div class="quiz" data-answer="2" data-why="投影は速度場の発散（出入りの差）を圧力で 0 にする処理。押しのけられた空気の行き場が巻き込みになるので、渦はここから生まれます。">
+  <div class="q">Pyro で「渦の巻き込み」を生んでいるステップは？</div>
+  <div class="opts">
+    <button class="opt">ソース（発生源）</button>
+    <button class="opt">移流（さかのぼって値を取る）</button>
+    <button class="opt">投影（圧力で発散を 0 にする）</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ S3 FLIP ============ -->
+<section class="lesson" data-title="FLIP：粒子で運び、格子で押す">
+<h2><span class="chap">CHAPTER</span>FLIP：粒子で運んで、格子で「押し合い」を解く</h2>
+<p class="lead">水は煙と違って「表面」があり、「量」が減ってはいけません。格子だけだと表面がボケて量も消える。粒子だけだと押し合い（圧力）が解けない。そこで <span class="hl">粒子が速度を持ち運び、圧力だけ格子で解いて、結果を粒子に返す</span>。これが FLIP です。前章の Pyro の投影を、そのまま「粒子のある所だけ」でやります。</p>
+
+<h3>FLIP が持っている状態：粒子と格子の両方</h3>
+<pre class="code"><span class="c">// 粒子：本体。これが「水の量」であり、消えない</span>
+particles[k] = { p: {x, y}, v: {x, y} };
+
+<span class="c">// 格子：毎ステップ作り直す一時的な作業台。Pyro と同じ vel と pressure</span>
+gridVel[i][j]      <span class="c">// 粒子の速度を集めたもの</span>
+cellType[i][j]     <span class="c">// FLUID（粒子がいる）/ AIR（空）/ SOLID（壁）</span>
+pressure[i][j]</pre>
+
+<h3>1 ステップの中身：粒子 → 格子 → 粒子</h3>
+<pre class="code"><span class="k">function</span> <span class="f">flipStep</span>(dt) {
+  <span class="c">// 1. 粒子に力を足して動かす（Part 4 の基本形）</span>
+  <span class="k">for</span> (p <span class="k">of</span> particles) { p.v.y += gravity * dt;  p.p = add(p.p, scale(p.v, dt)); }
+  pushParticlesApart();                         <span class="c">// 重なった粒子を少し離す（Particle Separation）</span>
+  collideWithWalls();
+
+  <span class="c">// 2. 粒子 → 格子（P2G）：各粒子の速度を、周り 4 セルに重み付きで配る。粒子のいるセルを FLUID に</span>
+  gridVel = splat(particles);
+  gridVelBefore = copy(gridVel);                <span class="c">// ★ 投影前の速度を覚えておく（FLIP のキモ）</span>
+
+  <span class="c">// 3. 格子で投影：FLUID セルだけ、前章と同じ圧力計算で発散を 0 に</span>
+  project(gridVel, cellType);
+
+  <span class="c">// 4. 格子 → 粒子（G2P）：直した速度を粒子に戻す。戻し方が 2 通りある</span>
+  <span class="k">for</span> (p <span class="k">of</span> particles) {
+    <span class="k">const</span> picV  = sampleBilinear(gridVel, p.p);                             <span class="c">// PIC：格子の速度をそのまま取る（なめらか・粘っこい）</span>
+    <span class="k">const</span> flipV = p.v + sampleBilinear(gridVel - gridVelBefore, p.p);       <span class="c">// FLIP：格子の「変化分」だけ足す（元気・ノイジー）</span>
+    p.v = lerp(picV, flipV, flipRatio);                                       <span class="c">// Part 2 の lerp で混ぜる</span>
+  }
+}</pre>
+
+<div class="viz">
+  <p class="hint">ダム崩壊。クリックで水を足せます。<b>FLIP/PIC 比を 0（PIC だけ）</b>にすると、蜂蜜のように粘っこく静かになります。「格子を見る」で FLUID セルと格子上の速度が見えます。</p>
+  <canvas id="c-flip"></canvas>
+  <div class="controls" id="flip-view">
+    <button class="btn active" data-m="particles">粒子</button>
+    <button class="btn" data-m="grid">格子を見る</button>
+  </div>
+  <div class="controls">
+    <label>FLIP / PIC 比 <input type="range" id="s-flr" min="0" max="1" step="0.05" value="0.9"><span id="s-flr-v">0.9</span></label>
+    <label>圧力の反復 <input type="range" id="s-fli" min="1" max="60" step="1" value="30"><span id="s-fli-v">30</span></label>
+    <label><input type="checkbox" id="k-fldrift" checked> 密度補正（体積を保つ）</label>
+    <button class="btn" id="b-flip-reset">ダム崩壊をリセット</button>
+  </div>
+  <div class="readout" id="r-flip"></div>
+</div>
+
+<h3>仕組み1：粒子 ↔ 格子の受け渡しは「重み付きの平均」</h3>
+<p>粒子は格子点の真上にはいません。だから粒子の速度は周り 4 つの格子点に「近いほど多く」配られ（P2G）、逆に格子から粒子へ返すときも 4 点を「近いほど多く」混ぜます（G2P）。重みは前章の移流と同じバイリニア（lerp の lerp）。<span class="hl">Part 2 の lerp が、流体の中でも主役です。</span></p>
+<pre class="code"><span class="c">// P2G：粒子 1 個の速度を、周り 4 格子点に配る</span>
+<span class="k">const</span> w = bilinearWeights(p.p);        <span class="c">// 4 つの重み。合計 1</span>
+<span class="k">for</span> (<span class="k">let</span> k = <span class="n">0</span>; k &lt; <span class="n">4</span>; k++) {
+  gridVel[node[k]]    += p.v * w[k];
+  gridWeight[node[k]] += w[k];
+}
+<span class="c">// 全粒子を配り終えたら、gridVel /= gridWeight で「重み付き平均」になる</span></pre>
+
+<h3>仕組み2：PIC と FLIP の違い＝「値」を返すか「変化」を返すか</h3>
+<ul class="plain">
+  <li><b>PIC</b>（Particle In Cell）：格子の速度をそのまま粒子に入れる。粒子 → 格子 → 粒子と平均を 2 回通るので、毎ステップ速度がならされる。結果：<b>粘っこい、静か、渦が死ぬ</b>。</li>
+  <li><b>FLIP</b>（FLuid Implicit Particle）：粒子の速度に「格子で直した分の差」だけ足す。粒子が持っていた細かい速度の違いが残る。結果：<b>元気、しぶきが出る、ノイジーで安定しにくい</b>。</li>
+  <li>Houdini はこの 2 つを lerp した「FLIP/PIC 比」を使っていました（既定 0.9〜0.95）。現在の既定 <b>APIC</b> は、粒子に「周りの回転（アフィン行列）」も持たせる方式で、PIC のなめらかさと FLIP の元気さを両立します。Part 2 の行列が粒子の中に入っている。</li>
+</ul>
+
+<h3>仕組み3：表面と体積</h3>
+<ul class="plain">
+  <li><b>FLUID / AIR</b>：粒子がいるセルだけ FLUID。投影は FLUID セルだけで解き、AIR セルは圧力 0（自由表面）。これで「表面」が自然に決まる。</li>
+  <li><b>体積が減る問題</b>：粒子が寄り集まると密度が上がり、水かさが減っていく（ドリフト）。上のデモの「密度補正」は、粒子が密なセルで発散にマイナスを足して押し広げる処理。Houdini の Reseeding（セルあたりの粒子数を保つ）と Particle Separation が同じ役目。</li>
+  <li><b>メッシュ化</b>：粒子 → 距離関数（Part 3 の SDF、VDB from Particles）→ Dilate → Erode → Laplacian（隙間を埋めてから戻して滑らかに）→ ポリゴン。これが Particle Fluid Surface の中身。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：FLIP Solver のパラメータ ↔ コード</div>
+  <table class="sheet">
+    <tr><th>パラメータ</th><th>コードのどこ</th><th>メモ</th></tr>
+    <tr><td>Particle Separation</td><td>粒子の間隔（<code>pushParticlesApart</code> の距離）</td><td>解像度そのもの。半分にすると粒子は 8 倍</td></tr>
+    <tr><td>Grid Scale</td><td>格子セル = Separation × Grid Scale</td><td>既定 2。格子が粗いほど速いが、圧力の細部が消える</td></tr>
+    <tr><td>Velocity Transfer: FLIP / APIC</td><td>G2P の方式</td><td>Splashy Kernel = FLIP 寄り、Swirly Kernel = APIC。旧版の FLIP/PIC ratio が上のスライダー</td></tr>
+    <tr><td>Reseeding</td><td>セルあたり粒子数の維持</td><td>薄い所に足し、濃い所から減らす。体積を保つ</td></tr>
+    <tr><td>Viscosity</td><td>速度を隣の平均に近づける（拡散）</td><td>PIC を増やすのと似た効果。蜂蜜・溶岩</td></tr>
+    <tr><td>Surface Tension</td><td>表面の曲率に応じた力</td><td>小さい水滴・雫。スケールが小さいときだけ効く</td></tr>
+    <tr><td>Collision（SDF / VDB）</td><td><code>cellType = SOLID</code> + 壁の速度</td><td>コリジョンは距離関数で持つ（Part 3）。動く壁の速度を格子に書けば押せる</td></tr>
+    <tr><td>Particle Fluid Surface</td><td>粒子 → SDF → メッシュ</td><td>Dilate → Erode → Laplacian の順（closing）</td></tr>
+  </table>
+  ホワイトウォーター（泡・しぶき）は、格子の速度場から「渦の強さ（curl）」「空気との接触」を測って粒子を追加で出すもの。Pyro の速度場と同じ数学で「どこがしぶきになるか」を決めています。
+</div>
+
+<div class="quiz" data-answer="0" data-why="FLIP は「格子で直した速度の変化分」だけを粒子に足すので、粒子が持つ細かい速度差が残り、元気でしぶきが出る。PIC は値をそのまま入れるので平均化されて粘っこくなります。">
+  <div class="q">FLIP/PIC 比を 0（PIC だけ）にすると、水はどうなる？</div>
+  <div class="opts">
+    <button class="opt">粘っこく静かになる（速度が平均化される）</button>
+    <button class="opt">しぶきが増えて激しくなる</button>
+    <button class="opt">体積が増える</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ S4 RBD ============ -->
+<section class="lesson" data-title="RBD：剛体は「向き」を持った粒子">
+<h2><span class="chap">CHAPTER</span>RBD：剛体は「向きと回転」を持った粒子</h2>
+<p class="lead">剛体（Rigid Body）＝形が変わらない物。Part 4 の粒子に <span class="hl">「向き」と「回転の速さ」</span> を足すと剛体になります。ぶつかったときの「跳ね返り」「回転」「摩擦」は、接触点 1 か所での撃力（インパルス）の計算です。Bullet も、Houdini の RBD Bullet Solver も、中身はこれ。</p>
+
+<h3>剛体が持っている状態</h3>
+<pre class="code"><span class="k">const</span> body = {
+  p: {x, y},      <span class="c">// 重心の位置（Part 4 と同じ）</span>
+  v: {x, y},      <span class="c">// 速度</span>
+  angle: <span class="n">0</span>,       <span class="c">// ★ 向き（3D なら四元数 @orient）</span>
+  w: <span class="n">0</span>,           <span class="c">// ★ 回転の速さ（角速度 @w）。3D ならベクトル</span>
+  mass: <span class="n">1</span>,        <span class="c">// 重さ。動かしにくさ</span>
+  inertia: <span class="n">1</span>,     <span class="c">// ★ 回しにくさ（慣性モーメント）。重さの「回転版」。形と質量分布で決まる</span>
+  shape: [...],   <span class="c">// 衝突判定用の形（Convex Hull など）</span>
+};
+<span class="c">// 進め方：位置と向きを、それぞれの速度で進めるだけ</span>
+body.v.y  += gravity * dt;
+body.p     = add(body.p, scale(body.v, dt));
+body.angle += body.w * dt;</pre>
+
+<h3>ぶつかったら：接触点で「撃力」を 1 発</h3>
+<p>力を「時間をかけて足す」代わりに、衝突の瞬間に速度を直接書き換える。これが撃力（インパルス）。<span class="hl">重心からズレた所で当たると、その分が回転になる</span>（Part 1 の外積 cross が出てきます）。</p>
+<pre class="code"><span class="k">function</span> <span class="f">resolveContact</span>(body, point, normal) {
+  <span class="k">const</span> r  = sub(point, body.p);                          <span class="c">// 重心 → 接触点 の矢印</span>
+  <span class="k">const</span> vp = add(body.v, perp(r) * body.w);              <span class="c">// 接触点の速度 = 重心の速度 + 回転ぶん</span>
+  <span class="k">const</span> vn = dot(vp, normal);                             <span class="c">// 面に向かう速さ（Part 1 の dot）。プラスなら離れていくので何もしない</span>
+  <span class="k">if</span> (vn &gt;= <span class="n">0</span>) <span class="k">return</span>;
+
+  <span class="k">const</span> rn = cross2d(r, normal);                          <span class="c">// 「重心からどれだけズレて当たったか」（外積）</span>
+  <span class="k">const</span> j  = -(<span class="n">1</span> + bounce) * vn / (<span class="n">1</span> / body.mass + rn * rn / body.inertia);   <span class="c">// 撃力の大きさ</span>
+  body.v = add(body.v, scale(normal, j / body.mass));    <span class="c">// 速度が跳ね返る</span>
+  body.w += rn * j / body.inertia;                        <span class="c">// ★ ズレて当たったぶんが回転になる</span>
+  <span class="c">// 摩擦：面に沿った速度を、j * friction を上限に打ち消す（同じ形の式）</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">クリックで箱を落とします。角で着地すると回転が生まれ、面で着地すると止まる。bounce と friction を変えてみてください。</p>
+  <canvas id="c-rbd"></canvas>
+  <div class="controls">
+    <label>跳ね返り bounce <input type="range" id="s-rbb" min="0" max="0.9" step="0.05" value="0.2"><span id="s-rbb-v">0.2</span></label>
+    <label>摩擦 friction <input type="range" id="s-rbf" min="0" max="1" step="0.05" value="0.5"><span id="s-rbf-v">0.5</span></label>
+    <label><input type="checkbox" id="k-rbshow" checked> 接触点を表示</label>
+    <button class="btn" id="b-rbd-reset">リセット</button>
+  </div>
+  <div class="readout" id="r-rbd"></div>
+</div>
+
+<h3>衝突判定：「重なっているか」「どの向きに」「どれだけ」</h3>
+<ul class="plain">
+  <li><b>凸包（Convex Hull）</b>：凸な形どうしは「分離軸」テストで速く判定できる（どこかの辺の向きに投影して、重なっていない軸が 1 本でもあれば離れている）。Bullet の既定が Convex Hull なのはこのため。凹んだ形（Concave）は正確だが遅く、不安定。</li>
+  <li><b>めり込みの修正</b>：撃力は速度を直すだけで、すでに重なった分は残る。少しずつ押し出す（位置補正）。上のデモで箱が微妙に震えるのはこれの副作用で、Bullet の「Sleeping」（十分遅くなったら止める）が抑えています。</li>
+  <li><b>すり抜け</b>：速い物は 1 ステップで壁を通り過ぎる。Substeps を上げるか、CCD（連続衝突判定）。動くコリジョンの式は <code>$F</code> ではなく <code>$FF</code>（小数フレーム）。<code>$F</code> はサブステップの間で止まるので速い物がすり抜ける。</li>
+</ul>
+
+<h3>拘束（Constraint）：剛体どうしをつなぐ「壊れる糸」</h3>
+<p>破壊シムの主役は衝突ではなく拘束です。割った破片を <b>Glue</b> でつなぎ、衝撃が強さ（strength）を超えた所だけ切れる。すると「当たった所から崩れる」が自動で起きます。</p>
+<div class="viz">
+  <p class="hint">壁のブロックは Glue（黄色の線）でつながっています。クリックで弾を撃ち込むと、衝撃で伸びた拘束から切れていきます。strength を -1 にすると絶対に切れません。</p>
+  <canvas id="c-glue"></canvas>
+  <div class="controls">
+    <label>strength <input type="range" id="s-gls" min="-1" max="200" step="1" value="60"><span id="s-gls-v">60</span></label>
+    <label>弾の重さ <input type="range" id="s-glm" min="1" max="100" step="1" value="30"><span id="s-glm-v">30</span></label>
+    <button class="btn" id="b-glue-reset">壁を直す</button>
+  </div>
+  <div class="readout" id="r-glue"></div>
+</div>
+<pre class="code"><span class="c">// 拘束 = 2 つの剛体の間の「約束」と、それを破る条件</span>
+<span class="k">for</span> (<span class="k">const</span> c <span class="k">of</span> constraints) {
+  <span class="k">const</span> stretch = length(sub(c.b.p, c.a.p)) - c.restLength;     <span class="c">// どれだけ約束からズレたか</span>
+  <span class="k">if</span> (c.strength &gt;= <span class="n">0</span> &amp;&amp; Math.abs(stretch) &gt; c.strength * k) c.broken = <span class="k">true</span>;   <span class="c">// 強さを超えたら切れる</span>
+  <span class="k">else</span> pullTogether(c.a, c.b, stretch);                            <span class="c">// 切れていなければ引き戻す（Part 4 のバネ）</span>
+}</pre>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：RBD Bullet Solver ↔ コード</div>
+  <table class="sheet">
+    <tr><th>パラメータ / 属性</th><th>コードのどこ</th><th>メモ</th></tr>
+    <tr><td><code>@P @v @orient @w</code></td><td><code>p v angle w</code></td><td>剛体の状態。<code>@orient</code> は四元数（回転を 4 つの数で持つ方式）</td></tr>
+    <tr><td><code>@mass</code> / Density</td><td><code>mass</code>（inertia は形から自動）</td><td>飛来物は <code>f@mass</code> = 100 のように重くして押し切る</td></tr>
+    <tr><td>Bounce / Friction</td><td><code>bounce</code> / <code>friction</code></td><td>RBD Configure / <code>rbdmaterial</code></td></tr>
+    <tr><td>Collision Shape: Convex Hull / Concave / Box</td><td><code>shape</code></td><td>既定は Convex Hull。速くて安定</td></tr>
+    <tr><td>Substeps / Solver Iterations</td><td>dt の分割 / 拘束の反復</td><td>すり抜け・震えはまずここ</td></tr>
+    <tr><td>Constraint Network: Glue / Hard / Soft</td><td><code>constraints[]</code></td><td>Glue の破断は <code>strength</code> 属性による暗黙のもの。Break Thresholds に Glue を足す必要は無い</td></tr>
+    <tr><td><code>strength</code></td><td><code>c.strength</code></td><td><b>-1 = 絶対に切れない</b>。0〜100 でよく割れる。10000（Material Fracture の既定）はほぼ割れない。「当たっているのに壊れない」ときは 1/10 にして試す</td></tr>
+    <tr><td><code>i@active</code> / <code>i@animated</code></td><td>動かす / キーフレームで動かす</td><td>0 なら静止した壁。<code>assemble</code> を必ず通す（通さないと当たっても無反応）</td></tr>
+  </table>
+  実務の罠：破片側と飛来物側の両方に <code>assemble</code> を通すと、どちらも <code>piece0</code> から始まる名前になり、同名どうしが拘束網に取り込まれてシーン全体が固まる（エラーは出ない）。飛来物には <code>s@name = "projectile";</code> で別名を振ること。飛来物を入力3（Collision Geometry）に生で繋ぐのも間違いで、<code>rbddeformingtoanimated</code> を挟む。
+</div>
+
+<div class="quiz" data-answer="1" data-why="撃力の式で回転に入るのは cross2d(r, normal)、つまり「重心から接触点までの矢印」と「面の向き」の外積。重心の真下で当たると 0 で回転しません。">
+  <div class="q">箱が角で着地すると回転するのはなぜ？</div>
+  <div class="opts">
+    <button class="opt">角のほうが摩擦が大きいから</button>
+    <button class="opt">接触点が重心からズレていて、そのズレ（外積）ぶんが回転になるから</button>
+    <button class="opt">角は速度が速いから</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ S5 Vellum ============ -->
+<section class="lesson" data-title="Vellum：位置を直接直す（PBD）">
+<h2><span class="chap">CHAPTER</span>Vellum：力を足さず、「位置を直接直す」（PBD）</h2>
+<p class="lead">布・髪・ゼリーを Part 4 のバネで作ると、硬くするほど dt を小さくしないと爆発します。Vellum は発想を変えて、<span class="hl">「伸びすぎた 2 点を、正しい距離になるまで直接動かす」</span>。これを拘束ごとに何回もまわす。位置ベース（Position Based Dynamics, PBD）と呼ばれ、硬くても爆発しません。</p>
+
+<h3>Vellum が持っている状態</h3>
+<pre class="code"><span class="c">// 粒子：位置と「前の位置」。速度は差から作る</span>
+points[k] = { p: {x, y}, prev: {x, y}, invMass: <span class="n">1</span> };   <span class="c">// invMass = 0 なら動かない（ピン）</span>
+
+<span class="c">// 拘束のリスト：「この 2 点の距離は restLength であるべき」</span>
+constraints[c] = { a, b, restLength, compliance };    <span class="c">// compliance = 柔らかさ（0 で完全に硬い）</span></pre>
+
+<h3>1 ステップの中身</h3>
+<pre class="code"><span class="k">function</span> <span class="f">vellumStep</span>(dt) {
+  <span class="c">// 1. 力で「仮の位置」を作る（Part 4 と同じ。ただし速度は prev との差）</span>
+  <span class="k">for</span> (pt <span class="k">of</span> points) {
+    <span class="k">const</span> v = scale(sub(pt.p, pt.prev), <span class="n">1</span> / dt);
+    pt.prev = pt.p;
+    pt.p = add(pt.p, scale(add(v, scale(gravity, dt)), dt));
+  }
+
+  <span class="c">// 2. 拘束を順番に直す。1 周では直しきれないので iterations 回まわす</span>
+  <span class="k">for</span> (<span class="k">let</span> it = <span class="n">0</span>; it &lt; iterations; it++)
+    <span class="k">for</span> (c <span class="k">of</span> constraints) {
+      <span class="k">const</span> d      = sub(c.b.p, c.a.p);
+      <span class="k">const</span> len    = length(d);
+      <span class="k">const</span> error  = len - c.restLength;                  <span class="c">// 伸びすぎ(+) / 縮みすぎ(-)</span>
+      <span class="k">const</span> dir    = scale(d, <span class="n">1</span> / len);
+      <span class="k">const</span> wSum   = c.a.invMass + c.b.invMass + c.compliance / (dt * dt);   <span class="c">// XPBD：柔らかさは dt で割った分だけ効く</span>
+      <span class="k">const</span> move   = error / wSum;
+      c.a.p = add(c.a.p, scale(dir,  move * c.a.invMass));   <span class="c">// 軽いほうが多く動く</span>
+      c.b.p = sub(c.b.p, scale(dir,  move * c.b.invMass));
+    }
+  <span class="c">// 3. 衝突も「拘束」：めり込んだ点を表面まで押し出すだけ</span>
+  <span class="c">// 4. 速度は prev との差で自動的に決まる。位置を直した分がそのまま速度の修正になる</span>
+}</pre>
+
+<div class="viz">
+  <p class="hint">布の点をドラッグできます。球（コライダー）もドラッグ。<b>反復を 1〜2 にすると伸びやすく</b>、増やすと硬くなる。stiffness は XPBD の compliance（柔らかさ）の逆数です。</p>
+  <canvas id="c-vellum"></canvas>
+  <div class="controls">
+    <label>反復 iterations <input type="range" id="s-vli" min="1" max="30" step="1" value="8"><span id="s-vli-v">8</span></label>
+    <label>substeps <input type="range" id="s-vls" min="1" max="6" step="1" value="2"><span id="s-vls-v">2</span></label>
+    <label>stiffness (10^n) <input type="range" id="s-vlk" min="0" max="7" step="0.5" value="5"><span id="s-vlk-v">5</span></label>
+  </div>
+  <div class="controls">
+    <label><input type="checkbox" id="k-vlbend" checked> 曲げ拘束（Bend）</label>
+    <label><input type="checkbox" id="k-vlpin" checked> 上端をピン</label>
+    <label><input type="checkbox" id="k-vlshow"> 伸びを色で表示</label>
+    <button class="btn" id="b-vellum-reset">リセット</button>
+  </div>
+  <div class="readout" id="r-vellum"></div>
+</div>
+
+<h3>なぜ「位置を直す」と爆発しないのか</h3>
+<ul class="plain">
+  <li>バネ（力）は「ズレ × 硬さ」を速度に足す。硬さが大きいと 1 ステップで行き過ぎ、次のステップでさらに行き過ぎ…と発散する。</li>
+  <li>PBD は「正しい距離になる位置」に置くだけ。行き過ぎようがない。硬さ無限でも安定。代わりに、<b>反復が足りないと柔らかく見える</b>（拘束を順番に直すので、後の拘束が前の拘束を壊す）。</li>
+  <li><b>XPBD</b>：ただの PBD は「反復回数と dt で硬さが変わってしまう」欠点があった。compliance を dt² で割って効かせることで、反復や substeps を変えても同じ硬さになる。Vellum の Stiffness はこの compliance の逆数（10^n の値）。</li>
+</ul>
+
+<h3>Vellum の拘束はぜんぶ「距離の約束」の親戚</h3>
+<table class="sheet">
+<tr><th>拘束</th><th>約束の内容</th><th>使いどころ</th></tr>
+<tr><td>Stretch（Distance）</td><td>2 点の距離を保つ</td><td>布の縦横、髪の長さ</td></tr>
+<tr><td>Bend</td><td>2 つ隣の点との距離、または 2 面の角度を保つ</td><td>布の折れ、髪のコシ。上のデモの「曲げ拘束」</td></tr>
+<tr><td>Pin to Target / Attach</td><td>この点はここにいる（invMass = 0、または目標へ引く）</td><td>固定、アニメーションへの追従</td></tr>
+<tr><td>Pressure / Volume</td><td>閉じた形の体積を保つ</td><td>風船、ソフトボディ</td></tr>
+<tr><td>Collision</td><td>表面より内側に入らない（Thickness で太さ）</td><td>自己衝突もこれ。粒子どうしの距離拘束</td></tr>
+<tr><td>Breaking</td><td>伸びが閾値を超えたら拘束を消す</td><td>破れる布、切れる髪。前章の Glue と同じ</td></tr>
+</table>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：Vellum ↔ コード</div>
+  <table class="sheet">
+    <tr><th>パラメータ</th><th>コードのどこ</th><th>メモ</th></tr>
+    <tr><td>Vellum Constraints: Stretch / Bend / Pin</td><td><code>constraints[]</code> を作る</td><td>Cloth プリセットは Stretch + Bend、Hair は Stretch + Bend（曲げ角）、Grain は距離拘束の粒</td></tr>
+    <tr><td>Stiffness（10^n）</td><td><code>1 / compliance</code></td><td>上のスライダーと同じ。Bend の Stiffness を下げると柔らかい布、上げると紙</td></tr>
+    <tr><td>Damping Ratio</td><td>速度を prev との差から作るときに少し減らす</td><td>Part 4 のバネの damping と同じ。1 で臨界減衰</td></tr>
+    <tr><td>Rest Length Scale</td><td><code>restLength</code></td><td>1 未満で縮む（張った布・ワイヤー）</td></tr>
+    <tr><td>Vellum Solver: Substeps / Constraint Iterations</td><td>外のループ / 内のループ</td><td>伸びる → Iterations、めり込む・すり抜ける → Substeps。目安：Cloth で Substeps 2〜5、Iterations 50〜200</td></tr>
+    <tr><td>Smoothing Iterations</td><td>反復の順番によるムラをならす</td><td>髪の縮れ・布のシワが不自然なとき</td></tr>
+    <tr><td>Thickness</td><td>衝突拘束の距離</td><td>薄すぎると自己衝突を抜ける</td></tr>
+  </table>
+  ソルバーの外から拘束を動的に足す（切る・つなぐ）なら、Vellum Solver の内側（Force 出力）に入れます。外で足すと毎フレーム上書きされます。
+</div>
+
+<div class="quiz" data-answer="2" data-why="PBD は拘束を順番に直すので、1 周では後の拘束が前の拘束を壊す。反復が少ないと直しきれず、布が伸びて（柔らかく）見えます。">
+  <div class="q">Vellum で Constraint Iterations を減らすと、布はどうなる？</div>
+  <div class="opts">
+    <button class="opt">爆発する</button>
+    <button class="opt">硬くなる</button>
+    <button class="opt">伸びやすく（柔らかく）なる</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ S6 MPM ============ -->
+<section class="lesson" data-title="MPM：粒子が「変形」を覚える">
+<h2><span class="chap">CHAPTER</span>MPM：粒子が「自分の周りの変形」を覚えている</h2>
+<p class="lead">雪、砂、ゼリー、泥。「流れるけど形も持つ」物は、FLIP（形を持たない）でも Vellum（つながりが固定）でも作りにくい。MPM（Material Point Method）は FLIP の骨格に <span class="hl">「この粒子の周りは元の形からどれだけ変形しているか」を表す行列</span> を足したものです。Part 2 の行列が、粒子 1 個ずつの中に入っています。</p>
+
+<h3>MPM が持っている状態：FLIP + 変形の記憶</h3>
+<pre class="code"><span class="c">// 粒子</span>
+particles[k] = {
+  p: {x, y}, v: {x, y},   <span class="c">// FLIP と同じ</span>
+  F: { i: {x:1, y:0}, j: {x:0, y:1} },   <span class="c">// ★ 変形勾配。Part 2 の行列そのもの。「元の正方形が今どんな平行四辺形になっているか」</span>
+  C: matrix,              <span class="c">// 周りの速度の傾き（APIC のアフィン行列）。回転を覚える</span>
+  material: <span class="n">"snow"</span>,       <span class="c">// 材料：F をどう「反発」に変換するかのルール</span>
+};
+<span class="c">// 格子：FLIP と同じ一時的な作業台（質量と運動量）</span></pre>
+
+<h3>1 ステップの中身：FLIP とほぼ同じ。違いは「応力」だけ</h3>
+<pre class="code"><span class="k">function</span> <span class="f">mpmStep</span>(dt) {
+  <span class="c">// 1. 粒子 → 格子（P2G）：質量と速度を配る。FLIP と同じ。ただし「応力」も一緒に配る</span>
+  <span class="k">for</span> (p <span class="k">of</span> particles) {
+    p.F = compose( I + dt * p.C, p.F );          <span class="c">// 周りの速度の傾きぶん、変形を更新（Part 2 の compose）</span>
+    <span class="k">const</span> stress = materialResponse(p.F, p.material);   <span class="c">// ★ 「元に戻ろうとする力」。材料で違う</span>
+    splat(p.mass, p.v, stress);                    <span class="c">// 質量・運動量・応力を周り 9 格子点に配る</span>
+  }
+  <span class="c">// 2. 格子：速度 = 運動量 / 質量。重力を足す。壁で止める（FLIP の「投影」の代わりに応力が押し合いを担う）</span>
+  <span class="k">for</span> (node <span class="k">of</span> grid) { node.v = node.momentum / node.mass;  node.v.y -= gravity * dt;  collide(node); }
+
+  <span class="c">// 3. 格子 → 粒子（G2P）：速度と「速度の傾き C」を粒子に戻し、進める</span>
+  <span class="k">for</span> (p <span class="k">of</span> particles) { p.v = sample(grid); p.C = sampleGradient(grid); p.p = add(p.p, scale(p.v, dt)); }
+}</pre>
+
+<div class="viz">
+  <p class="hint">材料を選んでクリックすると、その材料の塊が落ちます。同じコードで、<code>materialResponse</code> の中身だけが違います。</p>
+  <canvas id="c-mpm"></canvas>
+  <div class="controls" id="mpm-mat">
+    <button class="btn" data-m="liquid">液体</button>
+    <button class="btn active" data-m="jelly">ゼリー（弾性）</button>
+    <button class="btn" data-m="snow">雪（塑性）</button>
+  </div>
+  <div class="controls">
+    <label>硬さ E <input type="range" id="s-mpe" min="200" max="3000" step="100" value="1000"><span id="s-mpe-v">1000</span></label>
+    <button class="btn" id="b-mpm-reset">リセット</button>
+    <label><input type="checkbox" id="k-mpplay" checked> 再生</label>
+  </div>
+  <div class="readout" id="r-mpm"></div>
+</div>
+
+<h3>材料の違い＝「変形行列 F をどう扱うか」</h3>
+<p>F は Part 2 の行列。<code>det(F)</code>（面積が何倍か）と、F を「回転 × 伸び」に分解した「伸び」の部分が使えます。</p>
+<pre class="code"><span class="k">function</span> <span class="f">materialResponse</span>(F, material) {
+  <span class="k">const</span> J = det(F);                              <span class="c">// 体積が何倍になったか（Part 2 の cross2d(F.i, F.j)）</span>
+  <span class="k">const</span> { R, stretch } = polarDecompose(F);      <span class="c">// F = 回転 R × 伸び。回転は「変形」ではないので取り除く</span>
+
+  <span class="k">if</span> (material === <span class="n">"liquid"</span>) {
+    <span class="k">return</span> pressure(J);                          <span class="c">// 液体：形は覚えない。体積のズレだけ押し返す（= FLIP の圧力）</span>
+  }
+  <span class="k">if</span> (material === <span class="n">"jelly"</span>) {
+    <span class="k">return</span> mu * (F - R) * transpose(F) + lambda * J * (J - <span class="n">1</span>);   <span class="c">// 弾性：元の形からのズレ (F - R) ぶん戻ろうとする（Part 4 のバネの行列版）</span>
+  }
+  <span class="k">if</span> (material === <span class="n">"snow"</span>) {
+    <span class="c">// 塑性：伸びが限界を超えたら、「元の形」のほうを書き換えて忘れる（永久変形）</span>
+    stretch = clamp(stretch, <span class="n">1</span> - crit_compress, <span class="n">1</span> + crit_stretch);
+    F = R * stretch;                              <span class="c">// ← これで踏み固めた雪は戻らない</span>
+    hardening = exp(<span class="n">10</span> * (<span class="n">1</span> - Jp));               <span class="c">// 圧縮された雪ほど硬くなる</span>
+    <span class="k">return</span> elastic(F) * hardening;
+  }
+  <span class="c">// 砂：限界を「伸び」でなく「せん断（ずれ）」で決める（Drucker-Prager、摩擦角）。崩れる角度がここで決まる</span>
+}</pre>
+<ul class="plain">
+  <li><b>弾性（ゼリー、ゴム）</b>：ズレたぶん戻る。E（ヤング率）が硬さ、ポアソン比が「押すと横に膨らむ度合い」。</li>
+  <li><b>塑性（雪、泥、金属）</b>：ズレが限界を超えると、「元の形」のほうを更新して忘れる。戻らない。雪玉が固まる、金属が凹む。</li>
+  <li><b>粒状（砂）</b>：形は覚えないが、ずれ（せん断）に摩擦で抵抗する。摩擦角が「砂山の角度」。</li>
+  <li><b>液体</b>：体積のズレだけ押し返す。FLIP と同じ結果になるが、格子上の応力で解くので圧力投影が要らない（代わりに少し圧縮される）。</li>
+</ul>
+
+<h3>FLIP との違い、Vellum との違い</h3>
+<div class="grid2">
+  <div class="card"><div class="t">FLIP と比べて</div>粒子が「変形の履歴」を持つので、形を保てる・固まる・砕ける。代わりに圧力投影が無いので、純粋な水は FLIP のほうが速く正確。</div>
+  <div class="card"><div class="t">Vellum と比べて</div>「隣」が固定でない（格子で毎ステップ隣を見る）ので、砕ける・混ざる・流れるが自由。代わりに布のような薄い物は苦手（格子より薄い物は表現できない）。</div>
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：MPM Solver ↔ コード</div>
+  <table class="sheet">
+    <tr><th>パラメータ</th><th>コードのどこ</th><th>メモ</th></tr>
+    <tr><td>MPM Source / Particle Separation</td><td>粒子の間隔</td><td>FLIP と同じ。Grid Scale で格子の粗さ</td></tr>
+    <tr><td>MPM Material: Sand / Snow / Rubber / Metal / Mud …</td><td><code>materialResponse</code> の種類</td><td>プリセットは E・ポアソン比・降伏条件のセット</td></tr>
+    <tr><td>Young's Modulus (E)</td><td>弾性の硬さ <code>mu, lambda</code></td><td>上のスライダー。高いほど硬く、dt を小さく（Substeps）</td></tr>
+    <tr><td>Poisson Ratio</td><td><code>lambda / mu</code> の比</td><td>0.5 に近いほど体積を保つ（ゴム）</td></tr>
+    <tr><td>Yield / Friction Angle / Cohesion</td><td>塑性の限界 <code>crit_*</code>、砂の摩擦角</td><td>雪の「固まりやすさ」、砂山の角度、泥の粘り</td></tr>
+    <tr><td>Hardening</td><td><code>exp(10 * (1 - Jp))</code></td><td>圧縮されるほど硬く。踏み固めた雪</td></tr>
+    <tr><td>Collision（VDB）</td><td><code>collide(node)</code></td><td>格子点で壁との法線速度を止める。Part 3 の SDF</td></tr>
+  </table>
+  MPM は格子の解像度と粒子数の両方でコストが決まり、Substeps も多く必要（応力が硬いほど）。まず粗い Separation で挙動を決め、最後に細かくするのが定石。
+</div>
+
+<div class="quiz" data-answer="0" data-why="MPM の粒子は変形勾配 F（Part 2 の行列）を持ち、元の形からのズレを応力に変換する。材料の違いはこの変換ルールの違いです。">
+  <div class="q">MPM の粒子が FLIP の粒子に加えて持っているものは？</div>
+  <div class="opts">
+    <button class="opt">周りの変形を表す行列 F（変形勾配）</button>
+    <button class="opt">拘束のリスト</button>
+    <button class="opt">温度</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="callout green">
+  <div class="t">Part 6 のまとめ：ソルバーは「拘束の直し方」で分類できる</div>
+  <ul class="plain">
+    <li><b>Pyro</b>：格子。速度場の発散を圧力で 0 に。渦はそこから生まれる。</li>
+    <li><b>FLIP</b>：粒子で運び、格子で圧力。PIC / FLIP / APIC は「格子から粒子への返し方」の違い。</li>
+    <li><b>RBD</b>：向きと角速度を持つ粒子。接触点の撃力と、壊れる拘束。</li>
+    <li><b>Vellum</b>：力でなく位置を直す。硬くても爆発しない。反復が硬さを決める。</li>
+    <li><b>MPM</b>：FLIP + 変形の記憶（行列）。材料 = 行列を応力に変えるルール。</li>
+  </ul>
+  どれも Part 1〜4 の道具（ベクトル、内積、外積、行列、lerp、距離関数、ノイズ、速度と加速度、バネ）の組み合わせです。おつかれさまでした。
 </div>
 </section>
 
 </main>
 </div>
-<script src="app.js?v=20260905-2"></script>
-<script src="app-patterns.js?v=20260905-2"></script>
+<script src="app.js?v=20260906-1"></script>
+<script src="app-patterns.js?v=20260906-1"></script>
+<script src="app-sims.js?v=20260906-1"></script>
 </body>
 </html>
