@@ -7,7 +7,7 @@
 <meta name="description" content="CG の数学を、数学記号を使わずプログラムの書き方だけで学ぶ教材。ベクトル・内積・行列から、ノイズ・L-system・フラクタル・物理まで、触って動かせる図で理解する。">
 <title>CGの数学を、数式なしで。 | makeinufilm</title>
 <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
-<link rel="stylesheet" href="style.css?v=20260906-1">
+<link rel="stylesheet" href="style.css?v=20260906-2">
 </head>
 <body>
 <div class="app">
@@ -50,8 +50,8 @@
 
 <div class="grid2">
   <div class="card"><div class="t">Part 1：矢印の話</div>ベクトル → 長さ → 内積 → 外積 → sin/cos。全部「矢印をどう扱うか」。</div>
-  <div class="card"><div class="t">Part 2：空間を変える</div>行列 → 3D と投影 → 補間。「座標をどう変換するか」。</div>
-  <div class="card"><div class="t">Part 3：模様をつくる</div>乱数・ノイズ・繰り返し・距離関数・極座標・L-system・フラクタル・黄金角・ボロノイ・セルオートマトン・反応拡散。Houdini / シェーダーの模様の数学。</div>
+  <div class="card"><div class="t">Part 2：空間を変える</div>行列 → 3D と投影 → 補間 → 四元数（回転）→ 重心座標。「座標をどう変換するか」。</div>
+  <div class="card"><div class="t">Part 3：模様をつくる</div>乱数・ノイズ・繰り返し・距離関数・極座標・波とフーリエ変換・L-system・フラクタル・黄金角・ボロノイ・セルオートマトン・反応拡散。Houdini / シェーダーの模様の数学。</div>
   <div class="card"><div class="t">Part 4：動きをつくる</div>速度と加速度・バネ・ベジェ・ベクトル場。シミュレーションとアニメーションの骨格。</div>
   <div class="card"><div class="t">Part 5：AI と付録</div>LLM の中身が同じ数学でできていることを見て、「数学記号 → コード → VEX」の対応表。</div>
   <div class="card"><div class="t">Part 6：シミュレーションの中身</div>Pyro の速度場と圧力投影、FLIP の粒子と格子、RBD の撃力と拘束、Vellum の位置ベース、MPM の変形行列。全部 2D で実際に動きます。</div>
@@ -548,6 +548,170 @@ pos = lerpVec(start, goal, smoothstep(t));   <span class="c">// t を曲げて�
 </div>
 </section>
 
+<!-- ============ Q 四元数 ============ -->
+<section class="lesson" data-title="四元数：回転を4つの数で持つ">
+<h2><span class="chap">CHAPTER</span>四元数（クォータニオン）：回転を「軸と角度」で持つ</h2>
+<p class="lead">3D の回転の持ち方は3つあります。<b>オイラー角</b>（X, Y, Z の角度3つ）、<b>軸と角度</b>（どの軸のまわりに何度）、<b>四元数</b>（軸と角度を4つの数に畳んだもの）。Houdini の <code>@orient</code>、Bullet の剛体、KineFX のジョイント、Copy to Points。回転が出てくる所は、ほぼ全部四元数です。理由は「オイラー角が壊れる場面がある」から。</p>
+
+<h3>オイラー角が壊れる：ジンバルロック</h3>
+<p>オイラー角は「X で回して、次に Y で回して、次に Z で回す」という <span class="hl">順番付きの3回の回転</span> です。それぞれの回転は、前の回転で動いた軸のまわりで行われる。すると <b>真ん中の回転（Y）が 90° になったとき、最初の軸（X）と最後の軸（Z）が同じ向きに重なってしまう</b>。2つのスライダーが同じ回転しか作れなくなり、1方向に回せなくなる。これがジンバルロックです。</p>
+<div class="viz">
+  <p class="hint">3つのリングが3つの回転。Y を 90° にすると、赤のリング（X）と青のリング（Z）が同じ平面に重なります。その状態で X と Z を動かすと、どちらも同じ回転しかしません。</p>
+  <canvas id="c-gimbal"></canvas>
+  <div class="controls">
+    <label>X <input type="range" id="s-ex" min="-180" max="180" step="1" value="20"><span id="s-ex-v">20°</span></label>
+    <label>Y <input type="range" id="s-ey" min="-180" max="180" step="1" value="30"><span id="s-ey-v">30°</span></label>
+    <label>Z <input type="range" id="s-ez" min="-180" max="180" step="1" value="10"><span id="s-ez-v">10°</span></label>
+    <button class="btn" id="b-gimbal-lock">Y を 90° にする</button>
+    <button class="btn" id="b-gimbal-reset">戻す</button>
+  </div>
+  <div class="readout" id="r-gimbal"></div>
+</div>
+<pre class="code"><span class="c">// オイラー角：3 回の回転を順番に。順番（XYZ / ZXY …）が違えば結果も違う</span>
+<span class="k">function</span> <span class="f">rotateEuler</span>(p, ex, ey, ez) {
+  p = rotateX(p, ex);   <span class="c">// まず X 軸まわり</span>
+  p = rotateY(p, ey);   <span class="c">// 次に Y 軸まわり（X で回った後の座標で）</span>
+  p = rotateZ(p, ez);   <span class="c">// 最後に Z 軸まわり</span>
+  <span class="k">return</span> p;
+}
+<span class="c">// ey = 90° のとき、rotateX と rotateZ が同じ軸まわりの回転になる → 自由度が 1 つ消える</span></pre>
+
+<h3>軸と角度：回転は本来「1本の軸のまわりに、1回」</h3>
+<p>どんな複雑な回転も、<span class="hl">「ある1本の軸のまわりに、ある角度だけ回す」1回</span> で表せます（オイラーの回転定理）。3回に分けるから壊れるので、1回で持てば壊れない。四元数は、この「軸（3つの数）と角度（1つの数）」を、計算しやすいように4つの数に詰め直したものです。</p>
+<pre class="code"><span class="c">// 軸 axis（長さ 1）のまわりに angle 回す回転を、四元数にする</span>
+<span class="k">function</span> <span class="f">quaternion</span>(axis, angle) {
+  <span class="k">const</span> s = Math.sin(angle / <span class="n">2</span>);           <span class="c">// 「角度の半分」を使うのが四元数の約束。理由は後述</span>
+  <span class="k">return</span> { w: Math.cos(angle / <span class="n">2</span>), x: axis.x * s, y: axis.y * s, z: axis.z * s };
+}
+<span class="c">// w = 「回っていない度」、x y z = 「軸の向き × 回っている度」。合計の長さはいつも 1</span>
+
+<span class="c">// 四元数で点を回す（中身は cross を 2 回。Part 1 の外積）</span>
+<span class="k">function</span> <span class="f">qrotate</span>(q, v) {
+  <span class="k">const</span> u = { x: q.x, y: q.y, z: q.z };
+  <span class="k">const</span> t = scale3( cross3(u, v), <span class="n">2</span> );
+  <span class="k">return</span> add3( v, add3( scale3(t, q.w), cross3(u, t) ) );
+}
+
+<span class="c">// 回転を続けて行う（先に q1、次に q2）。行列の compose と同じ役目</span>
+<span class="k">function</span> <span class="f">qmul</span>(q2, q1) { ... }   <span class="c">// 4 つの数の掛け算のルール。順番が大事なのも行列と同じ</span></pre>
+
+<h3>四元数が本当に強い所：回転の「補間」</h3>
+<p>回転 A から回転 B へ、なめらかに動かしたい（キーフレームの間、カメラの追従、ブレンド）。オイラー角を lerp すると、途中で変な軌道を通ったり、速さが一定にならなかったりします。四元数の <b>slerp</b>（球面 lerp）は、<span class="hl">最短の軌道を一定の速さで</span> 通ります。</p>
+<div class="viz">
+  <p class="hint">回転 A（原点の姿勢）から回転 B へ。矢印の先端が球の上に描く軌跡を比べてください。点は等しい t 間隔。緑（slerp）は最短で等間隔、ピンク（オイラー角の lerp）は遠回りで速さもムラがあります。</p>
+  <canvas id="c-slerp"></canvas>
+  <div class="controls">
+    <label>t <input type="range" id="s-qt" min="0" max="1" step="0.01" value="0.4"><span id="s-qt-v">0.4</span></label>
+    <label><input type="checkbox" id="k-qplay" checked> 動かす</label>
+    <button class="btn" id="b-qrand">別の回転 B にする</button>
+  </div>
+  <div class="readout" id="r-slerp"></div>
+</div>
+<pre class="code"><span class="c">// 球面 lerp：2 つの四元数の「間の角度」を測って、その角度を t で割って進む</span>
+<span class="k">function</span> <span class="f">slerp</span>(a, b, t) {
+  <span class="k">let</span> d = a.w * b.w + a.x * b.x + a.y * b.y + a.z * b.z;   <span class="c">// 4 次元の dot（Part 1 の内積と同じ形）</span>
+  <span class="k">if</span> (d &lt; <span class="n">0</span>) { b = negate(b); d = -d; }                    <span class="c">// q と -q は同じ回転。近いほうを選ぶ</span>
+  <span class="k">const</span> theta = Math.acos(d);                                <span class="c">// 2 つの回転の間の角度</span>
+  <span class="k">const</span> wa = Math.sin((<span class="n">1</span> - t) * theta) / Math.sin(theta);
+  <span class="k">const</span> wb = Math.sin(t * theta) / Math.sin(theta);
+  <span class="k">return</span> add(scale(a, wa), scale(b, wb));                   <span class="c">// 重み付きで混ぜる。lerp の「弧」版</span>
+}</pre>
+
+<details><summary>なぜ「角度の半分」なのか（読まなくてOK）</summary>
+<p>四元数で点を回すとき、q を「前と後ろから」2回掛ける形になっています（q v q⁻¹）。1回の掛け算で半分ずつ回るので、合計で angle になるように半分を入れておきます。この「2回掛ける」構造のせいで、q と −q は同じ回転を表します（360° 回すと −q になり、720° で元に戻る）。slerp で「近いほうを選ぶ」のはこのため。</p></details>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら：@orient とその仲間</div>
+  <table class="sheet">
+    <tr><th>やりたいこと</th><th>VEX / ノード</th><th>メモ</th></tr>
+    <tr><td>回転を点に持たせる</td><td><code>p@orient</code>（vector4）</td><td>Copy to Points は <code>@orient</code> があればそれを最優先で使う。無ければ <code>@N</code> + <code>@up</code> から作る</td></tr>
+    <tr><td>軸と角度から作る</td><td><code>@orient = quaternion(angle, axis);</code></td><td>上の <code>quaternion()</code> と同じ。<code>quaternion(set(0, radians(45), 0))</code> のように「軸 × 角度」のベクトル 1 本でも可</td></tr>
+    <tr><td>点を回す</td><td><code>qrotate(@orient, v)</code></td><td></td></tr>
+    <tr><td>回転を続ける</td><td><code>qmultiply(q2, q1)</code></td><td>先に q1。順番に注意</td></tr>
+    <tr><td>a の向きを b の向きにする回転</td><td><code>dihedral(a, b)</code></td><td><b>一番便利</b>。「今の N を目標の向きへ」が 1 行。外積で軸、内積で角度を出している</td></tr>
+    <tr><td>補間</td><td><code>slerp(q1, q2, t)</code></td><td>Attribute Interpolate / Retime も内部で slerp</td></tr>
+    <tr><td>行列 ↔ 四元数</td><td><code>quaternion(matrix3)</code> / <code>qconvert(q)</code></td><td>KineFX の <code>@transform</code>（行列）と行き来する</td></tr>
+    <tr><td>オイラー角 ↔ 四元数</td><td><code>eulertoquaternion(v, order)</code> / <code>quaterniontoeuler(q, order)</code></td><td>Transform SOP の Rotate は内部でこれ。Rotation Order パラメータが「順番」</td></tr>
+  </table>
+  実務の目安：<b>保存・補間・合成は四元数、人が数字を読むときだけオイラー角</b>。「回転が途中で裏返る」「補間でグルッと遠回りする」はオイラー角を lerp しているサイン。
+</div>
+
+<div class="quiz" data-answer="1" data-why="オイラー角は順番付きの3回の回転。真ん中（Y）が 90° になると、最初の軸と最後の軸が重なって同じ回転しか作れなくなります（ジンバルロック）。四元数は「1本の軸のまわりに1回」なのでこれが起きません。">
+  <div class="q">ジンバルロックが起きるのは、どの持ち方で、どんなとき？</div>
+  <div class="opts">
+    <button class="opt">四元数で、角度が 360° を超えたとき</button>
+    <button class="opt">オイラー角で、真ん中の回転が 90° になったとき</button>
+    <button class="opt">軸と角度で、軸の長さが 1 でないとき</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ B 重心座標 ============ -->
+<section class="lesson" data-title="重心座標：三角形の中を3つの重みで">
+<h2><span class="chap">CHAPTER</span>重心座標：三角形の中の場所を「3つの重み」で表す</h2>
+<p class="lead">第8章の lerp は「2点の間を t で混ぜる」でした。三角形なら <span class="hl">「3頂点を、合計 1 になる3つの重みで混ぜる」</span>。これが重心座標（barycentric）。テクスチャの貼り付け、頂点カラー、スキニングのウェイト、<code>primuv</code>、Ray SOP。CG が「面の上」で何かを補間するとき、必ずこれです。</p>
+
+<pre class="code"><span class="c">// 三角形 A, B, C の中の点 P を、3 つの重み wa, wb, wc で表す</span>
+P = add( add( scale(A, wa), scale(B, wb) ), scale(C, wc) );   <span class="c">// wa + wb + wc = 1</span>
+
+<span class="c">// 逆に、P から重みを求める。重み = 「P の反対側の小三角形の面積 ÷ 全体の面積」（Part 1 の cross2d）</span>
+<span class="k">function</span> <span class="f">barycentric</span>(P, A, B, C) {
+  <span class="k">const</span> area = cross2d( sub(B, A), sub(C, A) );          <span class="c">// 三角形全体の面積（× 2）</span>
+  <span class="k">const</span> wa = cross2d( sub(B, P), sub(C, P) ) / area;     <span class="c">// P-B-C の面積 ÷ 全体。A に近いほど大きい</span>
+  <span class="k">const</span> wb = cross2d( sub(C, P), sub(A, P) ) / area;
+  <span class="k">const</span> wc = <span class="n">1</span> - wa - wb;                                <span class="c">// 合計 1 なので、最後は引き算</span>
+  <span class="k">return</span> { wa, wb, wc };
+}</pre>
+
+<div class="viz">
+  <p class="hint">左：頂点 A, B, C と点 P をドラッグ。3つの重みは「反対側の小三角形の面積の割合」です。右：同じ重みで頂点の UV を混ぜると、テクスチャのどこを読めばいいかが決まります（左の P の色 = 右で読んだ色）。</p>
+  <canvas id="c-bary"></canvas>
+  <div class="controls" id="bary-modes">
+    <button class="btn active" data-m="uv">UV を混ぜる（テクスチャ）</button>
+    <button class="btn" data-m="color">頂点カラーを混ぜる</button>
+  </div>
+  <div class="readout" id="r-bary"></div>
+</div>
+
+<h3>「頂点にある値」は何でも混ぜられる</h3>
+<pre class="code"><span class="c">// 重みが出れば、頂点に付いている値は全部同じ式で補間できる</span>
+<span class="k">const</span> { wa, wb, wc } = barycentric(P, A, B, C);
+uv     = add( add( scale(A.uv, wa), scale(B.uv, wb) ), scale(C.uv, wc) );   <span class="c">// テクスチャ座標 → GPU がピクセルごとにやっている</span>
+color  = mix3(A.Cd, B.Cd, C.Cd, wa, wb, wc);                                <span class="c">// 頂点カラー（グーロー補間）</span>
+normal = normalize( mix3(A.N, B.N, C.N, wa, wb, wc) );                      <span class="c">// 法線 → なめらかなシェーディング（第3章の dot に渡す）</span></pre>
+<ul class="plain">
+  <li><b>中か外か</b>：3つの重みが全部 0 以上なら P は三角形の中。1つでもマイナスなら外。当たり判定（Ray）はこれ。</li>
+  <li><b>スキニング</b>：頂点を「複数のボーンの変換の重み付き平均」で動かす。重みの合計が 1 なのは同じ理由。頂点カラーを混ぜるのと、行列を混ぜるのは同じ操作。</li>
+  <li><b>4点以上</b>：四角形は三角形2枚に割るか、バイリニア（第8章の lerp の lerp）。Houdini の <code>primuv</code> の <code>u, v</code> はこの「面の中の座標」。</li>
+</ul>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+<pre class="code"><span class="c">// Point Wrangle：入力 1 のメッシュ上で、自分に一番近い場所の色を拾う（Attribute Transfer の中身）</span>
+<span class="k">int</span> prim; <span class="k">vector</span> uv;
+<span class="k">float</span> d = xyzdist(<span class="n">1</span>, @P, prim, uv);          <span class="c">// 一番近い面の番号と、その面の中の座標（重心座標を u, v に畳んだもの）</span>
+@Cd = primuv(<span class="n">1</span>, <span class="n">"Cd"</span>, prim, uv);             <span class="c">// その場所で頂点の Cd を混ぜた値</span>
+v@nearP = primuv(<span class="n">1</span>, <span class="n">"P"</span>, prim, uv);          <span class="c">// P も同じ式で出る（= 面上の最近点）</span></pre>
+  <ul class="plain">
+    <li><b>Attribute Interpolate</b> SOP：<code>sourceprim</code> と <code>sourceprimuv</code> 属性を持つ点を、変形後のメッシュに貼り直す。「面に乗せた点を、面と一緒に動かす」の定番（Scatter → Attribute Interpolate）。</li>
+    <li><b>Ray</b> SOP / <code>intersect()</code>：当たった面と uv を返す。そこから <code>primuv</code> で何でも拾える。</li>
+    <li><b>Point Deform / Bone Capture</b>：<code>boneCapture</code> の重みは「どのボーンにどれだけ」の重み付き平均。合計 1 に正規化するのは重心座標と同じ理由。</li>
+    <li><b>Attribute Transfer</b> は距離ベースの近似。面の上で正確に混ぜたいときは <code>xyzdist + primuv</code>。</li>
+  </ul>
+</div>
+
+<div class="quiz" data-answer="0" data-why="重み = 反対側の小三角形の面積の割合。A に近いほど P-B-C の三角形が大きく、wa が大きくなります。全部 0 以上なら中、マイナスがあれば外。">
+  <div class="q">点 P が頂点 A のすぐ近くにあるとき、重心座標はどうなる？</div>
+  <div class="opts">
+    <button class="opt">wa が 1 に近く、wb と wc は 0 に近い</button>
+    <button class="opt">wa が 0 に近く、wb と wc が 0.5 ずつ</button>
+    <button class="opt">3 つとも 1/3</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
 <!-- ============ P1 乱数 ============ -->
 <section class="lesson" data-part="Part 3　模様をつくる数学" data-title="乱数：「バラバラ」も計算">
 <h2><span class="chap">CHAPTER</span>乱数：「バラバラ」も、実は計算でできている</h2>
@@ -955,6 +1119,130 @@ w = chramp(<span class="n">"falloff"</span>, w);                  <span class="c
     <button class="opt">2倍の高さ</button>
     <button class="opt">0（打ち消し合う）</button>
     <button class="opt">波が壊れて計算できない</button>
+  </div>
+  <div class="fb"></div>
+</div>
+</section>
+
+<!-- ============ F フーリエ変換 ============ -->
+<section class="lesson" data-title="フーリエ変換：形を「波」に分解する">
+<h2><span class="chap">CHAPTER</span>フーリエ変換：どんな形も「波の足し算」に分解できる</h2>
+<p class="lead">前章で「波は足せる」を見ました。フーリエ変換はその逆です。<span class="hl">どんな形（信号・輪郭・画像）も、周波数の違う sin の足し算に分解できる</span>。しかも「どの周波数がどれだけ入っているか」を測る道具は、Part 1 の内積です。Ocean Spectrum、ぼかし、ノイズの周波数、音の解析。全部この一本道の上にあります。</p>
+
+<h3>まず「足す」側から：波を重ねて角ばった形を作る</h3>
+<div class="viz">
+  <p class="hint">周波数 1, 2, 3, … の sin を、決まった強さで足していきます。項の数を増やすと、なめらかな波の足し算だけで矩形波（カクカク）ができていく。</p>
+  <canvas id="c-fseries"></canvas>
+  <div class="controls" id="fs-presets">
+    <button class="btn active" data-p="square">矩形波</button>
+    <button class="btn" data-p="saw">のこぎり波</button>
+    <button class="btn" data-p="tri">三角波</button>
+    <button class="btn" data-p="pulse">パルス</button>
+  </div>
+  <div class="controls">
+    <label>項の数 <input type="range" id="s-fsn" min="1" max="30" step="1" value="4"><span id="s-fsn-v">4</span></label>
+    <label><input type="checkbox" id="k-fsplay"> 時間で流す</label>
+  </div>
+  <div class="readout" id="r-fseries"></div>
+</div>
+<pre class="code"><span class="c">// 矩形波 = 奇数番目の sin を、1/番目 の強さで足したもの</span>
+<span class="k">function</span> <span class="f">squareWave</span>(x, terms) {
+  <span class="k">let</span> y = <span class="n">0</span>;
+  <span class="k">for</span> (<span class="k">let</span> k = <span class="n">1</span>; k &lt;= terms; k++) {
+    <span class="k">const</span> freq = <span class="n">2</span> * k - <span class="n">1</span>;                 <span class="c">// 1, 3, 5, 7 …</span>
+    y += Math.sin(freq * x) / freq;          <span class="c">// 高い周波数ほど弱く</span>
+  }
+  <span class="k">return</span> y;
+}
+<span class="c">// 「どの周波数を、どの強さで」のリストが「スペクトル」。右のバーがそれ</span></pre>
+
+<h3>次に「分解」する側：内積で「この周波数はどれだけ入っているか」を測る</h3>
+<p>第3章の内積は「2本の矢印がどれくらい同じ向きか」でした。信号を「長い矢印」（値の並び）だと思えば、<span class="hl">信号と sin 波の内積 = その周波数がどれだけ含まれているか</span>。全周波数についてこれを測るのがフーリエ変換です。</p>
+<pre class="code"><span class="c">// 信号 x[n]（N 個の値）に、周波数 k の波がどれだけ入っているか</span>
+<span class="k">function</span> <span class="f">fourier</span>(x) {
+  <span class="k">const</span> N = x.length, amp = [], phase = [];
+  <span class="k">for</span> (<span class="k">let</span> k = <span class="n">0</span>; k &lt; N / <span class="n">2</span>; k++) {
+    <span class="k">let</span> re = <span class="n">0</span>, im = <span class="n">0</span>;
+    <span class="k">for</span> (<span class="k">let</span> n = <span class="n">0</span>; n &lt; N; n++) {
+      <span class="k">const</span> a = <span class="n">2</span> * PI * k * n / N;
+      re += x[n] * Math.cos(a);              <span class="c">// 信号と cos 波の内積（Part 1 の dot と同じ：掛けて足す）</span>
+      im -= x[n] * Math.sin(a);              <span class="c">// 信号と sin 波の内積。cos と sin の両方を測るのは「ズレ（位相）」も知りたいから</span>
+    }
+    amp[k]   = Math.sqrt(re * re + im * im) * <span class="n">2</span> / N;   <span class="c">// 強さ（第2章の length）</span>
+    phase[k] = Math.atan2(im, re);                        <span class="c">// ズレ（極座標の章の atan2）</span>
+  }
+  <span class="k">return</span> { amp, phase };
+}
+
+<span class="c">// 逆変換：分解したものを足し直せば元に戻る。k を途中で打ち切ると「なめらかになった版」= ぼかし</span>
+<span class="k">function</span> <span class="f">rebuild</span>(amp, phase, n, N, useK) {
+  <span class="k">let</span> y = <span class="n">0</span>;
+  <span class="k">for</span> (<span class="k">let</span> k = <span class="n">0</span>; k &lt; useK; k++) y += amp[k] * Math.cos(<span class="n">2</span> * PI * k * n / N + phase[k]);
+  <span class="k">return</span> y;
+}</pre>
+
+<div class="viz">
+  <p class="hint">左の枠にマウスで自由に線を描いてください（プリセットも可）。右に「どの周波数がどれだけ」のスペクトルが出ます。<b>使う周波数の数</b>を減らすと、黄色の線は「低い周波数だけで作り直した形」= ぼかし。</p>
+  <canvas id="c-fdraw"></canvas>
+  <div class="controls" id="fd-presets">
+    <button class="btn" data-p="step">段差</button>
+    <button class="btn" data-p="bump">なだらかな山</button>
+    <button class="btn" data-p="noise">ギザギザ</button>
+    <button class="btn" data-p="clear">消す</button>
+  </div>
+  <div class="controls">
+    <label>使う周波数の数 <input type="range" id="s-fdk" min="1" max="64" step="1" value="8"><span id="s-fdk-v">8</span></label>
+  </div>
+  <div class="readout" id="r-fdraw"></div>
+</div>
+
+<div class="callout">
+  <div class="t">これが「周波数」という言葉の正体</div>
+  <ul class="plain">
+    <li><b>ぼかし（Blur / Attribute Blur / Smooth）</b>：高い周波数を捨てること。上のデモで「使う周波数の数」を減らしたのと同じ。</li>
+    <li><b>シャープ・ディテール</b>：高い周波数。ノイズの Octaves を増やす = 高い周波数の成分を足す（Part 3 のノイズ）。</li>
+    <li><b>エイリアシング（ジャギー・モアレ）</b>：格子（ピクセル・ボクセル）より高い周波数は表現できず、偽の低い周波数に化ける。「divsize より細かい模様は出ない」の理由もこれ。</li>
+    <li><b>圧縮（JPEG / MP3）</b>：目・耳に効かない周波数を捨てる。</li>
+  </ul>
+</div>
+
+<h3>おまけ：2D の形を「回る円」の足し算で描く（エピサイクル）</h3>
+<p>x と y をまとめて分解すると、各周波数は「一定の速さで回る矢印」になります。矢印を先端どうしつなげて回すと、その先端が元の形をなぞる。これは見た目が楽しいだけでなく、<span class="hl">「周波数 = 回転の速さ、強さ = 円の半径、位相 = 回り始めの角度」</span> という、フーリエ変換の3つの数の意味そのものです。</p>
+<div class="viz">
+  <p class="hint">枠の中に一筆書きで閉じた形を描いてください（プリセットも可）。円の数を減らすと、形が「ぼやけた版」になります。</p>
+  <canvas id="c-epi"></canvas>
+  <div class="controls" id="epi-presets">
+    <button class="btn active" data-p="heart">ハート</button>
+    <button class="btn" data-p="star">星</button>
+    <button class="btn" data-p="square">四角</button>
+  </div>
+  <div class="controls">
+    <label>円の数 <input type="range" id="s-epin" min="1" max="60" step="1" value="12"><span id="s-epin-v">12</span></label>
+    <label>速さ <input type="range" id="s-epis" min="0.2" max="3" step="0.1" value="1"><span id="s-epis-v">1</span></label>
+  </div>
+  <div class="readout" id="r-epi"></div>
+</div>
+
+<div class="callout hou">
+  <div class="t">Houdini でやるなら</div>
+  <ul class="plain">
+    <li><b>Ocean Spectrum → Ocean Evaluate</b>：「海の波はどの周波数がどれだけあるか」の統計（Phillips スペクトル）を作り、それを <b>逆</b>フーリエ変換して高さに戻す。Resolution が周波数の数（上のデモの「項の数」）、Wind Speed / Direction がスペクトルの形。波を 1 本ずつ足していないのに大量の波が出るのはこのため。</li>
+    <li><b>CHOP の Spectrum</b>：音や動きのチャンネルを周波数に分解。音に合わせて動かす（Audio Reactive）の第一歩。<b>Filter / Lag</b> は高周波を落とす（= ぼかし）。</li>
+    <li><b>Attribute Blur / Smooth / Volume Blur</b>：全部ローパス（低い周波数だけ残す）。Iterations を増やす = より低い周波数まで削る。</li>
+    <li><b>ノイズの Octaves / Roughness</b>：スペクトルを手で書いているのと同じ。Roughness が高い = 高周波が強い。</li>
+    <li><b>Copernicus の Blur / Sharpen</b>：ぼかしは高周波を引く、シャープは高周波を足す。Sharpen = 元 + (元 − ぼかし) × 強さ。</li>
+  </ul>
+</div>
+
+<details><summary>数学ではこう書く（読まなくてOK）</summary>
+<p>離散フーリエ変換は X[k] = Σ x[n] e^(−2πikn/N) と書きます。e^(iθ) = cos θ + i sin θ（オイラーの公式）なので、上のコードの re と im を 1 つの複素数にまとめただけです。FFT（高速フーリエ変換）は同じ計算を N log N 回で済ませる手順で、結果は同じ。</p></details>
+
+<div class="quiz" data-answer="2" data-why="フーリエ変換は「信号と各周波数の波の内積」。ぼかしは高い周波数の成分を捨てて、低い周波数だけで足し直すことです。">
+  <div class="q">「ぼかし」をフーリエ変換の言葉で言うと？</div>
+  <div class="opts">
+    <button class="opt">全部の周波数を 2 倍にする</button>
+    <button class="opt">位相をそろえる</button>
+    <button class="opt">高い周波数の成分を捨てる</button>
   </div>
   <div class="fb"></div>
 </div>
@@ -2419,8 +2707,9 @@ particles[k] = {
 
 </main>
 </div>
-<script src="app.js?v=20260906-1"></script>
-<script src="app-patterns.js?v=20260906-1"></script>
-<script src="app-sims.js?v=20260906-1"></script>
+<script src="app.js?v=20260906-2"></script>
+<script src="app-patterns.js?v=20260906-2"></script>
+<script src="app-extra.js?v=20260906-2"></script>
+<script src="app-sims.js?v=20260906-2"></script>
 </body>
 </html>
