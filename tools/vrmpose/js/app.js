@@ -1002,9 +1002,13 @@ async function createProp(buf, key, name) {
 
 function makeProp(object, key, name) {
   const prop = new Prop(object, key, name);
-  // 単位系がバラバラな glTF への保険: 大きすぎ/小さすぎは 1.5m 程度に寄せる
-  if (prop.size > 2.5) prop.root.scale.setScalar(1.5 / prop.size);
-  else if (prop.size < 0.1) prop.root.scale.setScalar(0.5 / prop.size);
+  // 単位系がバラバラな glTF への保険: 大きすぎ/小さすぎは 1.5m 程度に寄せる。
+  // 自前生成のプリミティブ・家具・画像下絵は実寸なので正規化しない
+  const realScale = key && (key.startsWith('prim:') || key.startsWith('img:'));
+  if (!realScale) {
+    if (prop.size > 2.5) prop.root.scale.setScalar(1.5 / prop.size);
+    else if (prop.size < 0.1) prop.root.scale.setScalar(0.5 / prop.size);
+  }
   scene.add(prop.root);
   scene.add(prop.handleGroup);
   state.props.push(prop);
@@ -1012,22 +1016,104 @@ function makeProp(object, key, name) {
   return prop;
 }
 
-// ---------- 基本プリミティブ(modelKey は "prim:○○"。IndexedDB を介さず再生成する) ----------
+// ---------- 基本プリミティブと実寸家具(modelKey は "prim:○○"。IndexedDB を介さず再生成する) ----------
+
+function primMaterial() {
+  return new THREE.MeshStandardMaterial({ color: 0x9aa8b3, roughness: 0.85, metalness: 0 });
+}
+
+/** 実寸家具のスタンドイン。boxes=[w,h,d,x,y,z]、spheres=[r,x,y,z](単位m、床置き、+Z が正面) */
+function buildFurniture(boxes, spheres = []) {
+  const g = new THREE.Group();
+  const mat = primMaterial();
+  for (const [w, h, d, x, y, z] of boxes) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    m.position.set(x, y, z);
+    g.add(m);
+  }
+  for (const [r, x, y, z] of spheres) {
+    const m = new THREE.Mesh(new THREE.SphereGeometry(r, 16, 12), mat);
+    m.position.set(x, y, z);
+    g.add(m);
+  }
+  return g;
+}
 
 const PRIMITIVES = {
   box: { label: '立方体', make: () => new THREE.BoxGeometry(0.5, 0.5, 0.5).translate(0, 0.25, 0) },
   sphere: { label: '球', make: () => new THREE.SphereGeometry(0.25, 32, 16).translate(0, 0.25, 0) },
   cylinder: { label: '円柱', make: () => new THREE.CylinderGeometry(0.25, 0.25, 0.5, 32).translate(0, 0.25, 0) },
   plane: { label: '板', make: () => new THREE.BoxGeometry(1, 0.02, 1).translate(0, 0.01, 0) },
+  // ---- 実寸家具(JIS 相当の寸法。作画用スタンドインなので形は簡略) ----
+  schoolDesk: {
+    label: '学校机',
+    make: () => buildFurniture([
+      [0.65, 0.02, 0.45, 0, 0.69, 0],          // 天板 650×450・高700(新JIS 5号)
+      [0.03, 0.68, 0.03, -0.30, 0.34, -0.20], [0.03, 0.68, 0.03, 0.30, 0.34, -0.20],
+      [0.03, 0.68, 0.03, -0.30, 0.34, 0.20], [0.03, 0.68, 0.03, 0.30, 0.34, 0.20],
+      [0.55, 0.015, 0.35, 0, 0.55, 0],         // 物入れ棚
+    ]),
+  },
+  schoolChair: {
+    label: '学校椅子',
+    make: () => buildFurniture([
+      [0.38, 0.02, 0.38, 0, 0.41, 0],          // 座面 380角・高420
+      [0.03, 0.40, 0.03, -0.165, 0.20, -0.165], [0.03, 0.40, 0.03, 0.165, 0.20, -0.165],
+      [0.03, 0.40, 0.03, -0.165, 0.20, 0.165], [0.03, 0.40, 0.03, 0.165, 0.20, 0.165],
+      [0.03, 0.34, 0.03, -0.165, 0.59, -0.175], [0.03, 0.34, 0.03, 0.165, 0.59, -0.175],
+      [0.38, 0.16, 0.025, 0, 0.70, -0.175],    // 背もたれ 上端780
+    ]),
+  },
+  table: {
+    label: 'テーブル',
+    make: () => buildFurniture([
+      [1.40, 0.03, 0.80, 0, 0.705, 0],         // 1400×800・高720
+      [0.06, 0.69, 0.06, -0.64, 0.345, -0.34], [0.06, 0.69, 0.06, 0.64, 0.345, -0.34],
+      [0.06, 0.69, 0.06, -0.64, 0.345, 0.34], [0.06, 0.69, 0.06, 0.64, 0.345, 0.34],
+    ]),
+  },
+  sofa: {
+    label: 'ソファ',
+    make: () => buildFurniture([
+      [1.30, 0.40, 0.70, 0, 0.20, 0.075],      // 2人掛け 1600×850・高750・座面400
+      [1.60, 0.75, 0.15, 0, 0.375, -0.35],
+      [0.15, 0.55, 0.85, -0.725, 0.275, 0], [0.15, 0.55, 0.85, 0.725, 0.275, 0],
+    ]),
+  },
+  bed: {
+    label: 'ベッド',
+    make: () => buildFurniture([
+      [0.97, 0.25, 1.95, 0, 0.125, 0],         // シングル 970×1950
+      [0.94, 0.18, 1.90, 0, 0.34, 0],          // マットレス 上面430
+      [0.97, 0.80, 0.05, 0, 0.40, -0.975],     // ヘッドボード 高800
+    ]),
+  },
+  shelf: {
+    label: '本棚',
+    make: () => buildFurniture([
+      [0.02, 1.80, 0.30, -0.39, 0.90, 0], [0.02, 1.80, 0.30, 0.39, 0.90, 0],
+      [0.76, 0.02, 0.30, 0, 1.79, 0], [0.76, 0.02, 0.30, 0, 0.01, 0],
+      [0.80, 1.80, 0.01, 0, 0.90, -0.145],     // 800×300・高1800
+      [0.76, 0.02, 0.28, 0, 0.45, 0.005], [0.76, 0.02, 0.28, 0, 0.90, 0.005], [0.76, 0.02, 0.28, 0, 1.35, 0.005],
+    ]),
+  },
+  door: {
+    label: 'ドア',
+    make: () => buildFurniture([
+      [0.78, 2.00, 0.04, 0, 1.00, 0],          // 780×2000+枠
+      [0.06, 2.06, 0.08, -0.42, 1.03, 0], [0.06, 2.06, 0.08, 0.42, 1.03, 0],
+      [0.96, 0.06, 0.08, 0, 2.09, 0],
+    ], [
+      [0.03, 0.31, 0.95, 0.035], [0.03, 0.31, 0.95, -0.035], // ノブ 高950
+    ]),
+  },
 };
 
 function makePrimitiveObject(kind) {
-  const mesh = new THREE.Mesh(
-    PRIMITIVES[kind].make(),
-    new THREE.MeshStandardMaterial({ color: 0x9aa8b3, roughness: 0.85, metalness: 0 }),
-  );
+  const made = PRIMITIVES[kind].make();
   const group = new THREE.Group();
-  group.add(mesh);
+  if (made.isObject3D) group.add(made);
+  else group.add(new THREE.Mesh(made, primMaterial()));
   return group;
 }
 
@@ -1039,12 +1125,71 @@ function addPrimitive(kind) {
   afterCharsChanged();
 }
 
-/** modelKey から小物を作る(プリミティブは再生成、それ以外は IndexedDB)。無ければ null */
+// ---------- 画像リファレンス(下絵)。modelKey は "img:<hash>"、高さ(m)は root.scale に持つ ----------
+
+/** 縦1m×アスペクト比の板に画像を貼った Group。root.scale がそのまま実寸の高さ(m)になる */
+function makeImageObject(bmp) {
+  const tex = new THREE.CanvasTexture(bmp);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const ar = bmp.width / bmp.height;
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(ar, 1).translate(0, 0.5, 0),
+    // ライト非依存で見えるよう Basic。透過 PNG 対応
+    new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide }),
+  );
+  const group = new THREE.Group();
+  group.add(mesh);
+  return group;
+}
+
+async function addImageProp(buf, fileName, mime) {
+  try {
+    const bmp = await createImageBitmap(new Blob([buf], { type: mime || 'image/png' }));
+    const key = 'img:' + await hashBuffer(buf);
+    if (!(await idb.getModel(key))) {
+      await idb.putModel(key, { name: fileName, blob: new Blob([buf], { type: mime || 'image/png' }) });
+    }
+    // シーン読込で不足していた画像なら、その状態で復元する
+    if (state.pendingProps) {
+      const matches = state.pendingProps.filter((ps) => ps.modelKey === key);
+      if (matches.length) {
+        state.pendingProps = state.pendingProps.filter((ps) => ps.modelKey !== key);
+        if (!state.pendingProps.length) state.pendingProps = null;
+        for (const ps of matches) {
+          const p = makeProp(makeImageObject(bmp), key, ps.name || baseName(fileName));
+          p.applyState(ps);
+        }
+        toast('シーンの配置を復元しました');
+        afterCharsChanged();
+        return;
+      }
+    }
+    const ans = prompt(`実寸の高さを m で入力してください(画像 ${bmp.width}×${bmp.height}px)`, '1.6');
+    if (ans === null) return;
+    const h = Math.max(0.05, Math.min(30, parseFloat(ans) || 1.6));
+    const prop = makeProp(makeImageObject(bmp), key, baseName(fileName));
+    prop.root.scale.setScalar(h);
+    prop.root.position.set(0, 0, -0.5);
+    toast(`${prop.name} を高さ ${h}m で配置しました(「大きさ」= 高さm)`);
+    afterCharsChanged();
+  } catch (err) {
+    console.error(err);
+    toast('画像の読み込みに失敗しました: ' + err.message);
+  }
+}
+
+/** modelKey から小物を作る(プリミティブは再生成、画像・glTF は IndexedDB)。無ければ null */
 async function createPropFromKey(key, name) {
   if (key && key.startsWith('prim:')) {
     const kind = key.slice(5);
     if (!PRIMITIVES[kind]) return null;
     return makeProp(makePrimitiveObject(kind), key, name || PRIMITIVES[kind].label);
+  }
+  if (key && key.startsWith('img:')) {
+    const rec = await idb.getModel(key);
+    if (!rec) return null;
+    const bmp = await createImageBitmap(rec.blob);
+    return makeProp(makeImageObject(bmp), key, name || rec.name);
   }
   const rec = await idb.getModel(key);
   if (!rec) return null;
@@ -1212,6 +1357,27 @@ $('fovRange').addEventListener('input', () => {
 });
 $('fovRange').addEventListener('change', markDirty);
 $('orthoToggle').addEventListener('change', (e) => setOrtho(e.target.checked));
+
+// 定面ビュー(平行投影に切り替えて軸方向から見る)。距離は現在のまま
+const ORTHO_VIEWS = {
+  front: [0, 0, 1], back: [0, 0, -1],
+  left: [1, 0, 0.001], right: [-1, 0, 0.001],   // 左=キャラの左側(+X)から
+  top: [0, 1, 0.001],                            // 真上(キャラ正面が画面下向き)
+};
+for (const b of document.querySelectorAll('#panelCamera [data-oview]')) {
+  b.addEventListener('click', () => {
+    pushUndo();
+    if (activeCamera === perspCam) {
+      setOrtho(true);
+      $('orthoToggle').checked = true;
+    }
+    const dir = new THREE.Vector3().fromArray(ORTHO_VIEWS[b.dataset.oview]).normalize();
+    const d = Math.max(0.5, activeCamera.position.distanceTo(controls.target));
+    activeCamera.position.copy(controls.target).addScaledVector(dir, d);
+    controls.update();
+    markDirty();
+  });
+}
 
 // ---------- シーンの直列化 ----------
 
@@ -1465,9 +1631,16 @@ for (const b of document.querySelectorAll('#addMenu [data-add]')) {
   b.addEventListener('click', () => {
     $('addMenu').classList.add('hidden');
     if (b.dataset.add === 'file') $('fileModel').click();
+    else if (b.dataset.add === 'imageFile') $('fileImage').click();
     else addPrimitive(b.dataset.add);
   });
 }
+$('fileImage').addEventListener('change', async (e) => {
+  const f = e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  await addImageProp(await f.arrayBuffer(), f.name, f.type);
+});
 // メニュー外をタップしたら閉じる(＋モデル自身は click 側のトグルに任せる)
 document.addEventListener('pointerdown', (e) => {
   const menu = $('addMenu');
@@ -2197,7 +2370,7 @@ window.app = {
   THREE, state, scene, renderer,
   get camera() { return activeCamera; },
   get controls() { return controls; },
-  serializeScene, applyScene, exportPNG, pickHandle, updateEyeLine, renderShot,
+  serializeScene, applyScene, exportPNG, pickHandle, updateEyeLine, renderShot, addImageProp,
   async loadVRMFromURL(url) {
     const res = await fetch(url);
     const buf = await res.arrayBuffer();

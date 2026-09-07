@@ -44,11 +44,20 @@
 <!-- ＋モデルのメニュー -->
 <div id="addMenu" class="menu hidden">
   <button data-add="file">ファイルを読み込み (VRM / glTF / GLB)</button>
+  <button data-add="imageFile">画像を読み込み (下絵・リファレンス)</button>
   <div class="menu-sep"></div>
   <button data-add="box">立方体</button>
   <button data-add="sphere">球</button>
   <button data-add="cylinder">円柱</button>
   <button data-add="plane">板 (1m)</button>
+  <div class="menu-sep"></div>
+  <button data-add="schoolDesk">学校机 (実寸)</button>
+  <button data-add="schoolChair">学校椅子 (実寸)</button>
+  <button data-add="table">テーブル (140×80)</button>
+  <button data-add="sofa">ソファ (2人掛け)</button>
+  <button data-add="bed">ベッド (シングル)</button>
+  <button data-add="shelf">本棚 (H180)</button>
+  <button data-add="door">ドア (H200)</button>
 </div>
 
 <!-- シーンパネル -->
@@ -116,6 +125,13 @@
     <input id="fovRange" type="range" min="10" max="120" step="1" value="30">
   </label>
   <label class="check-row"><input id="orthoToggle" type="checkbox"> 平行投影</label>
+  <div class="btn-row">定面
+    <button data-oview="front">正面</button>
+    <button data-oview="back">背面</button>
+    <button data-oview="left">左</button>
+    <button data-oview="right">右</button>
+    <button data-oview="top">上</button>
+  </div>
   <label class="check-row">アスペクト比
     <select id="aspectSelect">
       <option value="free" selected>画面のまま</option>
@@ -523,7 +539,7 @@
           <text x="286" y="165" font-size="10" fill="#8a97a5" text-anchor="middle">プリミティブ</text>
         </svg></div>
         <ul>
-          <li><b>＋モデル</b>から VRM(キャラ)・glTF/GLB(小物)・プリミティブ(立方体/球/円柱/板)を追加。複製は ⚙ のキャラクター欄</li>
+          <li><b>＋モデル</b>から VRM(キャラ)・glTF/GLB(小物)・プリミティブ・<b>実寸家具</b>(学校机・椅子・ベッド等)・<b>画像の下絵</b>(実寸の高さ指定)を追加。複製は ⚙ のキャラクター欄</li>
           <li>小物の回転は<b>三軸の玉</b>を円周ドラッグ: <i class="hchip" style="background:#ff6b6b"></i>上=X(手前に倒す)、<i class="hchip" style="background:#6fe26f"></i>前=Y(向き)、<i class="hchip" style="background:#4d8aff"></i>横=Z(横に倒す)</li>
           <li>頭の関節を選ぶと「大きさ」で<b>頭だけ拡縮</b>(デフォルメ用)。ライトの向き・背景色は ⚙</li>
           <li>「シーン」で保存・.json 書き出し・<b>新規シーン(すべてクリア)</b></li>
@@ -591,6 +607,7 @@
 <div id="loading" class="hidden"><div class="spin"></div>読み込み中…</div>
 
 <input type="file" id="fileModel" hidden>
+<input type="file" id="fileImage" hidden accept="image/*">
 <input type="file" id="fileScene" hidden accept=".json,application/json">
 
 <script type="module" src="./js/app.js"></script>

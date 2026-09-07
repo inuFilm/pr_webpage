@@ -142,6 +142,8 @@ input[type=range]::-webkit-slider-thumb {
 .menu {
   position: fixed; top: calc(var(--tb-h) + var(--safe-top) + 4px);
   min-width: 220px; z-index: 40;
+  max-height: calc(100vh - var(--tb-h) - var(--safe-top) - var(--safe-bottom) - 20px);
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
   background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px;
   padding: 6px; backdrop-filter: blur(8px);
   display: flex; flex-direction: column; gap: 2px;
