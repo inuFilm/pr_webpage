@@ -342,3 +342,11 @@ body.conte-mode #bonePanel { bottom: calc(170px + var(--safe-bottom)); }
 .spin { width: 36px; height: 36px; border: 4px solid #2c3540; border-top-color: var(--accent);
   border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+.object-tools { display: flex; flex-wrap: wrap; gap: 4px; }
+#charList li { flex-wrap: wrap; }
+#saveStatus { display: block; padding: 8px; font-size: 12px; }
+.reference-dialog { color: #eef2f5; background: #242b33; border: 1px solid #56616d; border-radius: 12px; width: min(540px, 85vw); max-height: 90dvh; overflow: auto; }
+.reference-dialog::backdrop { background: #000a; }
+.reference-dialog canvas { display: block; max-width: 100%; max-height: 50dvh; width: auto; height: auto; margin: auto; touch-action: none; background: #666; cursor: crosshair; }
+.reference-dialog input { width: 100px; }
+.reference-dialog button { margin: 12px 4px 0 0; }

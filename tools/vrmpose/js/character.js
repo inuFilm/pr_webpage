@@ -175,6 +175,7 @@ export function placeHeadingHandle(owner, mesh, userScale) {
 
 export class Character {
   constructor(vrm, modelKey, name) {
+    this.instanceId = THREE.MathUtils.generateUUID();
     this.id = ++_charSeq;
     this.vrm = vrm;
     this.modelKey = modelKey;
@@ -556,6 +557,8 @@ export class Character {
     return {
       name: this.name,
       modelKey: this.modelKey,
+      instanceId: this.instanceId,
+      visible: this.root.visible,
       rootPos: this.root.position.toArray().map(round5),
       rootRot: this.root.quaternion.toArray().map(round5),
       rootScale: round5(this.root.scale.x),
@@ -570,6 +573,9 @@ export class Character {
   }
 
   applyState(state) {
+    if (state.instanceId) this.instanceId = state.instanceId;
+    if ('locked' in state) this.locked = !!state.locked;
+    this.root.visible = state.visible !== false;
     if (state.rootPos) this.root.position.fromArray(state.rootPos);
     if (state.rootRot) this.root.quaternion.fromArray(state.rootRot).normalize();
     if (state.rootScale) this.root.scale.setScalar(state.rootScale);
@@ -861,6 +867,7 @@ export class Character {
 /** 小物(glTF/GLB)。移動・回転・スケールのみ */
 export class Prop {
   constructor(object, modelKey, name) {
+    this.instanceId = THREE.MathUtils.generateUUID();
     this.id = ++_charSeq;
     this.isProp = true;
     this.modelKey = modelKey;
@@ -943,6 +950,8 @@ export class Prop {
     return {
       name: this.name,
       modelKey: this.modelKey,
+      instanceId: this.instanceId,
+      visible: this.root.visible,
       pos: this.root.position.toArray().map(round5),
       rot: this.root.quaternion.toArray().map(round5),
       scale: round5(this.root.scale.x),
@@ -951,6 +960,9 @@ export class Prop {
 
   applyState(state) {
     if (state.pos) this.root.position.fromArray(state.pos);
+    if (state.instanceId) this.instanceId = state.instanceId;
+    if ('locked' in state) this.locked = !!state.locked;
+    this.root.visible = state.visible !== false;
     if (state.rot) this.root.quaternion.fromArray(state.rot).normalize();
     if (state.scale) this.root.scale.setScalar(state.scale);
     if (state.name) this.name = state.name;

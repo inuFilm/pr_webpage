@@ -5,6 +5,7 @@ import { Character, Prop, loadAsset, BONE_PARENT, HAND_POSES } from './character
 import { idb, hashBuffer } from './store.js';
 import { aimBone, solveTwoBoneIK, decomposeRot, composeRot, twistBone } from './ik.js';
 import { buildZip, crc32 } from './zip.js';
+import { imageHeightDialog } from './reference-ui.js';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('view');
@@ -258,7 +259,7 @@ renderer.setAnimationLoop(() => {
   controls.update();
   scene.updateMatrixWorld();
   for (const o of allOwners()) {
-    o.handleGroup.visible = state.settings.showHandles;
+    o.handleGroup.visible = state.settings.showHandles && o.root.visible && !o.locked;
     if (o.handleGroup.visible) o.updateHandles(state.settings.handleScale);
   }
   renderer.render(scene, activeCamera);
@@ -572,6 +573,7 @@ function onPointerUp(e) {
 // ---------- 選択とボーンパネル ----------
 
 function select(hit) {
+  if (!hit || hit.char.locked || !hit.char.root.visible) return;
   if (state.selection) {
     const h = state.selection.handle;
     h.material.color.setHex(h.userData.baseColor);
@@ -886,6 +888,7 @@ function applySnapshot(s) {
   });
   o.p.forEach((ps, i) => state.props[i].applyState(ps));
   syncBoneSliders();
+  renderCharUI();
 }
 $('btnUndo').addEventListener('click', () => {
   if (!undoStack.length) return;
@@ -1164,9 +1167,8 @@ async function addImageProp(buf, fileName, mime) {
         return;
       }
     }
-    const ans = prompt(`実寸の高さを m で入力してください(画像 ${bmp.width}×${bmp.height}px)`, '1.6');
-    if (ans === null) return;
-    const h = Math.max(0.05, Math.min(30, parseFloat(ans) || 1.6));
+    const h = await imageHeightDialog(bmp);
+    if (h === null) { bmp.close(); return; }
     const prop = makeProp(makeImageObject(bmp), key, baseName(fileName));
     prop.root.scale.setScalar(h);
     prop.root.position.set(0, 0, -0.5);
@@ -1209,6 +1211,7 @@ async function duplicateProp(prop) {
   showLoading(true);
   try {
     const st = prop.serialize();
+    delete st.instanceId;
     const copy = await createPropFromKey(prop.modelKey, prop.name + ' コピー');
     if (!copy) { toast('モデルデータが見つかりません'); return; }
     copy.applyState(st);
@@ -1236,6 +1239,7 @@ async function duplicateCharacter(char) {
   try {
     const buf = await rec.blob.arrayBuffer();
     const st = char.serialize();
+    delete st.instanceId;
     const copy = await createCharacter(buf, char.modelKey, char.name + ' コピー');
     copy.applyState(st);
     copy.name = char.name + ' コピー';
@@ -1257,6 +1261,7 @@ function baseName(fileName) {
 }
 
 function renderCharUI() {
+  queueMicrotask(renderObjectTools);
   if (!$('panelPose').classList.contains('hidden')) renderPosePanel();
   const bar = $('charbar');
   bar.innerHTML = '';
@@ -1305,6 +1310,38 @@ function renderCharUI() {
     li.appendChild(del);
     list.appendChild(li);
   });
+}
+
+function renderObjectTools() {
+  for (const [i, li] of [...$('charList').children].entries()) {
+    const owner = allOwners()[i];
+    if (!owner || li.querySelector('.object-tools')) continue;
+    for (const b of li.querySelectorAll('button')) b.disabled = !!owner.locked;
+    const tools = document.createElement('div');
+    tools.className = 'object-tools';
+    tools.append(miniBtn('選択', () => {
+      if (!owner.locked && owner.root.visible) select({ char: owner, handle: owner.handles.find(h => h.userData.def.mode === 'root') });
+    }));
+    tools.append(miniBtn(owner.root.visible ? '表示中' : '非表示', () => {
+      pushUndo(); owner.root.visible = !owner.root.visible;
+      if (state.selection?.char === owner) deselect();
+      renderCharUI(); markDirty();
+    }));
+    tools.append(miniBtn(owner.locked ? '固定中' : '固定する', () => {
+      owner.locked = !owner.locked;
+      if (state.selection?.char === owner) deselect();
+      renderCharUI(); markDirty();
+    }));
+    li.append(tools);
+  }
+}
+for (const event of ['pointerdown', 'click', 'keydown', 'input', 'change']) {
+  $('panelPose').addEventListener(event, e => {
+    if (state.activeChar?.locked && e.key !== 'Tab' && !e.target.closest('[data-close]')) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      if (event === 'click') toast('固定を解除すると編集できます');
+    }
+  }, true);
 }
 
 function miniBtn(label, fn) {
@@ -1419,12 +1456,13 @@ function captureShot() {
 /** captureShot の状態を現在のシーンへ適用(モデル構成は今あるものを流用) */
 function applyShot(cs) {
   if (!cs) return;
+  for (const owner of allOwners()) owner.root.visible = false;
   (cs.characters || []).forEach((st, i) => {
-    const c = state.characters[i];
+    const c = st.instanceId ? state.characters.find(o => o.instanceId === st.instanceId) : state.characters[i];
     if (c) { c.applyState(st); c.applyCurls(); }
   });
   (cs.props || []).forEach((st, i) => {
-    const p = state.props[i];
+    const p = st.instanceId ? state.props.find(o => o.instanceId === st.instanceId) : state.props[i];
     if (p) p.applyState(st);
   });
   applyCameraState(cs.camera);
@@ -1433,8 +1471,9 @@ function applyShot(cs) {
 function serializeScene() {
   return {
     app: 'vrmpose', version: 1,
-    characters: state.characters.map((c) => c.serialize()),
-    props: state.props.map((p) => p.serialize()),
+    mode: state.mode,
+    characters: [...state.characters.map((c) => ({ ...c.serialize(), locked: !!c.locked })), ...(state.pendingChars || [])],
+    props: [...state.props.map((p) => ({ ...p.serialize(), locked: !!p.locked })), ...(state.pendingProps || [])],
     camera: captureCameraState(),
     settings: { ...state.settings },
     timeline: {
@@ -1446,6 +1485,10 @@ function serializeScene() {
 }
 
 async function applyScene(data) {
+  data = JSON.parse(JSON.stringify(data));
+  for (const kind of ['characters', 'props']) {
+    for (const item of data?.[kind] || []) item.instanceId ||= THREE.MathUtils.generateUUID();
+  }
   if (!data || data.app !== 'vrmpose') { toast('vrmpose のシーンファイルではありません'); return; }
 
   // 設定
@@ -1473,12 +1516,14 @@ async function applyScene(data) {
     const char = await createCharacter(buf, cs.modelKey, cs.name || rec.name);
     char.applyState(cs);
     char.applyCurls();
+    char.locked = !!cs.locked;
   }
   const missingProps = [];
   for (const ps of data.props || []) {
     const prop = await createPropFromKey(ps.modelKey, ps.name);
     if (!prop) { missingProps.push(ps); continue; }
     prop.applyState(ps);
+    prop.locked = !!ps.locked;
   }
   if (missing.length || missingProps.length) {
     state.pendingChars = missing.length ? missing : null;
@@ -1495,7 +1540,19 @@ async function applyScene(data) {
     : { fps: 24, cuts: [] };
   if (!state.timeline.fps) state.timeline.fps = 24;
   if (!Array.isArray(state.timeline.cuts)) state.timeline.cuts = [];
+  // Upgrade old index-based cuts once, using the original saved order including missing assets.
+  for (const cut of state.timeline.cuts) {
+    for (const kind of ['characters', 'props']) {
+      (cut.state?.[kind] || []).forEach((item, i) => {
+        if (!item.instanceId) {
+          const source = data[kind]?.[i];
+          item.instanceId = source?.instanceId || THREE.MathUtils.generateUUID();
+        }
+      });
+    }
+  }
   selectedCut = state.timeline.cuts.length ? 0 : -1;
+  setMode(data.mode === 'conte' ? 'conte' : 'illust');
   renderTimeline(false);
 
   renderCharUI();
@@ -1505,11 +1562,45 @@ async function applyScene(data) {
 // ---------- 自動保存 ----------
 
 let dirtyTimer = 0;
+let saveQueue = Promise.resolve();
+const saveStatus = document.createElement('span');
+saveStatus.id = 'saveStatus';
+saveStatus.setAttribute('role', 'status');
+$('panelScenes').prepend(saveStatus);
+const objectHeading = document.createElement('h3');
+objectHeading.textContent = 'シーン内のキャラ・小物';
+$('panelScenes').append(objectHeading, $('charList'));
+function flushSave() {
+  clearTimeout(dirtyTimer);
+  const data = serializeScene();
+  saveStatus.textContent = '保存中…';
+  saveQueue = saveQueue.catch(() => {}).then(async () => {
+    const previous = await idb.getKV('autosave');
+    if (previous) await idb.putKV('autosavePrevious', previous);
+    await idb.putKV('autosave', data);
+    saveStatus.textContent = '端末に保存済み';
+  }).catch(err => {
+    saveStatus.textContent = '保存失敗 — JSONで書き出してください';
+    console.error('Autosave failed', err);
+  });
+  return saveQueue;
+}
+const recoverButton = miniBtn('ひとつ前の自動保存を復元', async () => {
+  const previous = await idb.getKV('autosavePrevious');
+  if (!previous) { toast('復元できる履歴がありません'); return; }
+  if (!confirm('現在のシーンを、ひとつ前の自動保存に置き換えますか？')) return;
+  clearTimeout(dirtyTimer); dirtyTimer = 0;
+  await saveQueue;
+  await applyScene(previous);
+});
+$('panelScenes').append(recoverButton);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && dirtyTimer) flushSave();
+});
 function markDirty() {
   clearTimeout(dirtyTimer);
-  dirtyTimer = setTimeout(() => {
-    idb.putKV('autosave', serializeScene()).catch(() => { });
-  }, 800);
+  saveStatus.textContent = '未保存の変更あり';
+  dirtyTimer = setTimeout(() => { dirtyTimer = 0; flushSave(); }, 800);
 }
 
 // ---------- PNG 書き出し ----------
@@ -2335,7 +2426,7 @@ async function boot() {
   syncSettingsUI();
   try {
     const saved = await idb.getKV('autosave');
-    if (saved && saved.characters && saved.characters.length) {
+    if (saved && saved.app === 'vrmpose' && Array.isArray(saved.characters) && Array.isArray(saved.props)) {
       await applyScene(saved);
       return;
     }
