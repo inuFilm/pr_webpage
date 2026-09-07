@@ -63,6 +63,8 @@
 <!-- シーンパネル -->
 <aside id="panelScenes" class="panel hidden">
   <div class="panel-head"><h3>シーン</h3><button class="close" data-close>✕</button></div>
+  <details id="sceneStorage" class="scene-storage">
+  <summary>保存・読み込み・新規シーン</summary>
   <button id="btnNewScene" class="wide" data-tip="キャラ・小物・カメラ・タイムラインをすべて消して空のシーンから始めます">新規シーン(すべてクリア)</button>
   <hr>
   <div class="row">
@@ -74,6 +76,7 @@
   <button id="btnExportScene" class="wide">ファイルへ書き出し (.json)</button>
   <button id="btnImportScene" class="wide">ファイルから読み込み</button>
   <p class="note">シーンにはポーズ・カメラ・背景設定が含まれます。モデル本体は含まれないので、別端末ではモデルを読み込み直すと復元されます。</p>
+  </details>
 </aside>
 
 <!-- ポーズ・表情パネル -->

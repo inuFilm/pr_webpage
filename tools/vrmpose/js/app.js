@@ -1316,10 +1316,33 @@ function renderObjectTools() {
   for (const [i, li] of [...$('charList').children].entries()) {
     const owner = allOwners()[i];
     if (!owner || li.querySelector('.object-tools')) continue;
-    for (const b of li.querySelectorAll('button')) b.disabled = !!owner.locked;
+    li.classList.add('object-card');
+    li.classList.toggle('is-selected', state.selection?.char === owner);
+    const name = li.querySelector('.name');
+    name.textContent = owner.name;
+    name.title = owner.name;
+    const heading = document.createElement('div');
+    heading.className = 'object-heading';
+    const kind = document.createElement('span');
+    kind.className = 'object-kind';
+    kind.textContent = owner.isProp ? (owner.modelKey?.startsWith('img:') ? '画像' : '小物') : 'キャラ';
+    heading.append(kind, name);
+    const more = document.createElement('details');
+    more.className = 'object-more';
+    const summary = document.createElement('summary');
+    summary.textContent = 'その他の操作';
+    more.append(summary);
+    const actions = document.createElement('div');
+    actions.className = 'object-actions';
+    for (const b of [...li.querySelectorAll('button')]) {
+      b.disabled = !!owner.locked;
+      actions.append(b);
+    }
+    more.append(actions);
+    li.replaceChildren(heading);
     const tools = document.createElement('div');
     tools.className = 'object-tools';
-    tools.append(miniBtn('選択', () => {
+    tools.append(miniBtn(state.selection?.char === owner ? '選択中' : '選択', () => {
       if (!owner.locked && owner.root.visible) select({ char: owner, handle: owner.handles.find(h => h.userData.def.mode === 'root') });
     }));
     tools.append(miniBtn(owner.root.visible ? '表示中' : '非表示', () => {
@@ -1332,12 +1355,18 @@ function renderObjectTools() {
       if (state.selection?.char === owner) deselect();
       renderCharUI(); markDirty();
     }));
-    li.append(tools);
+    const buttons = [...tools.children];
+    buttons[0].disabled = !!owner.locked || !owner.root.visible;
+    buttons[0].classList.toggle('is-on', state.selection?.char === owner);
+    buttons[1].setAttribute('aria-pressed', String(owner.root.visible));
+    buttons[2].setAttribute('aria-pressed', String(!!owner.locked));
+    buttons[2].classList.toggle('is-on', !!owner.locked);
+    li.append(tools, more);
   }
 }
 for (const event of ['pointerdown', 'click', 'keydown', 'input', 'change']) {
   $('panelPose').addEventListener(event, e => {
-    if (state.activeChar?.locked && e.key !== 'Tab' && !e.target.closest('[data-close]')) {
+    if (state.activeChar?.locked && e.key !== 'Tab' && !e.target.closest('[data-close], #charList')) {
       e.preventDefault(); e.stopImmediatePropagation();
       if (event === 'click') toast('固定を解除すると編集できます');
     }
@@ -1566,10 +1595,10 @@ let saveQueue = Promise.resolve();
 const saveStatus = document.createElement('span');
 saveStatus.id = 'saveStatus';
 saveStatus.setAttribute('role', 'status');
-$('panelScenes').prepend(saveStatus);
+$('panelScenes').querySelector('.panel-head').after(saveStatus);
 const objectHeading = document.createElement('h3');
-objectHeading.textContent = 'シーン内のキャラ・小物';
-$('panelScenes').append(objectHeading, $('charList'));
+objectHeading.textContent = 'キャラ・小物を選択';
+$('panelPose').querySelector('.panel-head').after(objectHeading, $('charList'));
 function flushSave() {
   clearTimeout(dirtyTimer);
   const data = serializeScene();
@@ -1593,7 +1622,8 @@ const recoverButton = miniBtn('ひとつ前の自動保存を復元', async () =
   await saveQueue;
   await applyScene(previous);
 });
-$('panelScenes').append(recoverButton);
+recoverButton.className = 'wide recovery-button';
+$('sceneStorage').append(recoverButton);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden' && dirtyTimer) flushSave();
 });

@@ -1,0 +1,12 @@
+<!doctype html><html lang="ja"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>シーンUI確認（保存なし）</title><link rel="stylesheet" href="../tools/vrmpose/style.css">
+<div id="charbar" hidden></div><div id="panelPose" class="hidden"></div>
+<aside id="panelScenes" class="panel"><div class="panel-head"><h3>シーン</h3></div><span id="saveStatus">端末に保存済み</span><details class="scene-storage"><summary>保存・読み込み・新規シーン</summary><button class="wide">ファイルへ書き出し (.json)</button><button class="wide recovery-button">ひとつ前の自動保存を復元</button></details><h3>シーン内のキャラ・小物</h3><ul id="charList" class="list"></ul></aside>
+<script type="module">
+const source = await (await fetch('../tools/vrmpose/js/app.js')).text();
+const owners = ['sotai_girl', 'sotai_girl コピー 長い名前の表示確認', '学校の机'].map((name,i)=>({name,isProp:i===2,root:{visible:true},locked:false}));
+const state = {characters:owners.slice(0,2),props:owners.slice(2),selection:null};
+const $ = id => document.getElementById(id);
+const miniBtn = (label,fn) => { const b=document.createElement('button'); b.textContent=label; b.onclick=fn; return b; };
+const render = new Function('state','$','allOwners','miniBtn',source.slice(source.indexOf('function renderCharUI()'),source.indexOf("for (const event of ['pointerdown'"))+'; return renderCharUI;')(state,$,()=>owners,miniBtn);
+render();
+</script></html>
