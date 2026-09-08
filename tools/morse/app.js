@@ -6,7 +6,7 @@ const cleanPhrase = value => value.toUpperCase().replace(/[^A-Z0-9\s]/g,'').repl
 const symbols = value => value.replace(/\./g,'·').replace(/-/g,'−');
 const $ = id => document.getElementById(id);
 const all = selector => [...document.querySelectorAll(selector)];
-let family='TMO', familyPractice='';
+let nextQuestionTimer=null;
 let sequence='', transcript='', selected='E', mode='free', target='', progress=0;
 let pending=[], held=new Map(), busyUntil=0, toneUntil=0, idleAt=0, lastSymbol='-', lastDecoded='—';
 let audio=null, soundOn=false, oscillator=null, gain=null;
@@ -39,7 +39,7 @@ function drawMap() {
     const name=document.createElement('span'),code=document.createElement('small');name.textContent=char;code.textContent=symbols(MORSE[char]);b.append(name,code);b.onclick=()=>choose(char);$('alphabet').append(b);
   }
 }
-function highlight(code){all('[data-step]').forEach(n=>n.setAttribute('aria-pressed',String(n.dataset.step===REVERSE[code])));for(const n of all('[data-code]'))n.classList.toggle('active',!!code&&code.startsWith(n.getAttribute('data-code')));$('path-label').textContent=pathFor(code);}
+function highlight(code){for(const n of all('[data-code]'))n.classList.toggle('active',!!code&&code.startsWith(n.getAttribute('data-code')));$('path-label').textContent=pathFor(code);}
 function choose(char){selected=char;highlight(MORSE[char]);if(!sequence){lastDecoded=char;$('decoded').textContent=$('show-live').checked?char:'?';$('sequence').textContent=symbols(MORSE[char]);}$('status').textContent=`見本 ${char} / ${symbols(MORSE[char])}`;}
 function renderInput(){highlight(sequence||MORSE[lastDecoded]||'');$('sequence').textContent=symbols(sequence);$('decoded').textContent=$('show-live').checked?(sequence?(REVERSE[sequence]||'?'):lastDecoded):'?';$('transcript').textContent=transcript||'入力した文字がここに並びます';}
 function renderTarget(){
@@ -59,7 +59,8 @@ function beep(duration){
 }
 function stopPlayback(){playToken++;playing=false;all('.paddle').forEach(n=>n.classList.remove('firing')); for(const t of playbackTimers)clearTimeout(t);playbackTimers.clear();$('play-phrase').textContent='文章を聴く';$('hear').textContent='選んだ文字を聴く';stopTone();}
 function stopInput(){held.clear();pending=[];busyUntil=0;toneUntil=0;idleAt=performance.now();all('.paddle').forEach(n=>n.classList.remove('firing'));stopTone();}
-function reset(){stopPlayback();stopInput();sequence='';transcript='';lastDecoded='—';renderInput();$('meter').style.width='0%';}
+function cancelNextQuestion(){if(nextQuestionTimer!==null){clearTimeout(nextQuestionTimer);nextQuestionTimer=null;}}
+function reset(){cancelNextQuestion();stopPlayback();stopInput();sequence='';transcript='';lastDecoded='—';renderInput();$('meter').style.width='0%';}
 function schedule(fn,delay,token){const timer=setTimeout(()=>{playbackTimers.delete(timer);if(token===playToken)fn();},delay);playbackTimers.add(timer);}
 async function play(text){
   if(playing){stopPlayback();$('status').textContent='再生を停止';return;}
@@ -79,10 +80,11 @@ async function play(text){
 }
 function accept(char){
   if(mode==='free'){transcript+=char;return;}
-  if(progress>=target.length){message('練習完了。「次の問題」で続けられます。');return;}
-  if(char===target[progress]){transcript+=char;progress++;message(progress===target.length?'正解！ 練習完了です。「次の問題」で続けましょう。':`正解 ${char===' '?'空白':char} · ${progress} / ${target.length}`);}
+  if(progress>=target.length){return;}
+  if(char===target[progress]){transcript+=char;progress++;message(progress===target.length?(mode==='letter'?'正解！ 次の問題へ進みます。':'正解！ 文章を入力できました。'):`正解 ${char===' '?'空白':char} · ${progress} / ${target.length}`);}
   else message(`いまの入力は ${char===' '?'空白':char}。次は ${target[progress]===' '?'空白':target[progress]} です。もう一度。`);
   renderTarget();
+  if(mode==='letter'&&progress===target.length){cancelNextQuestion();nextQuestionTimer=setTimeout(()=>{nextQuestionTimer=null;next();},350);}
 }
 function confirm(){
   if(playing)return;
@@ -93,6 +95,7 @@ function confirm(){
 }
 function addSpace(){if(playing)return;stopInput();confirm();if(!transcript.endsWith(' ')&&(transcript||mode!=='free'))accept(' ');renderInput();}
 function start(source,s){
+  if(nextQuestionTimer!==null)next();
   if(playing||held.has(source))return;
   held.set(source,s);pending=[s];idleAt=0;tick();
 }
@@ -113,11 +116,11 @@ function tick(){
 }
 function next(){
   reset();progress=0;
-  if(mode==='letter'){let pool=$('group').value;if(pool==='letters')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ';if(pool==='numbers')pool='0123456789';if(pool==='all')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';target=familyPractice||pool[Math.floor(Math.random()*pool.length)];}
+  if(mode==='letter'){let pool=$('group').value;if(pool==='letters')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ';if(pool==='numbers')pool='0123456789';if(pool==='all')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';const choices=[...pool].filter(char=>char!==target);target=choices[Math.floor(Math.random()*choices.length)]||pool[0];}
   else if(mode==='phrase'){target=cleanPhrase($('phrase').value);$('normalized').textContent=target?`練習文：${target}`:'英字か数字を入力してください。';}
   else target='';renderTarget();message(mode==='free'?'自由に入力できます。空白は Space。':target?'表示された文字をパドルで入力してください。':'練習文を入力してください。');
 }
-for(const b of all('[data-mode]'))b.onclick=()=>{familyPractice='';mode=b.dataset.mode;all('[data-mode]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));$('exercise').hidden=mode==='free';$('phrase-tools').hidden=mode!=='phrase';$('group-wrap').hidden=mode!=='letter';next();};
+for(const b of all('[data-mode]'))b.onclick=()=>{mode=b.dataset.mode;all('[data-mode]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));$('exercise').hidden=mode==='free';$('phrase-tools').hidden=mode!=='phrase';$('group-wrap').hidden=mode!=='letter';next();};
 for(const [id,s] of [['dit','.'],['dah','-']]){
   const n=$(id);
   n.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')start('mouse',s);});
@@ -134,37 +137,24 @@ window.addEventListener('keydown',e=>{
   if(k==='f'||k==='j')start(k,k==='f'?'.':'-');else if(k==='enter'){stopInput();confirm();}else if(k===' ')addSpace();else if(k==='backspace')undo();else{stopInput();stopPlayback();}
 });
 window.addEventListener('keyup',e=>release(e.key.toLowerCase()));
-function pause(){stopInput();stopPlayback();sequence='';renderInput();$('meter').style.width='0%';}
+function pause(){cancelNextQuestion();stopInput();stopPlayback();sequence='';renderInput();$('meter').style.width='0%';}
 window.addEventListener('blur',pause);document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
-function undo(){stopInput();stopPlayback();if(sequence)sequence=sequence.slice(0,-1);else if(transcript){transcript=transcript.slice(0,-1);if(mode!=='free')progress=Math.max(0,progress-1);}lastDecoded='—';renderInput();renderTarget();}
+function undo(){cancelNextQuestion();stopInput();stopPlayback();if(sequence)sequence=sequence.slice(0,-1);else if(transcript){transcript=transcript.slice(0,-1);if(mode!=='free')progress=Math.max(0,progress-1);}lastDecoded='—';renderInput();renderTarget();}
 $('undo').onclick=undo;$('clear').onclick=()=>{reset();progress=0;renderTarget();message('入力をクリアしました。');};$('confirm').onclick=()=>{stopInput();confirm();};$('space').onclick=addSpace;
 $('sound').onclick=()=>{if(soundOn){soundOn=false;stopTone();$('sound').textContent='音を有効にする';$('sound').setAttribute('aria-pressed','false');}else enableSound();};
 $('hear').onclick=()=>play(selected);$('play-phrase').onclick=()=>{if(target)play(target);};
-function renderLesson(){
-  const descriptions={TMO:'長点を1つずつ追加。T は1つ、M は2つ、O は3つ。',EISH:'短点を1つずつ追加。1・2・3・4のリズムで覚えます。',EAWJ:'最初は短点1つ。そこから長点だけを1つずつ足します。'};
-  $('lesson-description').textContent=descriptions[family];$('lesson-steps').replaceChildren();
-  [...family].forEach((char,i)=>{
-    const b=document.createElement('button');b.dataset.step=char;b.setAttribute('aria-pressed','false');b.setAttribute('aria-label',`${char} ${symbols(MORSE[char])} の見本`);
-    const letter=document.createElement('strong');letter.textContent=char;
-    const code=document.createElement('span');code.className='step-code';
-    [...MORSE[char]].forEach((s,j)=>{const mark=document.createElement('i');mark.textContent=s==='.'?'●':'▬';if(j===MORSE[char].length-1)mark.className='added';code.append(mark);});
-    const caption=document.createElement('small');caption.textContent=i?'＋ '+(MORSE[char].endsWith('.')?'短点':'長点'):'ここから';
-    b.append(letter,code,caption);b.onclick=()=>choose(char);$('lesson-steps').append(b);
-  });
-  all('[data-family]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.family===family)));choose(family[0]);
-}
-all('[data-family]').forEach(b=>b.onclick=()=>{family=b.dataset.family;renderLesson();});
-$('practice-path').onclick=()=>{
-  familyPractice=family;mode='letter';$('group').value=family;
-  all('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode==='letter')));
-  $('exercise').hidden=false;$('phrase-tools').hidden=true;$('group-wrap').hidden=false;next();
-  message(`${[...family].join(' → ')} の順に入力。文字ごとに離して確定しましょう。`);
-  $('station-title').scrollIntoView({behavior:'smooth',block:'nearest'});
-};
-$('next').onclick=next;$('group').onchange=()=>{familyPractice='';next();};$('apply-phrase').onclick=next;
+$('next').onclick=next;$('group').onchange=next;$('apply-phrase').onclick=next;
 let sampleIndex=0;const samples=['HELLO WORLD 73','CQ CQ DE MORSE','THE QUICK BROWN FOX 123','GOOD MORNING','PRACTICE MAKES PERFECT'];
 $('sample').onclick=()=>{$('phrase').value=samples[++sampleIndex%samples.length];next();};
 $('hint').onchange=renderTarget;$('show-live').onchange=renderInput;
 for(const [id,suffix] of [['speed',' WPM'],['gap',' ms'],['volume','%']])$(id).oninput=()=>{$(id+'-value').textContent=$(id).value+suffix;};
 $('repeat').onchange=()=>{stopInput();};
-drawMap();renderLesson();setInterval(tick,16);
+drawMap();highlight(MORSE.E);setInterval(tick,16);
+
+$('toggle-map').onclick=()=>{
+  const hidden=!$('map-content').hidden;
+  $('map-content').hidden=hidden;
+  $('toggle-map').setAttribute('aria-expanded',String(!hidden));
+  $('toggle-map').setAttribute('aria-label',hidden?'符号の地図を表示':'符号の地図を隠す');
+  $('toggle-map').innerHTML=hidden?'<span aria-hidden="true">⌄</span> 表示':'<span aria-hidden="true">⌃</span> 隠す';
+};

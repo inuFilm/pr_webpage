@@ -14,7 +14,7 @@ class Element {
 }
 const elements={};const html=fs.readFileSync(__dirname+'/index.html','utf8');
 for(const match of html.matchAll(/<([a-z]+)[^>]*\bid="([^"]+)"[^>]*>/g)){const n=elements[match[2]]=new Element(match[1]);const value=match[0].match(/\bvalue="([^"]*)"/);if(value)n.value=value[1];n.checked=/\bchecked\b/.test(match[0]);}
-elements.speed.value='12';elements.gap.value='900';elements.repeat.value='single';elements.group.value='TMO';elements.phrase.value='HELLO WORLD 73';
+elements.speed.value='12';elements.gap.value='900';elements.repeat.value='single';elements.group.value='all';elements.phrase.value='HELLO WORLD 73';
 const modeButtons=['free','letter','phrase'].map(mode=>{const n=new Element('button');n.dataset.mode=mode;return n;});
 const routes=['---','....','.---'].map(route=>{const n=new Element('button');n.dataset.route=route;return n;});
 const descendants=()=>{const out=[];function walk(n){out.push(n);n.children.forEach(walk);}Object.values(elements).forEach(walk);return out;};
