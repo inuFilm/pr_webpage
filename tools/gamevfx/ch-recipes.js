@@ -33,7 +33,7 @@ void main() {
     float fi = float(i), sd = hash(vec2(fi, 3.0));
     float life = fract(u_time * (0.25 + sd * 0.3) + sd);
     vec2 sp = vec2(0.5 + (hash(vec2(fi, 7.0)) - 0.5) * 0.25 + sin(u_time * 2.0 + fi) * 0.04 * life, 0.1 + life * (0.6 + sd * 0.3));
-    float s = smoothstep(0.012, 0.0, length((uv - sp) * vec2(u_res.x / u_res.y, 1.0)));
+    float s = (1.0 - smoothstep(0.0, 0.012, length((uv - sp) * vec2(u_res.x / u_res.y, 1.0))));
     col += vec3(1.0, 0.7, 0.3) * s * (1.0 - life);
   }
   // 根元の光：まわりを照らす（23 章「周囲の光」）
@@ -302,7 +302,7 @@ void main() {
   float r = length(p);
   float t = fract(u_time * u_speed * 0.5);                  // 0〜1 で 1 回（ループ）
   float R = 0.7 * (1.0 - (1.0 - t) * (1.0 - t));            // easeOut で広がる：はじめ速く（14 章）
-  float band = smoothstep(u_width, 0.0, abs(r - R));        // リングの断面（5 章の極座標）
+  float band = (1.0 - smoothstep(0.0, u_width, abs(r - R)));        // リングの断面（5 章の極座標）
   float fade = 1.0 - t;
   // 歪み（3 章）：リングの所で、中心から外へ UV を押し出す = 空気が圧縮されて見える
   vec2 dir = r > 0.001 ? p / r : vec2(0.0);
@@ -316,7 +316,7 @@ void main() {
     // 土埃の輪：リングの少し内側を、ノイズで抜く（2 章）。角度方向は周期ノイズでつなぎ目なし
     float a = (atan(p.y, p.x) / 6.2832 + 0.5) * 8.0;
     float dust = smoothstep(0.35, 0.7, fbmP(vec2(a, r * 6.0 - t * 3.0), vec2(8.0, 1e4)));
-    dust *= smoothstep(u_width * 2.5, 0.0, abs(r - R + u_width)) * fade;
+    dust *= (1.0 - smoothstep(0.0, u_width * 2.5, abs(r - R + u_width))) * fade;
     col = mix(col, vec3(0.6, 0.55, 0.45), dust * 0.7);
     // 光る縁（加算）：一瞬だけ強く（20 章）
     col += vec3(0.7, 0.9, 1.0) * band * fade * fade;

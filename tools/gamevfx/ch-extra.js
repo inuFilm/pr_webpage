@@ -101,7 +101,7 @@ void main() {
   col = mix(bg, col, alpha);
   // 光源の位置を点で示す
   vec2 lp = vec2(0.5) + vec2(cos(u_az) / (u_res.x / u_res.y), sin(u_az)) * cos(u_el) * 0.45;
-  col += vec3(1.0, 0.9, 0.6) * smoothstep(0.02, 0.0, length((uv - lp) * vec2(u_res.x / u_res.y, 1.0)));
+  col += vec3(1.0, 0.9, 0.6) * (1.0 - smoothstep(0.0, 0.02, length((uv - lp) * vec2(u_res.x / u_res.y, 1.0))));
   outColor = vec4(col, 1.0);
 }`;
   const S = { az: 0.8, el: 0.7, col: '#ffd9a6', bump: 0.5, mode: 0, orbit: true };

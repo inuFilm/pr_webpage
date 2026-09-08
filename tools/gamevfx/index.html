@@ -8,6 +8,7 @@
 <title>ゲームVFXの原則を、動く図で。 | makeinufilm</title>
 <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
 <link rel="stylesheet" href="style.css?v=20260906-2">
+<link rel="stylesheet" href="../learning/learning.css?v=20260907-1">
 </head>
 <body>
 <div class="app">
@@ -22,15 +23,16 @@
 <main>
 
 <!-- ============ 0 ============ -->
-<section class="lesson" data-part="Part 1　1枚の板から始まる" data-title="はじめに：原則だけを学ぶ理由">
+<section class="lesson" data-lesson-id="gamevfx-0" data-legacy-index="0" data-part="Part 1　1枚の板から始まる" data-title="はじめに：原則だけを学ぶ理由">
 <h2><span class="chap">CHAPTER</span>はじめに：エンジンの手順ではなく、原則を学ぶ</h2>
 <p class="lead">ゲームのエフェクト（リアルタイム VFX）は、突き詰めると <span class="hl">「板に絵を描く」「板をたくさん飛ばす」「時間で見せる」</span> の 3 つでできています。この教材は、その 3 つをエンジンの名前を出さずに説明します。</p>
 
+<p>追加の比較実験：<a href="#sampling">ちらつき</a>・<a href="#linear-color">色の計算</a>・<a href="#arc-length">帯の模様と等速移動</a>。数学ページと往復して、見た目が崩れる理由を確かめられます。</p>
 <h3>なぜエンジンの手順を書かないのか</h3>
 <p>Unity / Unreal / Godot のどれで作っても、爆発は「一瞬のフラッシュ → 広がるリング → 飛ぶ火花 → 残る煙」です。変わるのはボタンの場所とノードの名前だけで、それは数年で入れ替わります。逆に、ここで扱う原則は 2016 年のフォーラム投稿でも今でも同じことが書かれています。</p>
 <div class="callout green">
   <div class="t">「なぜそうするか」はここで学び、「どのボタンを押すか」は使うエンジンの現行ドキュメントで確認する。</div>
-  この教材の各章は、そのまま Shader Graph / マテリアルエディタ / VFX Graph / Niagara の 1 ノードや 1 モジュールに対応します。対応の付け方は最終章にまとめました。
+  各章の操作はノードやモジュールの組み合わせとして読み替えられます。必ず1対1に対応するわけではありません。対応の付け方は <a href="#ch30">Part 5の対応表</a> にまとめました。
 </div>
 
 <h3>この教材の書き方ルール</h3>
@@ -39,7 +41,7 @@
   <li>Part 2〜3 は JavaScript で、<a href="../cgmath/">CGの数学を、数式なしで。</a> と同じ書き方（<code>{x, y}</code> の矢印、<code>lerp()</code>、<code>noise()</code>）です。</li>
   <li>数学が出てくる所には <span class="v">数学</span> の印を付けて、数学アプリの該当章にリンクします。先にそちらを読んでも、後回しでも構いません。</li>
   <li>画像素材は一切使いません。炎も煙もフリップブックも、<span class="hl">全部ブラウザの中で計算して作ります</span>。だから「テクスチャの中身がどうなっているか」まで見えます。</li>
-  <li>図はクリックで一時停止 / 再開できます。</li>
+  <li>WebGLの図はクリックで一時停止 / 再開できます。追加の比較実験は「自動再生」で操作します。</li>
 </ul>
 
 <pre class="code"><span class="c">// Part 1 のコードはこの形。uv（板の上の住所）から色を決める関数です</span>
@@ -65,7 +67,7 @@
 </section>
 
 <!-- ============ 1 ============ -->
-<section class="lesson" data-title="UV：板の上の住所">
+<section class="lesson" data-lesson-id="gamevfx-1" data-legacy-index="1" data-title="UV：板の上の住所">
 <h2><span class="chap">CHAPTER</span>UV：板の上の「住所」から色を決める</h2>
 <p class="lead">シェーダーは「このピクセルは板のどこか？」を受け取って「なら何色か」を返す関数です。その「どこか」が <span class="hl">UV</span>。左下が <code>{u: 0, v: 0}</code>、右上が <code>{u: 1, v: 1}</code> です。</p>
 
@@ -104,7 +106,7 @@
 </section>
 
 <!-- ============ 2 ============ -->
-<section class="lesson" data-title="流す＋抜く：いちばん基本の組み合わせ">
+<section class="lesson" data-lesson-id="gamevfx-2" data-legacy-index="2" data-title="流す＋抜く：いちばん基本の組み合わせ">
 <h2><span class="chap">CHAPTER</span>流す＋抜く：炎も煙もオーラも、この 3 手順</h2>
 <p class="lead">ノイズを <span class="hl">流し</span>、マスクで <span class="hl">抜き</span>、しきい値で <span class="hl">切る</span>。リアルタイム VFX で最初に覚えるべき組み合わせで、見た目がまったく違うエフェクトの多くがこの構造です。</p>
 
@@ -156,7 +158,7 @@
 </section>
 
 <!-- ============ 3 ============ -->
-<section class="lesson" data-title="歪み：UV をノイズでずらす">
+<section class="lesson" data-lesson-id="gamevfx-3" data-legacy-index="3" data-title="歪み：UV をノイズでずらす">
 <h2><span class="chap">CHAPTER</span>歪み：絵を変えずに、読む場所をゆがめる</h2>
 <p class="lead">熱のゆらぎ、水面越しの景色、魔法の空間の歪み。これらは絵を加工していません。<span class="hl">UV にノイズを足してから読む</span> だけです。</p>
 
@@ -198,7 +200,7 @@
 </section>
 
 <!-- ============ 4 ============ -->
-<section class="lesson" data-title="ディゾルブ：しきい値を動かして消す">
+<section class="lesson" data-lesson-id="gamevfx-4" data-legacy-index="4" data-title="ディゾルブ：しきい値を動かして消す">
 <h2><span class="chap">CHAPTER</span>ディゾルブ：ノイズとしきい値で「燃えて消える」</h2>
 <p class="lead">キャラが灰になる、弾が霧散する、盾が砕ける。<span class="hl">ノイズより「しきい値」を上げていく</span> だけで、暗い所から順に消えていきます。しきい値のすぐ上に色を乗せると、燃えている縁になります。</p>
 
@@ -243,7 +245,7 @@
 </section>
 
 <!-- ============ 5 ============ -->
-<section class="lesson" data-title="極座標：リング・渦・放射">
+<section class="lesson" data-lesson-id="gamevfx-5" data-legacy-index="5" data-title="極座標：リング・渦・放射">
 <h2><span class="chap">CHAPTER</span>極座標：UV を「角度と距離」に変えると丸いものが作れる</h2>
 <p class="lead">衝撃波のリング、渦巻き、光の筋、魔法陣。丸いエフェクトは <span class="hl">UV を「中心からの角度」と「中心からの距離」に変換してから</span> 2 章の手順を使います。</p>
 
@@ -291,7 +293,7 @@
 </section>
 
 <!-- ============ 6 ============ -->
-<section class="lesson" data-title="ランプ：白黒に色を着ける">
+<section class="lesson" data-lesson-id="gamevfx-6" data-legacy-index="6" data-title="ランプ：白黒に色を着ける">
 <h2><span class="chap">CHAPTER</span>ランプ：0〜1 の数字を色に変える</h2>
 <p class="lead">ここまでの図の「白黒」は、最後に <span class="hl">ランプ（グラデーション）</span> を通して色になっています。ランプは「0 なら黒、0.5 なら橙、1 なら白」のような対応表です。同じ素材でも、ランプを変えるだけで別のエフェクトになります。</p>
 
@@ -345,7 +347,7 @@
 </section>
 
 <!-- ============ 7 ============ -->
-<section class="lesson" data-title="ブレンド：光は足す、煙は混ぜる">
+<section class="lesson" data-lesson-id="gamevfx-7" data-legacy-index="7" data-title="ブレンド：光は足す、煙は混ぜる">
 <h2><span class="chap">CHAPTER</span>ブレンド：板を重ねるときの「足し算」と「混ぜ算」</h2>
 <p class="lead">半透明の板を重ねるとき、後ろの色と新しい色をどう合成するかが <span class="hl">ブレンドモード</span> です。光るものは <span class="b">加算</span>、煙や埃は <span class="b">通常（アルファ）</span>。この使い分けが、エフェクトの「発光感」をほぼ決めます。</p>
 
@@ -361,6 +363,7 @@
 </div>
 <pre class="code" id="code-blend"></pre>
 
+<p>色管理を含めた違いは <a href="#linear-color">色の計算</a> で比較できます。加算は発光表現の選択肢ですが、発光素材が必ず加算という意味ではありません。</p>
 <h3>3 つの性格</h3>
 <table class="sheet">
   <tr><th>方式</th><th>式</th><th>向いているもの</th><th>弱点</th></tr>
@@ -392,7 +395,7 @@
 </section>
 
 <!-- ============ 8 ============ -->
-<section class="lesson" data-title="フレネルとソフトパーティクル：縁の扱い">
+<section class="lesson" data-lesson-id="gamevfx-8" data-legacy-index="8" data-title="フレネルとソフトパーティクル：縁の扱い">
 <h2><span class="chap">CHAPTER</span>フレネルとソフトパーティクル：「縁」をどう見せるか</h2>
 <p class="lead">シールドやオーラは <span class="hl">縁だけ光る</span>（フレネル）。煙の板は <span class="hl">地面と交わる線を消す</span>（ソフトパーティクル）。どちらも「縁」を扱う定番で、これがあるかないかでエフェクトの品質が一段変わります。</p>
 
@@ -414,7 +417,8 @@
 
 <h3>ソフトパーティクル：奥行きの差で薄くする</h3>
 <p>煙の板が地面や壁に刺さると、交線が「板です」と白状してしまいます。<span class="hl">板の奥行きと、その後ろにある物の奥行きの差</span> が小さい所を薄くすると、交線が消えます。エンジンでは「Soft Particles」「Depth Fade」という名前で用意されています。</p>
-<pre class="code"><span class="k">float</span> fade = <span class="f">clamp</span>((sceneDepth - particleDepth) / fadeDistance, <span class="n">0.0</span>, <span class="n">1.0</span>);
+<p>深度は同じ座標系・単位の線形距離に揃えます。深度バッファの生の値をそのまま距離として引かないでください。フェード距離0は無効として扱います。</p>
+<pre class="code">float fade = fadeDistance > 0.0 ? clamp((sceneDepth - particleDepth) / fadeDistance, 0.0, 1.0) : 1.0;
 alpha *= fade;   <span class="c">// 後ろの物とほぼ同じ距離 → 0 に近づく</span></pre>
 
 <div class="callout math">
@@ -434,7 +438,7 @@ alpha *= fade;   <span class="c">// 後ろの物とほぼ同じ距離 → 0 に�
 </section>
 
 <!-- ============ 9 ============ -->
-<section class="lesson" data-title="頂点オフセット：板そのものを動かす">
+<section class="lesson" data-lesson-id="gamevfx-9" data-legacy-index="9" data-title="頂点オフセット：板そのものを動かす">
 <h2><span class="chap">CHAPTER</span>頂点オフセット：色ではなく、形を動かす</h2>
 <p class="lead">ここまでは「色を決める」側（フラグメントシェーダー）でした。もう 1 つ、<span class="hl">頂点を動かす</span> 側（頂点シェーダー）があります。旗、水面、揺れる草、脈打つ盾、衝撃波で歪む地面。形そのものが動くエフェクトです。</p>
 
@@ -475,7 +479,7 @@ alpha *= fade;   <span class="c">// 後ろの物とほぼ同じ距離 → 0 に�
 </section>
 
 <!-- ============ 10 ============ -->
-<section class="lesson" data-title="ループ：つなぎ目を消す">
+<section class="lesson" data-lesson-id="gamevfx-10" data-legacy-index="10" data-title="ループ：つなぎ目を消す">
 <h2><span class="chap">CHAPTER</span>ループ：時間と空間の「つなぎ目」を消す</h2>
 <p class="lead">環境のアンビエントエフェクト（たいまつ、湯気、オーラ）は何分でも回り続けます。<span class="hl">時間のループ</span>（何秒かで同じ絵に戻る）と <span class="hl">空間のタイル</span>（並べても境目が出ない）は、どちらも「一周して元に戻る」を数学で保証する話です。</p>
 
@@ -516,7 +520,7 @@ alpha *= fade;   <span class="c">// 後ろの物とほぼ同じ距離 → 0 に�
 </section>
 
 <!-- ============ 11 サンドボックス ============ -->
-<section class="lesson" data-title="サンドボックス：部品を全部つなぐ">
+<section class="lesson" data-lesson-id="gamevfx-11" data-legacy-index="11" data-title="サンドボックス：部品を全部つなぐ">
 <h2><span class="chap">CHAPTER</span>サンドボックス：Part 1 の部品を 1 画面でつなぐ</h2>
 <p class="lead">ここまでの部品（座標・歪み・流す・抜く・切る・ランプ・ブレンド）を <span class="hl">1 本のシェーダーに直列につないだ</span> 図です。プリセットで炎・煙・オーラ・魔法陣・毒霧を呼び出して、どの数字が何を変えるか触ってください。</p>
 
@@ -572,7 +576,7 @@ alpha *= fade;   <span class="c">// 後ろの物とほぼ同じ距離 → 0 に�
 </section>
 
 <!-- ============ 12 光を受ける板 ============ -->
-<section class="lesson" data-title="光を受ける板：煙に法線を持たせる">
+<section class="lesson" data-lesson-id="gamevfx-12" data-legacy-index="12" data-title="光を受ける板：煙に法線を持たせる">
 <h2><span class="chap">CHAPTER</span>光を受ける板：自己発光ではない「物」の描き方</h2>
 <p class="lead">ここまでの板は全部「自分で光る」前提でした。でも煙・埃・破片は光を <span class="hl">受ける</span> 側です。板に <span class="hl">面の向き（法線）</span> の情報を持たせると、シーンの光の向きと色に合わせて明暗が付き、背景になじみます。</p>
 
@@ -623,7 +627,7 @@ alpha *= fade;   <span class="c">// 後ろの物とほぼ同じ距離 → 0 に�
 </section>
 
 <!-- ============ 11 ============ -->
-<section class="lesson" data-part="Part 2　パーティクル" data-title="発生と寿命：数を管理する">
+<section class="lesson" data-lesson-id="gamevfx-13" data-legacy-index="13" data-part="Part 2　パーティクル" data-title="発生と寿命：数を管理する">
 <h2><span class="chap">CHAPTER</span>発生と寿命：「いつ生まれて、いつ消えるか」</h2>
 <p class="lead">パーティクルシステムは、板を <span class="hl">いつ何個出して</span>、<span class="hl">何秒で消すか</span> を管理する仕組みです。設定項目は多く見えますが、根っこは「レート or バースト」と「寿命」の 2 つです。</p>
 
@@ -676,7 +680,7 @@ acc += rate * dt;                 <span class="c">// 「1 秒に rate 個」を�
 </section>
 
 <!-- ============ 12 ============ -->
-<section class="lesson" data-title="寿命カーブ：t で大きさ・色・透明度を変える">
+<section class="lesson" data-lesson-id="gamevfx-14" data-legacy-index="14" data-title="寿命カーブ：t で大きさ・色・透明度を変える">
 <h2><span class="chap">CHAPTER</span>寿命カーブ：生まれてから消えるまでの「変化」を描く</h2>
 <p class="lead">パーティクルの「らしさ」は、大きさ・透明度・色が寿命の中で <span class="hl">どう変わるか</span> で決まります。全部、前章の t（0〜1）を横軸にしたカーブです。</p>
 
@@ -738,7 +742,7 @@ p.color = <span class="f">fireRamp</span>(curves[colorCurve](t));   <span class=
 </section>
 
 <!-- ============ 13 ============ -->
-<section class="lesson" data-title="速度と力：扇・重力・抵抗・乱流・渦">
+<section class="lesson" data-lesson-id="gamevfx-15" data-legacy-index="15" data-title="速度と力：扇・重力・抵抗・乱流・渦">
 <h2><span class="chap">CHAPTER</span>速度と力：粒の「動き」は 4 つの力の足し算</h2>
 <p class="lead">パーティクルの動きは、生まれたときの <span class="hl">初速</span> と、毎フレーム足される <span class="hl">力</span> で決まります。重力・抵抗・乱流・渦。この 4 つで、噴水も火の粉も魔法の渦もできます。</p>
 
@@ -804,7 +808,7 @@ p.pos = <span class="f">add</span>(p.pos, <span class="f">scale</span>(p.vel, dt
 </section>
 
 <!-- ============ 14 ============ -->
-<section class="lesson" data-title="ビルボード・ストレッチ・リボン：板の向き">
+<section class="lesson" data-lesson-id="gamevfx-16" data-legacy-index="16" data-title="ビルボード・ストレッチ・リボン：板の向き">
 <h2><span class="chap">CHAPTER</span>ビルボード・ストレッチ・リボン：板を「どちらに向けるか」</h2>
 <p class="lead">パーティクルは板です。板をどう向けるかで、丸い光にも、速度で伸びる火花にも、通った道を残す帯にもなります。<span class="hl">向け方は 4 種類</span> 覚えれば足ります。</p>
 
@@ -857,7 +861,7 @@ p.pos = <span class="f">add</span>(p.pos, <span class="f">scale</span>(p.vel, dt
 </section>
 
 <!-- ============ 17 リボンの UV ============ -->
-<section class="lesson" data-title="リボンの UV：帯に沿って流す">
+<section class="lesson" data-lesson-id="gamevfx-17" data-legacy-index="17" data-title="リボンの UV：帯に沿って流す">
 <h2><span class="chap">CHAPTER</span>リボンの UV：曲がった帯の上でも、テクスチャは「まっすぐ」流れる</h2>
 <p class="lead">剣の斬撃、ミサイルの煙、魔法の尾。曲がった帯にテクスチャを流すとき、大事なのは帯の形ではなく <span class="hl">UV が平らでまっすぐに展開されていること</span> です。UV さえ平らなら、帯がどう曲がっていてもテクスチャは帯に沿って流れます。</p>
 
@@ -882,6 +886,7 @@ p.pos = <span class="f">add</span>(p.pos, <span class="f">scale</span>(p.vel, dt
 <span class="c">// 帯は「曲線に沿った小さな四角」の並び。各四角の (u, v) は曲線上の位置で決まる</span>
 <span class="k">for</span> (i = <span class="n">0</span>; i < N; i++) <span class="k">for</span> (j = <span class="n">0</span>; j < M; j++) <span class="f">fillQuad</span>(quad(i, j), <span class="f">tex</span>(i / N, j / M, time));</pre>
 
+<p>この図は曲線のtをUVにしています。実距離で間隔を揃える方法は <a href="#arc-length">曲線の距離</a> で比較できます。</p>
 <h3>設計のポイント</h3>
 <ul class="plain">
   <li><span class="b">UV は帯の長さ方向を u に。</span>u = 0 が根元、u = 1 が先端。テクスチャの「流す」は u 方向にだけ掛けます。横方向（v）に流したいことはほとんどありません。</li>
@@ -911,7 +916,7 @@ p.pos = <span class="f">add</span>(p.pos, <span class="f">scale</span>(p.vel, dt
 </section>
 
 <!-- ============ 15 ============ -->
-<section class="lesson" data-title="フリップブック：連番を 1 枚に並べる">
+<section class="lesson" data-lesson-id="gamevfx-18" data-legacy-index="18" data-title="フリップブック：連番を 1 枚に並べる">
 <h2><span class="chap">CHAPTER</span>フリップブック：形が変わるものは「連番」で持つ</h2>
 <p class="lead">爆発や煙のように <span class="hl">形そのものが時間で変わる</span> ものは、ノイズを流すだけでは作れません。シミュレーションで作った連番を 1 枚のテクスチャに並べ、UV で「今のコマ」を切り出して見せます。これがフリップブック（スプライトシート）です。</p>
 
@@ -935,14 +940,15 @@ p.pos = <span class="f">add</span>(p.pos, <span class="f">scale</span>(p.vel, dt
 
 <span class="c">// なめらかにする：次のコマと混ぜる（frame blending）</span>
 <span class="k">const</span> f = time * fps, mixT = f - Math.floor(f);
-color = <span class="f">lerp</span>(<span class="f">sample</span>(frame), <span class="f">sample</span>(frame + <span class="n">1</span>), mixT);</pre>
+const nextFrame = (frame + 1) % (cols * rows); // ループ再生。単発なら最後のコマで止める
+color = <span class="f">lerp</span>(<span class="f">sample</span>(frame), <span class="f">sample</span>(nextFrame), mixT);</pre>
 
 <h3>フリップブックの原則</h3>
 <ul class="plain">
   <li><span class="b">コマ数と解像度はトレードオフ。</span>1 枚のテクスチャの中で、8 × 8 なら 1 コマは 1/8 の解像度です。動きが速いものはコマ数、静かなものは解像度に振ります。</li>
   <li><span class="b">コマ間の補間で少ないコマを誤魔化す。</span>「次のコマと混ぜる」は最も単純な方法（クロスフェード）。さらに「モーションベクター」（各ピクセルが次のコマでどこへ動くかの矢印）を持たせると、混ぜるのではなく <b>歪めて</b> つなぐので、コマを大きく減らせます。3 章の歪みの応用です。</li>
   <li><span class="b">チャンネルに詰める。</span>白黒の連番なら、R・G・B・A の 4 チャンネルに別々の連番を入れられます。8 × 8 × 4 = 256 コマが 1 枚に入ります。この図の「チャンネルに詰める」は R = 火球、G = 煙、B = 衝撃波です。アトラス自体は色が混ざって見えますが、シェーダーで 1 チャンネルだけ読めば元に戻ります。</li>
-  <li><span class="b">最後のコマは透明に。</span>寿命の終わりでコマが最後に達したとき、絵が残っていると「パッ」と消えます。連番の最後は必ず空にします。</li>
+  <li><span class="b">単発とループで終わり方を変える。</span>単発は最後を透明にするか、寿命カーブで薄くしてから止めます。ループは最後と最初の形・動きをつなぎます。毎周透明にすると、かえって点滅する場合があります。</li>
 </ul>
 <div class="callout green">
   <div class="t">素材はどこから来るか</div>
@@ -966,7 +972,7 @@ color = <span class="f">lerp</span>(<span class="f">sample</span>(frame), <span 
 </section>
 
 <!-- ============ 16 ============ -->
-<section class="lesson" data-title="オーバードロー：なぜ半透明は重いのか">
+<section class="lesson" data-lesson-id="gamevfx-19" data-legacy-index="19" data-title="オーバードロー：なぜ半透明は重いのか">
 <h2><span class="chap">CHAPTER</span>オーバードロー：「何枚描くか」より「何回塗るか」</h2>
 <p class="lead">リアルタイム VFX が重くなる一番の理由は、ポリゴン数でもテクスチャの大きさでもなく、<span class="hl">同じピクセルを何回も塗り直すこと</span>（オーバードロー）です。半透明の板は後ろを隠せないので、重なった分だけ全部塗ります。</p>
 
@@ -1015,7 +1021,7 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 17 ============ -->
-<section class="lesson" data-part="Part 3　演出" data-title="タイミング：溜め・衝撃・余韻">
+<section class="lesson" data-lesson-id="gamevfx-20" data-legacy-index="20" data-part="Part 3　演出" data-title="タイミング：溜め・衝撃・余韻">
 <h2><span class="chap">CHAPTER</span>タイミング：技術より先に効いてくるもの</h2>
 <p class="lead">手法を覚えれば作れますが、良し悪しを決めるのはタイミングです。ヒットも爆発も魔法も、時間の形は <span class="hl">溜め → 衝撃 → 余韻</span>。この 3 つの長さと、要素をいつ出すかで、ほとんどが決まります。</p>
 
@@ -1075,7 +1081,7 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 18 ============ -->
-<section class="lesson" data-title="可読性：ゲームプレイが王様">
+<section class="lesson" data-lesson-id="gamevfx-21" data-legacy-index="21" data-title="可読性：ゲームプレイが王様">
 <h2><span class="chap">CHAPTER</span>可読性：きれいなエフェクトと、ゲームとして成立するエフェクトは別</h2>
 <p class="lead">対戦ゲームの VFX 担当者が繰り返し言うのは、<span class="hl">プレイヤーが状況を読めなくなるエフェクトは、どれだけ美しくても採用されない</span> ということです。「派手すぎず、コントラストが強すぎない」が実務の基準になります。</p>
 
@@ -1129,9 +1135,9 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 19 ============ -->
-<section class="lesson" data-title="色の階層：コアは白、縁は暗く">
+<section class="lesson" data-lesson-id="gamevfx-22" data-legacy-index="22" data-title="色の階層：コアは白、縁は暗く">
 <h2><span class="chap">CHAPTER</span>色の階層：明るさの順番で「光っている」に見せる</h2>
-<p class="lead">光るエフェクトの色は 3 段でできています。<span class="hl">コア（ほぼ白）→ 中（一番鮮やかな色）→ 縁（暗い色 or 補色）</span>。この順番が守られていれば、どんな色相でも「光」に見えます。逆だと「塗った丸」になります。</p>
+<p class="lead">この作例では <span class="hl">コア（ほぼ白）→ 中（鮮やかな色）→ 縁（暗い色）</span> の明るさの差で発光を表現します。これはスタイライズの一例です。中心が暗いシールドや色の濃い光などもあり、背景・露出・作品の表現に合わせて階層を設計します。</p>
 
 <div class="viz">
   <p class="hint">「明るさだけ」を入れて、コアが一番明るいことを確かめてください。プリセットの「逆（悪い例）」はコアが暗く縁が明るい。同じ形なのに光って見えません。</p>
@@ -1185,7 +1191,7 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 20 ============ -->
-<section class="lesson" data-title="要素の役割：ヒットを組み立てる">
+<section class="lesson" data-lesson-id="gamevfx-23" data-legacy-index="23" data-title="要素の役割：ヒットを組み立てる">
 <h2><span class="chap">CHAPTER</span>要素の役割：1 つのヒットは 8 つの部品でできている</h2>
 <p class="lead">ここまでの部品を全部使って、ヒットエフェクトを組み立てます。要素を 1 つずつ入れたり切ったりして、<span class="hl">それぞれが何を担当しているか</span> を確かめてください。</p>
 
@@ -1244,7 +1250,7 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 24 炎 ============ -->
-<section class="lesson" data-part="Part 4　レシピ：部品を組む" data-title="レシピ 1：炎">
+<section class="lesson" data-lesson-id="gamevfx-24" data-legacy-index="24" data-part="Part 4　レシピ：部品を組む" data-title="レシピ 1：炎">
 <h2><span class="chap">CHAPTER</span>レシピ 1：炎 = 本体 + コア + 火花 + 根元の光</h2>
 <p class="lead">ここからは <span class="hl">新しい仕組みは出てきません</span>。前の章の部品を「何を、どの順で、どの数字で」組むかだけです。まず一番よく使う炎から。たき火・たいまつ・燃える瓦礫は全部これの変形です。</p>
 
@@ -1289,7 +1295,7 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 25 煙 ============ -->
-<section class="lesson" data-title="レシピ 2：煙">
+<section class="lesson" data-lesson-id="gamevfx-25" data-legacy-index="25" data-title="レシピ 2：煙">
 <h2><span class="chap">CHAPTER</span>レシピ 2：煙 = 大きくなる粒 + 通常ブレンド + 光を受ける</h2>
 <p class="lead">煙は炎と正反対の性格です。<span class="hl">遅く、大きくなり、光を受け、通常ブレンド</span>。炎の設定をそのまま使うと「灰色の炎」になります。</p>
 
@@ -1348,7 +1354,7 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 26 雷 ============ -->
-<section class="lesson" data-title="レシピ 3：雷">
+<section class="lesson" data-lesson-id="gamevfx-26" data-legacy-index="26" data-title="レシピ 3：雷">
 <h2><span class="chap">CHAPTER</span>レシピ 3：雷 = ギザギザの線 + 3 段の光 + 一瞬のタイミング</h2>
 <p class="lead">雷はテクスチャではなく <span class="hl">線</span> でできています。線をギザギザにする（中点変位）、線を太さ違いで 3 回重ねる（色の階層）、そして <span class="hl">2〜3 フレームだけ光る</span>。形より時間が効くエフェクトです。</p>
 
@@ -1410,7 +1416,7 @@ fill = <span class="f">sum</span>(sprite.w * sprite.h) / (screen.w * screen.h); 
 </section>
 
 <!-- ============ 27 斬撃 ============ -->
-<section class="lesson" data-title="レシピ 4：斬撃">
+<section class="lesson" data-lesson-id="gamevfx-27" data-legacy-index="27" data-title="レシピ 4：斬撃">
 <h2><span class="chap">CHAPTER</span>レシピ 4：斬撃 = 弧の帯 + 白いコア + 走ってから消える</h2>
 <p class="lead">斬撃は「帯（17 章）」の代表的な使い方です。弧に沿って <span class="hl">先端が走り、尾が追いかけ、走り終わったらディゾルブで消える</span>。0.3 秒前後の短いエフェクトなので、再生速度を落として見てください。</p>
 
@@ -1454,8 +1460,8 @@ erode = <span class="f">max</span>(<span class="n">0</span>, t - <span class="n"
   <li><span class="b">実務ではキャラの武器の軌跡に沿って帯を作る</span>ことが多い（トレイル、16 章）。この図の弧はその簡略版です。</li>
 </ul>
 
-<div class="quiz" data-answer="1" data-why="先端は easeOut（はじめ速く減速）。斬撃は「振り抜く」動きなので、最初に一気に進んで止まります。等速や加速だと機械的に見えます。">
-  <div class="q">斬撃の先端の動きに向いているカーブは？</div>
+<div class="quiz" data-answer="1" data-why="この作例の先端は easeOut（はじめ速く減速）です。実際の武器に追従させる場合は武器の軌跡とタイミングを優先し、加速や等速も使い分けます。">
+  <div class="q">この作例の斬撃の先端に使っているカーブは？</div>
   <div class="opts">
     <button class="opt">等速</button>
     <button class="opt">easeOut（はじめ速く、減速して止まる）</button>
@@ -1466,7 +1472,7 @@ erode = <span class="f">max</span>(<span class="n">0</span>, t - <span class="n"
 </section>
 
 <!-- ============ 28 回復 ============ -->
-<section class="lesson" data-title="レシピ 5：回復">
+<section class="lesson" data-lesson-id="gamevfx-28" data-legacy-index="28" data-title="レシピ 5：回復">
 <h2><span class="chap">CHAPTER</span>レシピ 5：回復 = 衝撃のない、上がって消えるループ</h2>
 <p class="lead">回復・バフ・詠唱は、ヒットと逆の時間構造です。<span class="hl">溜めも衝撃もなく、上昇と減衰だけ</span>。柔らかい山のカーブ、2 色 + 白、ループ。「良い効果」であることを、形と時間で伝えます。</p>
 
@@ -1514,7 +1520,7 @@ y = ground - t * t * <span class="n">170</span>;                  <span class="c
 </section>
 
 <!-- ============ 29 衝撃波 ============ -->
-<section class="lesson" data-title="レシピ 6：衝撃波">
+<section class="lesson" data-lesson-id="gamevfx-29" data-legacy-index="29" data-title="レシピ 6：衝撃波">
 <h2><span class="chap">CHAPTER</span>レシピ 6：衝撃波 = 広がるリング + 歪み + 土埃 + 跡</h2>
 <p class="lead">着地、爆発、強攻撃のヒット。衝撃波は <span class="hl">極座標のリング</span> を「光」ではなく <span class="hl">歪み</span> として使うのが定番です。空気が押される見た目は、背景の UV をリングの位置で外へ押し出すだけで作れます。</p>
 
@@ -1559,7 +1565,7 @@ y = ground - t * t * <span class="n">170</span>;                  <span class="c
 </section>
 
 <!-- ============ 21 ============ -->
-<section class="lesson" data-part="Part 5　対応表" data-title="対応表：数学・言語・ノードへの読み替え">
+<section class="lesson" data-lesson-id="gamevfx-30" data-legacy-index="30" data-part="Part 5　対応表" data-title="対応表：数学・言語・ノードへの読み替え">
 <h2><span class="chap">CHAPTER</span>対応表：この教材から、数学アプリと実際のツールへ</h2>
 <p class="lead">ここまでの原則を、<span class="hl">数学アプリの章</span>、<span class="hl">シェーダー言語の関数名</span>、<span class="hl">ノード式エディタの概念</span> に読み替えるための表です。エンジン固有の手順は書きません。ノード名や UI は使うエンジンの現行ドキュメントで確認してください。</p>
 
@@ -1607,7 +1613,7 @@ y = ground - t * t * <span class="n">170</span>;                  <span class="c
 </div>
 
 <h3>ノード式エディタでの読み替え</h3>
-<p>Shader Graph・マテリアルエディタ・VFX Graph・Niagara などでは、この教材の各章がそのまま「ノード 1 個」や「モジュール 1 個」に対応します。名前は違っても、探すときの手がかりになります。</p>
+  各章の操作はノードやモジュールの組み合わせとして読み替えられます。必ず1対1に対応するわけではありません。対応の付け方は <a href="#ch30">Part 5の対応表</a> にまとめました。
 <table class="sheet">
   <tr><th>この教材</th><th>ノード式エディタで探す言葉</th></tr>
   <tr><td>1 UV スクロール</td><td>UV / Tiling and Offset / Panner / Time</td></tr>
@@ -1639,14 +1645,69 @@ y = ground - t * t * <span class="n">170</span>;                  <span class="c
 </div>
 </section>
 
+<section class="lesson" data-lesson-id="sampling" data-title="サンプリング：細かい模様がちらつく理由" data-part="Part 6　見た目の崩れを読み解く">
+<h2><span class="chap">CHAPTER</span>サンプリング：細かい模様がちらつく理由</h2>
+<p class="lead">雷の細い線、魔法陣の縞、ディゾルブの縁。近くではきれいでも、小さく表示するとちらつくのは、画素が模様を拾いきれない場合があるからです。</p>
+<div class="viz" data-learning-demo="sampling">
+<p class="hint">模様を細かくしてから位相を動かしてください。同じ標本数でも「点で読む」と「幅で平均する」では見え方が変わります。</p>
+<canvas role="img" aria-label="高解像度と低解像度の縞模様の比較"></canvas>
+<div class="controls"><label>模様の周波数（周 / 幅） <input type="range" data-control="cycles" min="1" max="80" step="1" value="28"> <output>28</output></label><label>横方向の標本数 <input type="range" data-control="samples" min="8" max="128" step="1" value="32"> <output>32</output></label><label>位相 <input type="range" data-control="phase" min="0" max="1" step="0.001" value="0"> <output>0</output></label><label><input type="checkbox" data-play> 自動再生</label></div>
+<p class="readout" data-readout></p></div>
+<h3>「点」ではなく「画素が覆う範囲」を考える</h3>
+<p>幅の中に f 周の正弦波があり、N 個の等間隔な標本で読むとします。元の波を区別するには f が N/2 より小さい必要があります（帯域制限された信号を前提とするナイキスト条件）。境界ちょうども位相によって情報が失われます。</p>
+<p>デモの下段は、各画素の幅で正弦波を平均した結果です。細部を灰色に近づけることで偽の模様を弱めます。失われた細部を復元する処理ではなく、箱型平均だけですべてのエイリアシングを除けるわけでもありません。</p>
+<pre class="code" data-demo-code="sampling"></pre>
+<p>上はこの図で使う平均値の計算です。正弦波だから積分を直接計算でき、一般の画像では複数の標本やフィルターを使います。</p>
+<h3>VFXで調整する順番</h3>
+<ul class="plain"><li>まず表示サイズと模様の細かさを合わせる。遠景ではノイズの細部やリング本数を減らす。</li><li>テクスチャの縮小ではミップマップを使う。手続き模様には自動でミップが付かないので、画素の幅に応じて細部を減らす。</li><li>境界の滑らかさには <code>fwidth</code> などの画面上の変化量を使える。WebGL 1では微分の拡張が必要。この図はCPUで計算するため不要。</li><li>時間方向も同じ。発光の点滅が速すぎるとフレーム間で見落とす。空間の平均だけで時間方向まで解決するわけではない。</li></ul>
+<p><a href="../cgmath/#ch18">数学18章：フーリエ変換</a> / <a href="../gamevfx/#ch4">VFX4章：ディゾルブ</a></p>
+<p>参考：<a href="https://www.pbr-book.org/4ed/Textures_and_Materials/Texture_Sampling_and_Antialiasing">PBRT — Texture Sampling and Antialiasing</a></p>
+<p><a href="../cgmath/#sampling">数学の仕組みから読み直す →</a></p><div class="quiz" data-answer="1" data-why="表示サイズに対して細かすぎる成分を減らすか平均します。単に明るくしても標本数は増えません。"><div class="q">細い縞が小さな表示で別の太い縞に見える。最初に試すことは？</div><div class="opts"><button class="opt">模様をさらに細かくする</button><button class="opt">模様を粗くする・画素の範囲で平均する</button><button class="opt">発光を強くする</button></div><div class="fb" aria-live="polite"></div></div></section>
+<section class="lesson" data-lesson-id="linear-color" data-title="色の計算：半分の光はどんな灰色？">
+<h2><span class="chap">CHAPTER</span>色の計算：半分の光はどんな灰色？</h2>
+<p class="lead">発光や煙の合成は、RGBを足すだけで終わりではありません。保存・表示用のsRGB値と、光の量に比例した値を区別すると、暗い混ざり目の原因が読めます。</p>
+<div class="viz" data-learning-demo="color">
+<p class="hint">白の割合を0.5にすると違いがよく見えます。左右は同じ黒と白から作っています。</p>
+<canvas role="img" aria-label="sRGBの直接補間と線形補間の比較"></canvas>
+<div class="controls"><label>白の割合 <input type="range" data-control="mix" min="0" max="1" step="0.01" value="0.5"> <output>0.5</output></label></div>
+<p class="readout" data-readout></p></div>
+<h3>読む → 線形に戻す → 計算 → 表示用に戻す</h3>
+<p>黒0と白1を光の量で半分ずつ混ぜると、線形値は0.5、表示用のsRGB値は約0.735です。sRGB値を直接0.5にすると、その線形値は約0.214。この違いが左右の灰色の差です。</p>
+<pre class="code" data-demo-code="color"></pre>
+<p>この図で使うsRGB変換です。一般の色はR・G・Bそれぞれを <code>decode</code> し、補間や合成後に <code>encode</code> します。入力は0〜1のsRGB、計算も同じ色域を前提としています。芸術的なグラデーションでは別の色空間を選ぶこともあります。</p>
+<h3>色とデータを区別する</h3>
+<ul class="plain"><li>色として保存した画像にはsRGB変換が必要な場合がある。描画環境が自動変換しているときは二重に変換しない。</li><li>マスク・法線・深度などの数値データは、見た目の色ではない。意図せずsRGB変換すると値を変えてしまう。</li><li>アルファは通常、色のsRGB変換の対象にしない。事前乗算アルファは <code>rgbPremultiplied = rgbLinear * alpha</code>。背景との合成も線形で行う。</li><li>HDRは1より大きな光の値も保持する。露出・トーンマッピング・ブルームは別の処理。この比較図は0〜1のSDRで、ブルームやHDRを再現していない。</li></ul>
+<p>既存のランプ・ブレンドの図は計算構造を見せる簡略例です。実際の色管理を含めた見た目が、すべてのレンダラーで一致するという意味ではありません。</p>
+<p><a href="../cgmath/#ch8">数学8章：補間</a> / <a href="../gamevfx/#ch7">VFX7章：ブレンド</a></p>
+<p>参考：<a href="https://www.pbr-book.org/4ed/Utilities/Images">PBRT — Images / ColorEncoding</a></p>
+<p><a href="../cgmath/#linear-color">数学の仕組みから読み直す →</a></p><div class="quiz" data-answer="2" data-why="線形の0.5をsRGBに符号化すると約0.735です。表示値0.5とは光の量が異なります。"><div class="q">光の量で黒と白を半分ずつ混ぜたとき、表示用sRGB値は？</div><div class="opts"><button class="opt">約0.214</button><button class="opt">0.5</button><button class="opt">約0.735</button></div><div class="fb" aria-live="polite"></div></div></section>
+<section class="lesson" data-lesson-id="arc-length" data-title="曲線の距離：tを等間隔にしても等速ではない">
+<h2><span class="chap">CHAPTER</span>曲線の距離：tを等間隔にしても等速ではない</h2>
+<p class="lead">帯の根元から先端へUVを並べても、模様の間隔まで揃うとは限りません。曲線のパラメータを使うか、実際の長さを使うかで、模様の伸縮と流速が変わります。</p>
+<div class="viz" data-learning-demo="curve">
+<p class="hint">青い点は12等分の目印、黄色は現在位置です。曲線の形を変えてから再生すると、上の点だけ速さが変わる様子が見えます。</p>
+<canvas role="img" aria-label="ベジェのパラメータと距離で進む点の比較"></canvas>
+<div class="controls"><label>曲線の形 <input type="range" data-control="bend" min="0" max="1" step="0.01" value="0.15"> <output>0.15</output></label><label>進行 <input type="range" data-control="phase" min="0" max="1" step="0.001" value="0.35"> <output>0.35</output></label><label><input type="checkbox" data-play> 自動再生</label></div>
+<p class="readout" data-readout></p></div>
+<h3>距離を足した表から逆引きする</h3>
+<ol class="plain"><li>曲線上の点を細かく取る。</li><li>隣り合う点の距離を足して「t → 累積距離」の表を作る。</li><li>進みたい距離を表で探し、その間のtを補間して位置を求める。</li></ol>
+<pre class="code" data-demo-code="curve"></pre>
+<p>この図の計算に使う関数です。折れ線での近似なので、鋭く曲がる場所では分割数を増やす必要があります。同じ距離を進む点でも、曲がり角を挟んだ直線距離は短く見えることがあります。</p>
+<h3>帯のUVに使うなら</h3>
+<p><code>u = 累積距離 / 全長</code> は帯全体に模様を収める方法。帯が伸びれば模様も伸びます。<code>u = 累積距離 / 1模様の長さ</code> は世界の長さで密度を揃える方法。帯が伸びると繰り返し回数が増えます。どちらを使うかは演出によります。</p>
+<p>この図は固定された曲線を一定の周回時間で進む比較です。曲線そのものが変形するときの世界速度や、3Dで帯がねじれないフレームの計算は含みません。</p>
+<p><a href="../cgmath/#ch27">数学27章：ベジェ曲線</a> / <a href="../gamevfx/#ch17">VFX17章：リボンのUV</a></p>
+<p><a href="../cgmath/#arc-length">数学の仕組みから読み直す →</a></p><div class="quiz" data-answer="1" data-why="tを一定量増やすだけでは、進む距離は一定になりません。累積距離の表を使い、距離からtを逆引きします。"><div class="q">同じ曲線をほぼ等速で進めるには？</div><div class="opts"><button class="opt">tを一定量ずつ増やすだけ</button><button class="opt">進む距離からtを逆引きする</button><button class="opt">色を一定速度で変える</button></div><div class="fb" aria-live="polite"></div></div></section>
 </main>
 </div>
-<script src="app.js?v=20260906-3"></script>
-<script src="ch-shader.js?v=20260906-3"></script>
+<script src="../learning/lesson-state.js?v=20260907-1"></script>
+<script src="app.js?v=20260907-1"></script>
+<script src="ch-shader.js?v=20260907-1"></script>
 <script src="ch-particles.js?v=20260906-3"></script>
 <script src="ch-direction.js?v=20260906-3"></script>
-<script src="ch-extra.js?v=20260906-3"></script>
-<script src="ch-recipes.js?v=20260906-3"></script>
+<script src="ch-extra.js?v=20260907-1"></script>
+<script src="ch-recipes.js?v=20260907-1"></script>
+<script src="../learning/demos.js?v=20260907-1"></script>
 <script>initNav();</script>
 </body>
 </html>

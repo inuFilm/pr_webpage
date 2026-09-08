@@ -95,7 +95,7 @@ void main() {
   vec2 g = floor(uv2 * 10.0);
   float checker = mod(g.x + g.y, 2.0);
   vec3 col = mix(vec3(0.16, 0.26, 0.34), vec3(0.85, 0.9, 0.95), checker);
-  float ring = smoothstep(0.02, 0.0, abs(length(uv2 - 0.5) - 0.3));
+  float ring = (1.0 - smoothstep(0.0, 0.02, abs(length(uv2 - 0.5) - 0.3)));
   col = mix(col, vec3(1.0, 0.5, 0.2), ring);
   if (u_show > 0.5) col = vec3(d * 2.0 + 0.5, 0.5);   // 赤 = 右へ、緑 = 上へ
   outColor = vec4(col, 1.0);
@@ -124,7 +124,7 @@ void main() {
   vec3 base = mix(vec3(0.2, 0.5, 0.9), vec3(0.6, 0.85, 1.0), uv.y);
   float n = fbm(uv * u_scale);                        // 消える順番を決めるノイズ（動かない）
   float alive = step(u_th, n);                        // n がしきい値より大きい所だけ残す
-  float edge = 1.0 - smoothstep(u_th, u_th + u_w, n); // しきい値のすぐ上 = 今まさに燃えている縁
+  float edge = u_w > 0.0 ? 1.0 - smoothstep(u_th, u_th + u_w, n) : 0.0; // 幅0は縁の発光なし。等しい境界を渡さない
   vec3 col = mix(base, u_glow, edge);
   float a = shape * alive;
   vec3 bg = vec3(0.07, 0.11, 0.14);
@@ -159,7 +159,7 @@ void main() {
   if (u_mode < 0.5) col = vec3(polar, 0.0);
   else if (u_mode < 1.5) {                    // 衝撃波：r 方向に走る細い帯
     float t = fract(u_time * u_speed * 0.5);
-    float ring = smoothstep(0.08, 0.0, abs(r - t)) * (1.0 - t);  // 広がるほど薄く
+    float ring = (1.0 - smoothstep(0.0, 0.08, abs(r - t))) * (1.0 - t);  // 広がるほど薄く
     col = ring * vec3(0.6, 0.9, 1.0);
   } else if (u_mode < 2.5) {                  // 渦：角度に r を足してから、r 方向に流す
     vec2 q = vec2(a * u_rep + r * u_twist, r * 3.0 - u_time * u_speed);

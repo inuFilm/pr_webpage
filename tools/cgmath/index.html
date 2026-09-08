@@ -8,6 +8,7 @@
 <title>CGの数学を、数式なしで。 | makeinufilm</title>
 <link rel="shortcut icon" href="../../img/favicons/favicon.ico">
 <link rel="stylesheet" href="style.css?v=20260906-2">
+<link rel="stylesheet" href="../learning/learning.css?v=20260907-1">
 </head>
 <body>
 <div class="app">
@@ -22,10 +23,11 @@
 <main>
 
 <!-- ============ 0 ============ -->
-<section class="lesson" data-part="Part 1　矢印の話" data-title="はじめに：数式なしで読むルール">
+<section class="lesson" data-lesson-id="cgmath-0" data-legacy-index="0" data-part="Part 1　矢印の話" data-title="はじめに：数式なしで読むルール">
 <h2><span class="chap">CHAPTER</span>はじめに：数式なしで読むためのルール</h2>
 <p class="lead">CGの数学は、突き詰めると「点を動かす」「向きを測る」「大きさを変える」の3つでほぼ全部です。この教材では、数学の記号を一切使わず、<span class="hl">全部プログラムの書き方</span>で説明します。</p>
 
+<p>追加の比較実験：<a href="#sampling">ちらつきと標本化</a>・<a href="#linear-color">色の計算</a>・<a href="#arc-length">曲線の等速移動</a>。基礎を読んでから、VFXの見た目へつなげられます。</p>
 <h3>この教材の書き方ルール</h3>
 <ul class="plain">
   <li>ベクトル（矢印）は <code>{x: 2, y: 1}</code> のような「値のセット」。中身は <code>v.x</code> のように取り出します。</li>
@@ -59,7 +61,7 @@
 </section>
 
 <!-- ============ 1 ============ -->
-<section class="lesson" data-title="ベクトル：矢印として考える">
+<section class="lesson" data-lesson-id="cgmath-1" data-legacy-index="1" data-title="ベクトル：矢印として考える">
 <h2><span class="chap">CHAPTER</span>ベクトル：数字のセットを「矢印」として考える</h2>
 <p class="lead">ベクトルとは、数字を何個かまとめたものです。CGでは <span class="hl">「矢印」</span> だと思うと一気にラクになります。</p>
 
@@ -120,7 +122,7 @@ scale(v, <span class="n">-1</span>);    <span class="c">// 真逆の向き</span
 </section>
 
 <!-- ============ 2 ============ -->
-<section class="lesson" data-title="長さと正規化：向きだけ取り出す">
+<section class="lesson" data-lesson-id="cgmath-2" data-legacy-index="2" data-title="長さと正規化：向きだけ取り出す">
 <h2><span class="chap">CHAPTER</span>長さと正規化：「向きだけ」を取り出す</h2>
 <p class="lead">矢印の長さの求め方と、長さを 1 に揃える <span class="hl">normalize（正規化）</span>。CGのコードで一番よく見る関数のひとつです。</p>
 
@@ -166,7 +168,7 @@ scale(v, <span class="n">-1</span>);    <span class="c">// 真逆の向き</span
 </section>
 
 <!-- ============ 3 ============ -->
-<section class="lesson" data-title="内積：どれくらい同じ向き？">
+<section class="lesson" data-lesson-id="cgmath-3" data-legacy-index="3" data-title="内積：どれくらい同じ向き？">
 <h2><span class="chap">CHAPTER</span>内積（dot）：2本の矢印は、どれくらい同じ向き？</h2>
 <p class="lead">内積は、2本の矢印を渡すと <span class="hl">「どれくらい同じ方向を向いているか」を1つの数字</span> にして返す関数です。CGでもLLMでも、たぶん一番働いている関数。</p>
 
@@ -231,7 +233,7 @@ scale(v, <span class="n">-1</span>);    <span class="c">// 真逆の向き</span
 </section>
 
 <!-- ============ 4 ============ -->
-<section class="lesson" data-title="外積：面の向き（法線）を作る">
+<section class="lesson" data-lesson-id="cgmath-4" data-legacy-index="4" data-title="外積：面の向き（法線）を作る">
 <h2><span class="chap">CHAPTER</span>外積（cross）：面の「向き」を作る</h2>
 <p class="lead">内積が「同じ向き度」を返す関数なら、外積は <span class="hl">「2本の矢印の両方に直角な、新しい矢印」</span> を返す関数。3D の面の向き（法線）はこれで作ります。</p>
 
@@ -292,7 +294,7 @@ scale(v, <span class="n">-1</span>);    <span class="c">// 真逆の向き</span
 </section>
 
 <!-- ============ 5 ============ -->
-<section class="lesson" data-title="sin / cos：角度から矢印を作る">
+<section class="lesson" data-lesson-id="cgmath-5" data-legacy-index="5" data-title="sin / cos：角度から矢印を作る">
 <h2><span class="chap">CHAPTER</span>sin / cos：「角度」から「矢印」を作る道具</h2>
 <p class="lead">三角関数と聞くと身構えますが、CGで必要なのは1つだけ。<span class="hl">「角度 angle を渡すと、その向きの長さ1の矢印が返ってくる」</span>。それが sin と cos です。</p>
 
@@ -346,7 +348,7 @@ light.brightness = <span class="n">0.5</span> + <span class="n">0.5</span> * Mat
 </section>
 
 <!-- ============ 6 ============ -->
-<section class="lesson" data-part="Part 2　空間を変える" data-title="行列：空間を変形するレシピ">
+<section class="lesson" data-lesson-id="cgmath-6" data-legacy-index="6" data-part="Part 2　空間を変える" data-title="行列：空間を変形するレシピ">
 <h2><span class="chap">CHAPTER</span>行列：空間ぜんぶを変形する「レシピ」</h2>
 <p class="lead">行列は数字の表に見えますが、正体はシンプル。<span class="hl">「x 方向の矢印 i がどこへ行くか」「y 方向の矢印 j がどこへ行くか」を書いたメモ</span> です。それだけで空間全体の変形が決まります。</p>
 
@@ -416,7 +418,7 @@ light.brightness = <span class="n">0.5</span> + <span class="n">0.5</span> * Mat
 </section>
 
 <!-- ============ 7 ============ -->
-<section class="lesson" data-title="3D と投影：画面に映るまで">
+<section class="lesson" data-lesson-id="cgmath-7" data-legacy-index="7" data-title="3D と投影：画面に映るまで">
 <h2><span class="chap">CHAPTER</span>3D と投影：立体が画面に映るまでの道のり</h2>
 <p class="lead">3D は「z が増えるだけ」。行列も i, j に k が増えるだけ。でも1つだけ困ることがあって、それを解決するのが <span class="hl">4×4 行列</span> です。そして最後に「遠いものは小さく」するのが投影。</p>
 
@@ -484,7 +486,7 @@ light.brightness = <span class="n">0.5</span> + <span class="n">0.5</span> * Mat
 </section>
 
 <!-- ============ 8 ============ -->
-<section class="lesson" data-title="補間：lerp とイージング">
+<section class="lesson" data-lesson-id="cgmath-8" data-legacy-index="8" data-title="補間：lerp とイージング">
 <h2><span class="chap">CHAPTER</span>補間（lerp）：A と B の「あいだ」を作る</h2>
 <p class="lead">アニメーション、グラデーション、ブレンド、テクスチャの色の混ぜ合わせ。全部この <span class="hl">3行の関数</span> から始まります。</p>
 
@@ -549,7 +551,7 @@ pos = lerpVec(start, goal, smoothstep(t));   <span class="c">// t を曲げて�
 </section>
 
 <!-- ============ Q 四元数 ============ -->
-<section class="lesson" data-title="四元数：回転を4つの数で持つ">
+<section class="lesson" data-lesson-id="cgmath-9" data-legacy-index="9" data-title="四元数：回転を4つの数で持つ">
 <h2><span class="chap">CHAPTER</span>四元数（クォータニオン）：回転を「軸と角度」で持つ</h2>
 <p class="lead">3D の回転の持ち方は3つあります。<b>オイラー角</b>（X, Y, Z の角度3つ）、<b>軸と角度</b>（どの軸のまわりに何度）、<b>四元数</b>（軸と角度を4つの数に畳んだもの）。Houdini の <code>@orient</code>、Bullet の剛体、KineFX のジョイント、Copy to Points。回転が出てくる所は、ほぼ全部四元数です。理由は「オイラー角が壊れる場面がある」から。</p>
 
@@ -648,7 +650,7 @@ pos = lerpVec(start, goal, smoothstep(t));   <span class="c">// t を曲げて�
 </section>
 
 <!-- ============ B 重心座標 ============ -->
-<section class="lesson" data-title="重心座標：三角形の中を3つの重みで">
+<section class="lesson" data-lesson-id="cgmath-10" data-legacy-index="10" data-title="重心座標：三角形の中を3つの重みで">
 <h2><span class="chap">CHAPTER</span>重心座標：三角形の中の場所を「3つの重み」で表す</h2>
 <p class="lead">第8章の lerp は「2点の間を t で混ぜる」でした。三角形なら <span class="hl">「3頂点を、合計 1 になる3つの重みで混ぜる」</span>。これが重心座標（barycentric）。テクスチャの貼り付け、頂点カラー、スキニングのウェイト、<code>primuv</code>、Ray SOP。CG が「面の上」で何かを補間するとき、必ずこれです。</p>
 
@@ -713,7 +715,7 @@ v@nearP = primuv(<span class="n">1</span>, <span class="n">"P"</span>, prim, uv)
 </section>
 
 <!-- ============ P1 乱数 ============ -->
-<section class="lesson" data-part="Part 3　模様をつくる数学" data-title="乱数：「バラバラ」も計算">
+<section class="lesson" data-lesson-id="cgmath-11" data-legacy-index="11" data-part="Part 3　模様をつくる数学" data-title="乱数：「バラバラ」も計算">
 <h2><span class="chap">CHAPTER</span>乱数：「バラバラ」も、実は計算でできている</h2>
 <p class="lead">Houdini で <code>rand(@ptnum)</code> と書くと点ごとにバラバラな値が出ます。でもこれは本当のサイコロではなく、<span class="hl">「種（seed）を入れると、決まったバラバラな数字が返ってくる関数」</span>です。ここが「模様の数学」の出発点。</p>
 
@@ -760,7 +762,7 @@ v@nearP = primuv(<span class="n">1</span>, <span class="n">"P"</span>, prim, uv)
 </section>
 
 <!-- ============ P2 ノイズ ============ -->
-<section class="lesson" data-title="ノイズ：なめらかな乱数">
+<section class="lesson" data-lesson-id="cgmath-12" data-legacy-index="12" data-title="ノイズ：なめらかな乱数">
 <h2><span class="chap">CHAPTER</span>ノイズ：乱数を「なめらか」にすると、地形と雲になる</h2>
 <p class="lead">rand は隣どうしが無関係にバラバラ。それを <span class="hl">格子の上だけ乱数にして、間を lerp でつなぐ</span> と「なめらかなバラバラ」= ノイズになります。Mountain SOP、Attribute Noise、雲・地形・木目、ほぼ全部これ。</p>
 
@@ -829,7 +831,7 @@ v@nearP = primuv(<span class="n">1</span>, <span class="n">"P"</span>, prim, uv)
 </section>
 
 <!-- ============ P3 タイリング ============ -->
-<section class="lesson" data-title="mod と fract：繰り返し模様">
+<section class="lesson" data-lesson-id="cgmath-13" data-legacy-index="13" data-title="mod と fract：繰り返し模様">
 <h2><span class="chap">CHAPTER</span>mod / fract / floor：「繰り返し」を作る3つの道具</h2>
 <p class="lead">縞、市松、レンガ、タイル。繰り返す模様は、<span class="hl">座標を「整数部分」と「小数部分」に分ける</span> だけで作れます。シェーダーの最初の一歩であり、Houdini の UV や Grid の分割も同じ考え方。</p>
 
@@ -887,7 +889,7 @@ fract(<span class="n">3.7</span>)        <span class="c">// → 0.7   小数部�
 </section>
 
 <!-- ============ P4 距離関数 ============ -->
-<section class="lesson" data-title="距離関数（SDF）：形を「距離」で表す">
+<section class="lesson" data-lesson-id="cgmath-14" data-legacy-index="14" data-title="距離関数（SDF）：形を「距離」で表す">
 <h2><span class="chap">CHAPTER</span>距離関数（SDF）：形を「そこまでの距離」で表す</h2>
 <p class="lead">「円」を <span class="hl">「中心からの距離 − 半径」を返す関数</span> で表す。これが距離関数（SDF）。マイナスなら中、プラスなら外、0 なら輪郭。Houdini の VDB、Boolean、Distance from Geometry の裏側はこれです。</p>
 
@@ -950,7 +952,7 @@ subtract(a, b)  = Math.max(a, -b);     <span class="c">// b を裏返して交�
 </section>
 
 <!-- ============ P5 フォールオフ ============ -->
-<section class="lesson" data-title="フォールオフ：距離で効き目を変える">
+<section class="lesson" data-lesson-id="cgmath-15" data-legacy-index="15" data-title="フォールオフ：距離で効き目を変える">
 <h2><span class="chap">CHAPTER</span>フォールオフ：距離に応じて「効き目」を変える</h2>
 <p class="lead">Soft Transform、Soft Selection、ブラシの硬さ、Attribute Transfer の Distance Threshold。全部 <span class="hl">「距離 → 0〜1 の重み」に変換する関数</span> でできています。第8章の lerp / smoothstep と前章の距離を合体させるだけ。</p>
 
@@ -1013,7 +1015,7 @@ w = chramp(<span class="n">"falloff"</span>, w);                  <span class="c
 </section>
 
 <!-- ============ P6 極座標 ============ -->
-<section class="lesson" data-title="極座標：角度と距離で描く">
+<section class="lesson" data-lesson-id="cgmath-16" data-legacy-index="16" data-title="極座標：角度と距離で描く">
 <h2><span class="chap">CHAPTER</span>極座標：「角度」と「距離」で座標を読み替える</h2>
 <p class="lead">x, y の代わりに <span class="hl">「中心からの角度」と「中心からの距離」</span> で場所を表す。それだけで、放射状の縞・渦巻き・花びらが、前の章のタイリングと同じコードで描けます。第5章の sin/cos の逆向きの道具です。</p>
 
@@ -1070,7 +1072,7 @@ w = chramp(<span class="n">"falloff"</span>, w);                  <span class="c
 </section>
 
 <!-- ============ P7 波の重ね合わせ ============ -->
-<section class="lesson" data-title="波の重ね合わせ：干渉と波紋">
+<section class="lesson" data-lesson-id="cgmath-17" data-legacy-index="17" data-title="波の重ね合わせ：干渉と波紋">
 <h2><span class="chap">CHAPTER</span>波の重ね合わせ：足すだけで、干渉と波紋になる</h2>
 <p class="lead">第5章の sin は「1本の波」でした。<span class="hl">波は足せる</span>。2つの波源からの sin を足すと干渉縞、たくさん足すと海面。Ripple Solver や Ocean Spectrum の一番奥にあるのは、この足し算です。</p>
 
@@ -1125,7 +1127,7 @@ w = chramp(<span class="n">"falloff"</span>, w);                  <span class="c
 </section>
 
 <!-- ============ F フーリエ変換 ============ -->
-<section class="lesson" data-title="フーリエ変換：形を「波」に分解する">
+<section class="lesson" data-lesson-id="cgmath-18" data-legacy-index="18" data-title="フーリエ変換：形を「波」に分解する">
 <h2><span class="chap">CHAPTER</span>フーリエ変換：どんな形も「波の足し算」に分解できる</h2>
 <p class="lead">前章で「波は足せる」を見ました。フーリエ変換はその逆です。<span class="hl">どんな形（信号・輪郭・画像）も、周波数の違う sin の足し算に分解できる</span>。しかも「どの周波数がどれだけ入っているか」を測る道具は、Part 1 の内積です。Ocean Spectrum、ぼかし、ノイズの周波数、音の解析。全部この一本道の上にあります。</p>
 
@@ -1249,7 +1251,7 @@ w = chramp(<span class="n">"falloff"</span>, w);                  <span class="c
 </section>
 
 <!-- ============ P8 L-system ============ -->
-<section class="lesson" data-title="L-system：文字の置き換えで植物">
+<section class="lesson" data-lesson-id="cgmath-19" data-legacy-index="19" data-title="L-system：文字の置き換えで植物">
 <h2><span class="chap">CHAPTER</span>L-system：「文字の置き換え」だけで植物が生える</h2>
 <p class="lead">Houdini の L-System SOP は魔法に見えますが、中身は2段階。<span class="hl">1. 文字列を「ルール」で置き換えて長くする。2. その文字列を「亀」に読ませて線を描く。</span> 数学というより、文字遊びです。</p>
 
@@ -1335,7 +1337,7 @@ F=FF</textarea></label>
 </section>
 
 <!-- ============ P9 再帰とフラクタル ============ -->
-<section class="lesson" data-title="再帰とフラクタル：自分を呼ぶ">
+<section class="lesson" data-lesson-id="cgmath-20" data-legacy-index="20" data-title="再帰とフラクタル：自分を呼ぶ">
 <h2><span class="chap">CHAPTER</span>再帰とフラクタル：「自分を呼ぶ関数」が無限の細部を作る</h2>
 <p class="lead">L-system は「文字列」で自己相似を作りました。同じことを <span class="hl">「関数が自分自身を呼ぶ」</span> で書くのが再帰。木、雪の結晶、海岸線、山。「どこまで拡大しても同じ形」= フラクタルは、たいてい数行の再帰です。</p>
 
@@ -1395,7 +1397,7 @@ tree({x: <span class="n">0</span>, y: <span class="n">0</span>}, PI / <span clas
 </section>
 
 <!-- ============ P10 黄金角 ============ -->
-<section class="lesson" data-title="黄金角：ひまわりの並び方">
+<section class="lesson" data-lesson-id="cgmath-21" data-legacy-index="21" data-title="黄金角：ひまわりの並び方">
 <h2><span class="chap">CHAPTER</span>黄金角：ひまわりの種は、なぜあの並び方なのか</h2>
 <p class="lead">「n 番目の点を、角度 n × 137.5°、距離 sqrt(n) に置く」。たった2行で、ひまわり・松ぼっくり・多肉植物の配置になります。<span class="hl">137.5° が特別なのは、「どれだけ回しても、前の点と重ならない角度」だから</span>。</p>
 
@@ -1448,7 +1450,7 @@ tree({x: <span class="n">0</span>, y: <span class="n">0</span>}, PI / <span clas
 </section>
 
 <!-- ============ P11 ボロノイ ============ -->
-<section class="lesson" data-title="ボロノイ：一番近い点はどれ？">
+<section class="lesson" data-lesson-id="cgmath-22" data-legacy-index="22" data-title="ボロノイ：一番近い点はどれ？">
 <h2><span class="chap">CHAPTER</span>ボロノイ：「一番近い点はどれ？」だけで割れ目ができる</h2>
 <p class="lead">Voronoi Fracture、キリンの模様、泡、乾いた泥。全部 <span class="hl">「場所ごとに、いちばん近い種（seed 点）を探す」</span> だけ。同じ種に属する場所を集めると、細胞のような領域になります。</p>
 
@@ -1512,7 +1514,7 @@ i@cell = near;                          <span class="c">// この属性で Parti
 </section>
 
 <!-- ============ P12 セルオートマトン ============ -->
-<section class="lesson" data-title="セルオートマトン：隣を見るだけ">
+<section class="lesson" data-lesson-id="cgmath-23" data-legacy-index="23" data-title="セルオートマトン：隣を見るだけ">
 <h2><span class="chap">CHAPTER</span>セルオートマトン：「隣を見て決める」を繰り返すと生き物になる</h2>
 <p class="lead">マス目のそれぞれが「隣のマスの状態」だけを見て、次の自分を決める。それを毎ステップ繰り返す。<span class="hl">ルールは数行なのに、結果は予測できない模様と動き</span>。Solver SOP の考え方そのものです。</p>
 
@@ -1576,7 +1578,7 @@ i@cell = near;                          <span class="c">// この属性で Parti
 </section>
 
 <!-- ============ P13 反応拡散 ============ -->
-<section class="lesson" data-title="反応拡散：チューリング模様">
+<section class="lesson" data-lesson-id="cgmath-24" data-legacy-index="24" data-title="反応拡散：チューリング模様">
 <h2><span class="chap">CHAPTER</span>反応拡散：「にじむ」と「反応する」で、動物の模様ができる</h2>
 <p class="lead">ヒョウの斑点、シマウマの縞、サンゴ、指紋。1952年にチューリング（コンピュータの父）が「2種類の薬品が <span class="hl">にじみながら反応するだけ</span> で模様になる」と予言し、本当にそうでした。前章のセルオートマトンを「小数」にしたものです。</p>
 
@@ -1645,9 +1647,10 @@ i@cell = near;                          <span class="c">// この属性で Parti
 </section>
 
 <!-- ============ M1 速度と加速度 ============ -->
-<section class="lesson" data-part="Part 4　動きをつくる数学" data-title="速度と加速度：物理の基本形">
+<section class="lesson" data-lesson-id="cgmath-25" data-legacy-index="25" data-part="Part 4　動きをつくる数学" data-title="速度と加速度：物理の基本形">
 <h2><span class="chap">CHAPTER</span>速度と加速度：シミュレーションの基本形は3行</h2>
-<p class="lead">POP、RBD、Vellum、FLIP。どのソルバーも一番奥では <span class="hl">「速度に力を足す。位置に速度を足す。」</span> を毎フレーム繰り返しているだけ。第1章の「ベクトル＝移動」がそのまま動きになります。</p>
+<p class="lead">動きの基本は <span class="hl">「速度に加速度 × dt を足す。位置に速度 × dt を足す。」</span>。第1章のベクトルが動きになります。ここでは粒子の簡単な積分を学びます。流体の圧力や布の拘束など、各ソルバーが追加する計算は Part 6 で扱います。</p>
+<div class="callout"><div class="t">力と加速度を分ける</div><code>acceleration = force / mass</code>、<code>v += acceleration * dt</code>。重力の -9.8 は力ではなく加速度（距離を m、時間を秒で扱う場合）です。この章と次のバネの例では質量を1とします。質量が違えば、同じ力でも加速度は変わります。</div>
 
 <pre class="code"><span class="c">// 毎フレーム呼ぶ。dt = 1 フレームの時間（1/24 秒など）</span>
 <span class="k">function</span> <span class="f">update</span>(ball, dt) {
@@ -1673,12 +1676,20 @@ i@cell = near;                          <span class="c">// この属性で Parti
   <div class="readout" id="r-phys"></div>
 </div>
 
-<h3>「力」を足せば、何でも作れる</h3>
+<h3>抵抗と時間刻み：同じ1秒を比べる</h3>
+<p><code>v *= 1 - drag * dt</code> は一次近似で、drag × dt が1を超えると符号まで反転します。一定係数の抵抗だけなら <code>v *= exp(-drag * dt)</code> で指数減衰を表せます。衝突やバネを含む計算全体の誤差が消えるわけではありません。</p>
+<div class="viz" data-learning-demo="decay">
+<p class="hint">抵抗を変えて30・60・120fpsの結果を比べてください。</p>
+<canvas role="img" aria-label="時間刻み別の減衰比較"></canvas>
+<div class="controls"><label>抵抗（/秒） <input type="range" data-control="drag" min="0" max="5" step="0.1" value="1"> <output>1</output></label></div>
+<p class="readout" data-readout></p></div>
+<pre class="code" data-demo-code="decay"></pre>
+<h3>加速度を組み合わせて動きを作る</h3>
 <ul class="plain">
   <li><b>風</b>：一定の力を足す。<code>v += wind * dt</code></li>
   <li><b>空気抵抗</b>：速度と逆向きに、速度に比例した力。<code>v = scale(v, 1 - drag * dt)</code></li>
   <li><b>引き寄せ</b>：目標へ向かうベクトル（第1章の sub）を力にする。<code>v += scale(normalize(sub(target, p)), k * dt)</code></li>
-  <li><b>ノイズで揺らす</b>：第2章のノイズを力にする。POP Force の Noise はこれ。</li>
+  <li><b>ノイズで揺らす</b>：第12章のノイズを力にする。POP Force の Noise はこれ。</li>
 </ul>
 
 <div class="callout pink">
@@ -1696,14 +1707,14 @@ i@cell = near;                          <span class="c">// この属性で Parti
 <span class="c">// SOP Solver（DOP なし）で自前の物理をやるなら、@P の更新も自分で書く</span>
 @P += @v * @TimeInc;
 <span class="k">if</span> (@P.y &lt; <span class="n">0</span>) { @P.y = <span class="n">0</span>; @v.y *= -ch(<span class="n">"bounce"</span>); }</pre>
-  POP Force の Gravity は <code>@v += force * dt</code>、POP Drag は <code>@v *= (1 - drag*dt)</code>、POP Attract は「目標への向き × 強さ」。中身を知っていると、パラメータが「どの式のどの数字か」で読めます。
+  これは加速度と抵抗の簡略モデルです。POP Forceでは質量の扱い（Ignore Mass）により結果が変わり、POP Dragなどの実装と上の一次近似が同一という意味ではありません。<a href="https://www.sidefx.com/docs/houdini/nodes/dop/popforce.html">SideFX：POP Force</a>
 </div>
 
-<div class="quiz" data-answer="1" data-why="速度に力（加速度 × dt）を足し、位置に速度 × dt を足す。この 2 行が物理シミュレーションの基本形です。">
+<div class="quiz" data-answer="1" data-why="速度に加速度 × dt を足し、更新後の速度 × dt を位置に足します（半陰的オイラー法）。力を与える場合は、先に質量で割って加速度にします。">
   <div class="q">物理シミュレーションの毎フレームの基本形は？</div>
   <div class="opts">
     <button class="opt">位置に重力を直接足す</button>
-    <button class="opt">速度に力を足し、位置に速度を足す</button>
+    <button class="opt">速度に加速度 × dt、位置に速度 × dt を足す</button>
     <button class="opt">位置を乱数で動かす</button>
   </div>
   <div class="fb"></div>
@@ -1711,7 +1722,7 @@ i@cell = near;                          <span class="c">// この属性で Parti
 </section>
 
 <!-- ============ M2 バネと減衰 ============ -->
-<section class="lesson" data-title="バネと減衰：揺れて止まる">
+<section class="lesson" data-lesson-id="cgmath-26" data-legacy-index="26" data-title="バネと減衰：揺れて止まる">
 <h2><span class="chap">CHAPTER</span>バネと減衰：「戻ろうとする力」と「止まろうとする力」</h2>
 <p class="lead">髪、布、ゼリー、追従カメラ、UI のバウンス。「揺れて、だんだん止まる」動きは全部 <span class="hl">バネ（元の場所に戻る力）+ 減衰（速度を殺す力）</span>。Vellum の Stiffness と Damping はこの 2 つの数字です。</p>
 
@@ -1719,7 +1730,7 @@ i@cell = near;                          <span class="c">// この属性で Parti
 <span class="k">function</span> <span class="f">update</span>(s, dt) {
   <span class="k">const</span> springForce = -stiffness * s.x;   <span class="c">// ズレと逆向きに、ズレに比例した力（フックの法則）</span>
   <span class="k">const</span> dampForce   = -damping   * s.v;   <span class="c">// 速度と逆向きに、速度に比例した力（ブレーキ）</span>
-  s.v += (springForce + dampForce) * dt;   <span class="c">// 前章と同じ：速度に力を足す</span>
+  s.v += (springForce + dampForce) * dt;   <span class="c">// 質量1：加速度 × dt を速度に足す</span>
   s.x += s.v * dt;                         <span class="c">// 位置に速度を足す</span>
 }</pre>
 
@@ -1749,7 +1760,7 @@ i@cell = near;                          <span class="c">// この属性で Parti
 @v += (-k * offset - c * @v) * @TimeInc;
 @P += @v * @TimeInc;</pre>
   <ul class="plain">
-    <li><b>Vellum</b>：Stretch Stiffness = 隣の点との距離を保つバネの硬さ。Damping Ratio = 上の damping を「0〜1 の割合」にしたもの（1 で臨界減衰）。</li>
+    <li><b>バネの減衰比</b>：質量m、硬さk、減衰係数cなら <code>ratio = c / (2 * sqrt(k * m))</code>。連続時間の線形バネでは1が臨界減衰です。Vellumの拘束パラメータとこの力ベースの式を、数値まで同一とはみなしません。</li>
     <li><b>CHOP の Lag / Spring</b>：チャンネル（アニメーションカーブ）にこの式をかけて、追従の遅れと揺れを付ける。</li>
     <li><b>追従カメラ / 二次アニメーション</b>：目標に向かって同じ式。「揺れて止まる」は全部これ。</li>
   </ul>
@@ -1767,7 +1778,7 @@ i@cell = near;                          <span class="c">// この属性で Parti
 </section>
 
 <!-- ============ M3 ベジェ曲線 ============ -->
-<section class="lesson" data-title="ベジェ曲線：lerp の lerp">
+<section class="lesson" data-lesson-id="cgmath-27" data-legacy-index="27" data-title="ベジェ曲線：lerp の lerp">
 <h2><span class="chap">CHAPTER</span>ベジェ曲線：「lerp の lerp の lerp」で曲線になる</h2>
 <p class="lead">Illustrator のパス、アニメーションカーブ、フォント、Houdini の Curve SOP。全部ベジェ曲線で、中身は <span class="hl">第8章の lerp を入れ子にしただけ</span>。制御点を触ると曲線が動く理由も、これで分かります。</p>
 
@@ -1832,11 +1843,11 @@ i@cell = near;                          <span class="c">// この属性で Parti
 </section>
 
 <!-- ============ M4 ベクトル場 ============ -->
-<section class="lesson" data-title="ベクトル場：流れに乗せる">
+<section class="lesson" data-lesson-id="cgmath-28" data-legacy-index="28" data-title="ベクトル場：流れに乗せる">
 <h2><span class="chap">CHAPTER</span>ベクトル場：「場所ごとの矢印」に粒子を乗せる</h2>
-<p class="lead">煙の渦、髪の流れ、群れの動き、Advect by Volumes。空間の各点に「そこでの向き」を置いたものが <span class="hl">ベクトル場</span>。粒子はその矢印に従って進むだけ。第2章のノイズを「角度」に使うと、あの有機的な流れになります。</p>
+<p class="lead">煙の渦、髪の流れ、群れの動き、Advect by Volumes。空間の各点に「そこでの向き」を置いたものが <span class="hl">ベクトル場</span>。粒子はその矢印に従って進むだけ。第12章のノイズを「角度」に使うと、あの有機的な流れになります。</p>
 
-<pre class="code"><span class="c">// 場所 p での「流れの向き」を返す。ノイズ（第2章）を角度（第5章）にする</span>
+<pre class="code"><span class="c">// 場所 p での「流れの向き」を返す。ノイズ（第12章）を角度（第5章）にする</span>
 <span class="k">function</span> <span class="f">field</span>(p, time) {
   <span class="k">const</span> angle = fbm(p.x * scale, p.y * scale + time * <span class="n">0.2</span>, <span class="n">3</span>) * PI * <span class="n">4</span>;   <span class="c">// ノイズ 0〜1 を角度に</span>
   <span class="k">return</span> { x: Math.cos(angle), y: Math.sin(angle) };                     <span class="c">// 長さ 1 の矢印</span>
@@ -1869,7 +1880,7 @@ i@cell = near;                          <span class="c">// この属性で Parti
 <ul class="plain">
   <li><b>ノイズ → 角度</b>：上のコード。粒子が溜まる場所ができる（矢印が集まる所）。</li>
   <li><b>curl ノイズ</b>：ノイズの「傾き」を 90° 回した向き。<code>{x: dNoise/dy, y: -dNoise/dx}</code>。矢印が集まる場所が無いので、粒子が均一に流れ続ける。煙・流体っぽさの定番。</li>
-  <li><b>中心へ渦巻き</b>：第6章の極座標。「中心への向き」と「それを 90° 回した向き」を混ぜる。</li>
+  <li><b>中心へ渦巻き</b>：第16章の極座標。「中心への向き」と「それを 90° 回した向き」を混ぜる。</li>
   <li><b>ジオメトリから</b>：法線や、Curve の接線を場にする（Attribute from Volume / Volume from Attribute）。髪の流れ、毛並み。</li>
 </ul>
 
@@ -1897,7 +1908,7 @@ v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</p
 </section>
 
 <!-- ============ 9 ============ -->
-<section class="lesson" data-part="Part 5　AI と付録" data-title="LLM の中身も、同じ数学">
+<section class="lesson" data-lesson-id="cgmath-29" data-legacy-index="29" data-part="Part 5　AI と付録" data-title="LLM の中身も、同じ数学">
 <h2><span class="chap">CHAPTER</span>LLM の中身も、ここまでと同じ数学でできている</h2>
 <p class="lead">ChatGPT のような LLM（大規模言語モデル）は、魔法ではありません。<span class="hl">ベクトル・内積・行列・補間</span>。ここまでの章の道具だけで、骨格が説明できます。</p>
 
@@ -1943,14 +1954,15 @@ v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</p
 <span class="c">// output = 「文脈を混ぜ込んだ、新しい意味のベクトル」</span></pre>
 <pre class="code"><span class="c">// softmax：数字の列を「合計 1 の割合」に直す。大きい数字ほど大きい割合に</span>
 <span class="k">function</span> <span class="f">softmax</span>(xs) {
-  <span class="k">const</span> es = xs.map(<span class="k">function</span>(x) { <span class="k">return</span> Math.exp(x); });   <span class="c">// exp で全部プラスに、差を強調</span>
+  const maxX = Math.max(...xs); // 共通の値を引いても割合は同じ。expのオーバーフローを避ける
+  <span class="k">const</span> es = xs.map(<span class="k">function</span>(x) { <span class="k">return</span> Math.exp(x - maxX); });   <span class="c">// exp で全部プラスに、差を強調</span>
   <span class="k">const</span> sum = es.reduce(<span class="k">function</span>(a, b) { <span class="k">return</span> a + b; }, <span class="n">0</span>);
   <span class="k">return</span> es.map(<span class="k">function</span>(e) { <span class="k">return</span> e / sum; });
 }</pre>
 <p>本物では、query 用・key 用・value 用にそれぞれ <b>行列</b>（第6章）で単語ベクトルを変換してから dot します。「どんな関係に注目するか」をその行列が決めていて、それを学習で調整します。</p>
 
 <h3>9-3. 層 = 「行列で変形して、折り曲げる」</h3>
-<p>第6章の行列は「空間ぜんぶを変形するレシピ」でした。ニューラルネットの1層は、まさに <code>transform(m, p)</code> です。ただし行列だけだと直線的な変形しかできないので、<span class="hl">間に「折り曲げ」を挟みます</span>。一番よく使う折り曲げが ReLU：「マイナスは 0 にする」だけ。</p>
+<p>第6章の行列は「空間ぜんぶを変形するレシピ」でした。ニューラルネットの1層は、まさに <code>transform(m, p)</code> です。ただし行列だけだと直線的な変形しかできないので、<span class="hl">間に「折り曲げ」を挟みます</span>。ここでは説明しやすい ReLU を使います：「マイナスは 0 にする」だけ。</p>
 <pre class="code"><span class="k">function</span> <span class="f">relu</span>(v) {
   <span class="k">return</span> { x: Math.max(<span class="n">0</span>, v.x), y: Math.max(<span class="n">0</span>, v.y) };   <span class="c">// マイナスを 0 に折る</span>
 }
@@ -1992,7 +2004,7 @@ v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</p
 </section>
 
 <!-- ============ 10 ============ -->
-<section class="lesson" data-title="チートシート：数学記号 → コード">
+<section class="lesson" data-lesson-id="cgmath-30" data-legacy-index="30" data-title="チートシート：数学記号 → コード">
 <h2><span class="chap">CHAPTER</span>チートシート：数学記号を見たらこう読む</h2>
 <p class="lead">他の資料や論文に出てくる記号を、この教材のコードに翻訳する表です。「読めない記号が出てきたらここに戻る」用に。</p>
 
@@ -2017,6 +2029,7 @@ v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</p
 <tr><td class="m">det M, |M|</td><td>面積・体積が何倍になるか</td><td><code>cross2d(m.i, m.j)</code></td><td>6</td></tr>
 <tr><td class="m">Σ</td><td>全部足す</td><td><code>for</code> ループ or <code>reduce</code></td><td>9</td></tr>
 <tr><td class="m">Π</td><td>全部掛ける</td><td><code>for</code> ループで <code>*=</code></td><td></td></tr>
+  const maxX = Math.max(...xs); // 共通の値を引いても割合は同じ。expのオーバーフローを避ける
 <tr><td class="m">eˣ, exp(x)</td><td>指数（急に大きくなる）</td><td><code>Math.exp(x)</code></td><td>9</td></tr>
 <tr><td class="m">f(x) = ...</td><td>関数の定義</td><td><code>function f(x) { return ...; }</code></td><td>0</td></tr>
 <tr><td class="m">x ∈ S</td><td>x は S の要素</td><td><code>S.includes(x)</code></td><td></td></tr>
@@ -2076,7 +2089,7 @@ v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</p
 </section>
 
 <!-- ============ S1 共通の骨格 ============ -->
-<section class="lesson" data-part="Part 6　シミュレーションの中身" data-title="ソルバーの共通骨格：粒子と格子">
+<section class="lesson" data-lesson-id="cgmath-31" data-legacy-index="31" data-part="Part 6　シミュレーションの中身" data-title="ソルバーの共通骨格：粒子と格子">
 <h2><span class="chap">CHAPTER</span>ソルバーの共通骨格：「粒子」で持つか「格子」で持つか</h2>
 <p class="lead">Pyro、FLIP、RBD、Vellum、MPM。名前も見た目も違いますが、中身は全部 <span class="hl">「状態を持つ → 力を足す → 拘束を直す → 進める」を毎ステップ繰り返す</span> だけ。違いは「状態を何で持つか」と「拘束をどう直すか」の2点です。この章でその地図を作ってから、次章以降で1つずつ中を開けます。</p>
 
@@ -2147,7 +2160,7 @@ v@vel = <span class="k">set</span>(cos(a), <span class="n">0</span>, sin(a));</p
 </section>
 
 <!-- ============ S2 Pyro ============ -->
-<section class="lesson" data-title="Pyro：煙は「速度場」でできている">
+<section class="lesson" data-lesson-id="cgmath-32" data-legacy-index="32" data-title="Pyro：煙は「速度場」でできている">
 <h2><span class="chap">CHAPTER</span>Pyro：煙と炎は「速度の格子」でできている</h2>
 <p class="lead">Pyro の主役は煙（density）ではなく <span class="hl">速度場（vel）</span> です。密度も温度も、速度場に乗って運ばれる「乗客」にすぎません。この章では、速度場が毎ステップ何をされているかを、実際に動く 2D の Pyro で見ます。</p>
 
@@ -2287,7 +2300,7 @@ vel[cell] = add(vel[cell], scale(curlNoise(cell.center * freq + time), amount * 
 </section>
 
 <!-- ============ S3 FLIP ============ -->
-<section class="lesson" data-title="FLIP：粒子で運び、格子で押す">
+<section class="lesson" data-lesson-id="cgmath-33" data-legacy-index="33" data-title="FLIP：粒子で運び、格子で押す">
 <h2><span class="chap">CHAPTER</span>FLIP：粒子で運んで、格子で「押し合い」を解く</h2>
 <p class="lead">水は煙と違って「表面」があり、「量」が減ってはいけません。格子だけだと表面がボケて量も消える。粒子だけだと押し合い（圧力）が解けない。そこで <span class="hl">粒子が速度を持ち運び、圧力だけ格子で解いて、結果を粒子に返す</span>。これが FLIP です。前章の Pyro の投影を、そのまま「粒子のある所だけ」でやります。</p>
 
@@ -2390,7 +2403,7 @@ pressure[i][j]</pre>
 </section>
 
 <!-- ============ S4 RBD ============ -->
-<section class="lesson" data-title="RBD：剛体は「向き」を持った粒子">
+<section class="lesson" data-lesson-id="cgmath-34" data-legacy-index="34" data-title="RBD：剛体は「向き」を持った粒子">
 <h2><span class="chap">CHAPTER</span>RBD：剛体は「向きと回転」を持った粒子</h2>
 <p class="lead">剛体（Rigid Body）＝形が変わらない物。Part 4 の粒子に <span class="hl">「向き」と「回転の速さ」</span> を足すと剛体になります。ぶつかったときの「跳ね返り」「回転」「摩擦」は、接触点 1 か所での撃力（インパルス）の計算です。Bullet も、Houdini の RBD Bullet Solver も、中身はこれ。</p>
 
@@ -2490,9 +2503,9 @@ body.angle += body.w * dt;</pre>
 </section>
 
 <!-- ============ S5 Vellum ============ -->
-<section class="lesson" data-title="Vellum：位置を直接直す（PBD）">
+<section class="lesson" data-lesson-id="cgmath-35" data-legacy-index="35" data-title="Vellum：位置を直接直す（PBD）">
 <h2><span class="chap">CHAPTER</span>Vellum：力を足さず、「位置を直接直す」（PBD）</h2>
-<p class="lead">布・髪・ゼリーを Part 4 のバネで作ると、硬くするほど dt を小さくしないと爆発します。Vellum は発想を変えて、<span class="hl">「伸びすぎた 2 点を、正しい距離になるまで直接動かす」</span>。これを拘束ごとに何回もまわす。位置ベース（Position Based Dynamics, PBD）と呼ばれ、硬くても爆発しません。</p>
+<p class="lead">布・髪・ゼリーを単純なバネで作ると、硬さに応じた小さな dt が必要になります。位置ベースの方法は、<span class="hl">「伸びすぎた 2 点を、目標の距離へ直接動かす」</span>ことで硬い拘束を扱いやすくします。このデモは柔らかさも扱う XPBD の簡略例です。無条件に安定するわけではなく、衝突・時間刻み・反復数の影響は残ります。</p>
 
 <h3>Vellum が持っている状態</h3>
 <pre class="code"><span class="c">// 粒子：位置と「前の位置」。速度は差から作る</span>
@@ -2567,7 +2580,7 @@ constraints[c] = { a, b, restLength, compliance };    <span class="c">// complia
     <tr><th>パラメータ</th><th>コードのどこ</th><th>メモ</th></tr>
     <tr><td>Vellum Constraints: Stretch / Bend / Pin</td><td><code>constraints[]</code> を作る</td><td>Cloth プリセットは Stretch + Bend、Hair は Stretch + Bend（曲げ角）、Grain は距離拘束の粒</td></tr>
     <tr><td>Stiffness（10^n）</td><td><code>1 / compliance</code></td><td>上のスライダーと同じ。Bend の Stiffness を下げると柔らかい布、上げると紙</td></tr>
-    <tr><td>Damping Ratio</td><td>速度を prev との差から作るときに少し減らす</td><td>Part 4 のバネの damping と同じ。1 で臨界減衰</td></tr>
+    <tr><td>Damping Ratio</td><td>このデモは固定の速度減衰による簡略化</td><td>実機の減衰比を再現するものではない</td></tr>
     <tr><td>Rest Length Scale</td><td><code>restLength</code></td><td>1 未満で縮む（張った布・ワイヤー）</td></tr>
     <tr><td>Vellum Solver: Substeps / Constraint Iterations</td><td>外のループ / 内のループ</td><td>伸びる → Iterations、めり込む・すり抜ける → Substeps。目安：Cloth で Substeps 2〜5、Iterations 50〜200</td></tr>
     <tr><td>Smoothing Iterations</td><td>反復の順番によるムラをならす</td><td>髪の縮れ・布のシワが不自然なとき</td></tr>
@@ -2588,7 +2601,7 @@ constraints[c] = { a, b, restLength, compliance };    <span class="c">// complia
 </section>
 
 <!-- ============ S6 MPM ============ -->
-<section class="lesson" data-title="MPM：粒子が「変形」を覚える">
+<section class="lesson" data-lesson-id="cgmath-36" data-legacy-index="36" data-title="MPM：粒子が「変形」を覚える">
 <h2><span class="chap">CHAPTER</span>MPM：粒子が「自分の周りの変形」を覚えている</h2>
 <p class="lead">雪、砂、ゼリー、泥。「流れるけど形も持つ」物は、FLIP（形を持たない）でも Vellum（つながりが固定）でも作りにくい。MPM（Material Point Method）は FLIP の骨格に <span class="hl">「この粒子の周りは元の形からどれだけ変形しているか」を表す行列</span> を足したものです。Part 2 の行列が、粒子 1 個ずつの中に入っています。</p>
 
@@ -2698,18 +2711,73 @@ particles[k] = {
     <li><b>Pyro</b>：格子。速度場の発散を圧力で 0 に。渦はそこから生まれる。</li>
     <li><b>FLIP</b>：粒子で運び、格子で圧力。PIC / FLIP / APIC は「格子から粒子への返し方」の違い。</li>
     <li><b>RBD</b>：向きと角速度を持つ粒子。接触点の撃力と、壊れる拘束。</li>
-    <li><b>Vellum</b>：力でなく位置を直す。硬くても爆発しない。反復が硬さを決める。</li>
+    <li><b>Vellum</b>：位置に拘束を適用する。デモでは柔らかさ・時間刻み・反復数を比較する。実機と同一のソルバーではない。</li>
     <li><b>MPM</b>：FLIP + 変形の記憶（行列）。材料 = 行列を応力に変えるルール。</li>
   </ul>
   どれも Part 1〜4 の道具（ベクトル、内積、外積、行列、lerp、距離関数、ノイズ、速度と加速度、バネ）の組み合わせです。おつかれさまでした。
 </div>
 </section>
 
+<section class="lesson" data-lesson-id="sampling" data-title="サンプリング：細かい模様がちらつく理由" data-part="Part 7　数学を画面につなぐ">
+<h2><span class="chap">CHAPTER</span>サンプリング：細かい模様がちらつく理由</h2>
+<p class="lead">連続した波から、飛び飛びの場所の値を読むのがサンプリングです。読む間隔より細かい変化は、別の粗い模様に見えることがあります。</p>
+<div class="viz" data-learning-demo="sampling">
+<p class="hint">模様を細かくしてから位相を動かしてください。同じ標本数でも「点で読む」と「幅で平均する」では見え方が変わります。</p>
+<canvas role="img" aria-label="高解像度と低解像度の縞模様の比較"></canvas>
+<div class="controls"><label>模様の周波数（周 / 幅） <input type="range" data-control="cycles" min="1" max="80" step="1" value="28"> <output>28</output></label><label>横方向の標本数 <input type="range" data-control="samples" min="8" max="128" step="1" value="32"> <output>32</output></label><label>位相 <input type="range" data-control="phase" min="0" max="1" step="0.001" value="0"> <output>0</output></label><label><input type="checkbox" data-play> 自動再生</label></div>
+<p class="readout" data-readout></p></div>
+<h3>「点」ではなく「画素が覆う範囲」を考える</h3>
+<p>幅の中に f 周の正弦波があり、N 個の等間隔な標本で読むとします。元の波を区別するには f が N/2 より小さい必要があります（帯域制限された信号を前提とするナイキスト条件）。境界ちょうども位相によって情報が失われます。</p>
+<p>デモの下段は、各画素の幅で正弦波を平均した結果です。細部を灰色に近づけることで偽の模様を弱めます。失われた細部を復元する処理ではなく、箱型平均だけですべてのエイリアシングを除けるわけでもありません。</p>
+<pre class="code" data-demo-code="sampling"></pre>
+<p>上はこの図で使う平均値の計算です。正弦波だから積分を直接計算でき、一般の画像では複数の標本やフィルターを使います。</p>
+<h3>フーリエから画面の模様へ</h3>
+<ul class="plain"><li>まず表示サイズと模様の細かさを合わせる。遠景ではノイズの細部やリング本数を減らす。</li><li>テクスチャの縮小ではミップマップを使う。手続き模様には自動でミップが付かないので、画素の幅に応じて細部を減らす。</li><li>境界の滑らかさには <code>fwidth</code> などの画面上の変化量を使える。WebGL 1では微分の拡張が必要。この図はCPUで計算するため不要。</li><li>時間方向も同じ。発光の点滅が速すぎるとフレーム間で見落とす。空間の平均だけで時間方向まで解決するわけではない。</li></ul>
+<p><a href="../cgmath/#ch18">数学18章：フーリエ変換</a> / <a href="../gamevfx/#ch4">VFX4章：ディゾルブ</a></p>
+<p>参考：<a href="https://www.pbr-book.org/4ed/Textures_and_Materials/Texture_Sampling_and_Antialiasing">PBRT — Texture Sampling and Antialiasing</a></p>
+<p><a href="../gamevfx/#sampling">VFXの見た目に応用する →</a></p><div class="quiz" data-answer="1" data-why="表示サイズに対して細かすぎる成分を減らすか平均します。単に明るくしても標本数は増えません。"><div class="q">細い縞が小さな表示で別の太い縞に見える。最初に試すことは？</div><div class="opts"><button class="opt">模様をさらに細かくする</button><button class="opt">模様を粗くする・画素の範囲で平均する</button><button class="opt">発光を強くする</button></div><div class="fb" aria-live="polite"></div></div></section>
+<section class="lesson" data-lesson-id="linear-color" data-title="色の計算：半分の光はどんな灰色？">
+<h2><span class="chap">CHAPTER</span>色の計算：半分の光はどんな灰色？</h2>
+<p class="lead">lerpの前に、数字が何を表すかを確かめます。画面用のsRGB値は光の量に比例しないため、数字の中点と光の量の中点は違います。</p>
+<div class="viz" data-learning-demo="color">
+<p class="hint">白の割合を0.5にすると違いがよく見えます。左右は同じ黒と白から作っています。</p>
+<canvas role="img" aria-label="sRGBの直接補間と線形補間の比較"></canvas>
+<div class="controls"><label>白の割合 <input type="range" data-control="mix" min="0" max="1" step="0.01" value="0.5"> <output>0.5</output></label></div>
+<p class="readout" data-readout></p></div>
+<h3>読む → 線形に戻す → 計算 → 表示用に戻す</h3>
+<p>黒0と白1を光の量で半分ずつ混ぜると、線形値は0.5、表示用のsRGB値は約0.735です。sRGB値を直接0.5にすると、その線形値は約0.214。この違いが左右の灰色の差です。</p>
+<pre class="code" data-demo-code="color"></pre>
+<p>この図で使うsRGB変換です。一般の色はR・G・Bそれぞれを <code>decode</code> し、補間や合成後に <code>encode</code> します。入力は0〜1のsRGB、計算も同じ色域を前提としています。芸術的なグラデーションでは別の色空間を選ぶこともあります。</p>
+<h3>色とデータを区別する</h3>
+<ul class="plain"><li>色として保存した画像にはsRGB変換が必要な場合がある。描画環境が自動変換しているときは二重に変換しない。</li><li>マスク・法線・深度などの数値データは、見た目の色ではない。意図せずsRGB変換すると値を変えてしまう。</li><li>アルファは通常、色のsRGB変換の対象にしない。事前乗算アルファは <code>rgbPremultiplied = rgbLinear * alpha</code>。背景との合成も線形で行う。</li><li>HDRは1より大きな光の値も保持する。露出・トーンマッピング・ブルームは別の処理。この比較図は0〜1のSDRで、ブルームやHDRを再現していない。</li></ul>
+<p>既存のランプ・ブレンドの図は計算構造を見せる簡略例です。実際の色管理を含めた見た目が、すべてのレンダラーで一致するという意味ではありません。</p>
+<p><a href="../cgmath/#ch8">数学8章：補間</a> / <a href="../gamevfx/#ch7">VFX7章：ブレンド</a></p>
+<p>参考：<a href="https://www.pbr-book.org/4ed/Utilities/Images">PBRT — Images / ColorEncoding</a></p>
+<p><a href="../gamevfx/#linear-color">VFXの見た目に応用する →</a></p><div class="quiz" data-answer="2" data-why="線形の0.5をsRGBに符号化すると約0.735です。表示値0.5とは光の量が異なります。"><div class="q">光の量で黒と白を半分ずつ混ぜたとき、表示用sRGB値は？</div><div class="opts"><button class="opt">約0.214</button><button class="opt">0.5</button><button class="opt">約0.735</button></div><div class="fb" aria-live="polite"></div></div></section>
+<section class="lesson" data-lesson-id="arc-length" data-title="曲線の距離：tを等間隔にしても等速ではない">
+<h2><span class="chap">CHAPTER</span>曲線の距離：tを等間隔にしても等速ではない</h2>
+<p class="lead">ベジェのtは計算の割合です。tが同じだけ増えても、点が進む距離は場所によって変わります。距離を積み上げた表からtを逆に探すと、ほぼ等速に進めます。</p>
+<div class="viz" data-learning-demo="curve">
+<p class="hint">青い点は12等分の目印、黄色は現在位置です。曲線の形を変えてから再生すると、上の点だけ速さが変わる様子が見えます。</p>
+<canvas role="img" aria-label="ベジェのパラメータと距離で進む点の比較"></canvas>
+<div class="controls"><label>曲線の形 <input type="range" data-control="bend" min="0" max="1" step="0.01" value="0.15"> <output>0.15</output></label><label>進行 <input type="range" data-control="phase" min="0" max="1" step="0.001" value="0.35"> <output>0.35</output></label><label><input type="checkbox" data-play> 自動再生</label></div>
+<p class="readout" data-readout></p></div>
+<h3>距離を足した表から逆引きする</h3>
+<ol class="plain"><li>曲線上の点を細かく取る。</li><li>隣り合う点の距離を足して「t → 累積距離」の表を作る。</li><li>進みたい距離を表で探し、その間のtを補間して位置を求める。</li></ol>
+<pre class="code" data-demo-code="curve"></pre>
+<p>この図の計算に使う関数です。折れ線での近似なので、鋭く曲がる場所では分割数を増やす必要があります。同じ距離を進む点でも、曲がり角を挟んだ直線距離は短く見えることがあります。</p>
+<h3>帯のUVに使うなら</h3>
+<p><code>u = 累積距離 / 全長</code> は帯全体に模様を収める方法。帯が伸びれば模様も伸びます。<code>u = 累積距離 / 1模様の長さ</code> は世界の長さで密度を揃える方法。帯が伸びると繰り返し回数が増えます。どちらを使うかは演出によります。</p>
+<p>この図は固定された曲線を一定の周回時間で進む比較です。曲線そのものが変形するときの世界速度や、3Dで帯がねじれないフレームの計算は含みません。</p>
+<p><a href="../cgmath/#ch27">数学27章：ベジェ曲線</a> / <a href="../gamevfx/#ch17">VFX17章：リボンのUV</a></p>
+<p><a href="../gamevfx/#arc-length">VFXの見た目に応用する →</a></p><div class="quiz" data-answer="1" data-why="tを一定量増やすだけでは、進む距離は一定になりません。累積距離の表を使い、距離からtを逆引きします。"><div class="q">同じ曲線をほぼ等速で進めるには？</div><div class="opts"><button class="opt">tを一定量ずつ増やすだけ</button><button class="opt">進む距離からtを逆引きする</button><button class="opt">色を一定速度で変える</button></div><div class="fb" aria-live="polite"></div></div></section>
 </main>
 </div>
-<script src="app.js?v=20260906-2"></script>
+<script src="../learning/lesson-state.js?v=20260907-1"></script>
+<script src="app.js?v=20260907-1"></script>
 <script src="app-patterns.js?v=20260906-2"></script>
 <script src="app-extra.js?v=20260906-2"></script>
 <script src="app-sims.js?v=20260906-2"></script>
+<script src="../learning/demos.js?v=20260907-1"></script>
 </body>
 </html>

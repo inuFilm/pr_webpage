@@ -1,0 +1,10 @@
+/* Comparison readouts are prose, not single-line numeric dumps. */
+[data-learning-demo] [data-readout] { white-space: normal; line-height: 1.8; overflow-wrap: anywhere; }
+[data-learning-demo] output { min-width: 3ch; font-variant-numeric: tabular-nums; }
+[data-learning-demo] .controls { row-gap: 12px; }
+@media (max-width: 860px) {
+  nav .part { white-space: nowrap; flex: none; align-self: center; margin: 0 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lesson.active { animation: none; }
+}

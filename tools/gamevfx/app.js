@@ -355,8 +355,8 @@ function showCode(id, src, lang = 'glsl') {
 /* =========================================================
    ナビゲーション / クイズ / 進捗
    ========================================================= */
-const DONE_KEY = 'gamevfx-done-v1';
-let done = new Set(JSON.parse(localStorage.getItem(DONE_KEY) || '[]'));
+const progressState = new LessonState('gamevfx', lessons);
+let done = progressState.done;
 let current = 0;
 
 function initNav() {
@@ -375,12 +375,12 @@ function initNav() {
     prev.disabled = i === 0; prev.style.visibility = i === 0 ? 'hidden' : 'visible';
     prev.addEventListener('click', () => show(i - 1));
     const lab = document.createElement('label'); lab.className = 'done';
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = done.has(i);
-    cb.addEventListener('change', () => { cb.checked ? done.add(i) : done.delete(i); saveDone(); });
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = done.has(lessons[i].dataset.lessonId);
+    cb.addEventListener('change', () => { cb.checked ? done.add(lessons[i].dataset.lessonId) : done.delete(lessons[i].dataset.lessonId); saveDone(); });
     lab.appendChild(cb); lab.appendChild(document.createTextNode('この章を理解した'));
     const next = document.createElement('button'); next.className = 'navbtn primary';
     next.textContent = i === lessons.length - 1 ? '最初に戻る' : '次の章 →';
-    next.addEventListener('click', () => { if (!done.has(i)) { done.add(i); cb.checked = true; saveDone(); } show((i + 1) % lessons.length); });
+    next.addEventListener('click', () => { show((i + 1) % lessons.length); });
     f.append(prev, lab, next); s.appendChild(f);
   });
 
@@ -402,19 +402,18 @@ function initNav() {
   requestAnimationFrame(tick);
 
   window.addEventListener('hashchange', () => {
-    const m = location.hash.match(/^#ch(\d+)$/);
-    if (m && +m[1] !== current) show(clamp(+m[1], 0, lessons.length - 1));
+    const target = progressState.index(location.hash);
+    if (target !== current) show(target);
   });
 
   saveDone();
-  const h = location.hash.match(/^#ch(\d+)$/);
-  show(h ? clamp(+h[1], 0, lessons.length - 1) : 0);
+  show(progressState.index(location.hash));
 }
 
 function saveDone() {
-  localStorage.setItem(DONE_KEY, JSON.stringify([...done]));
-  $$('#nav-list button').forEach((b, i) => b.classList.toggle('done', done.has(i)));
-  $('#prog-text').textContent = `${done.size} / ${lessons.length} 完了`;
+  const saved = progressState.save();
+  $$('#nav-list button').forEach((b, i) => b.classList.toggle('done', done.has(lessons[i].dataset.lessonId)));
+  $('#prog-text').textContent = `${done.size} / ${lessons.length} 完了${saved ? '' : '（この環境では保存できません）'}`;
   $('#prog-bar').style.width = `${done.size / lessons.length * 100}%`;
 }
 
@@ -422,7 +421,7 @@ function show(i) {
   current = i;
   lessons.forEach((s, k) => s.classList.toggle('active', k === i));
   $$('#nav-list button').forEach((b, k) => b.classList.toggle('active', k === i));
-  location.hash = `#ch${i}`;
+  location.hash = lessons[i].dataset.lessonId;
   window.scrollTo({ top: 0, behavior: 'auto' });
   (vizBySection.get(i) || []).forEach(v => v.redraw());
 }
