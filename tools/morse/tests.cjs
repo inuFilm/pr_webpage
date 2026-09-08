@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const vm=require('node:vm');
 const assert=require('node:assert/strict');
 class Element {
-  constructor(tag='DIV'){this.tagName=tag.toUpperCase();this.attrs={};this.dataset={};this.children=[];this.handlers={};this.style={};this.value='';this.checked=false;this.textContent='';this.hidden=false;const classes=new Set();this.classList={toggle:(c,on)=>on?classes.add(c):classes.delete(c),remove:c=>classes.delete(c),add:c=>classes.add(c)};}
+  constructor(tag='DIV'){this.tagName=tag.toUpperCase();this.attrs={};this.dataset={};this.children=[];this.handlers={};this.style={};this.value='';this.checked=false;this.textContent='';this.hidden=false;const classes=new Set();this.classList={toggle:(c,on)=>on?classes.add(c):classes.delete(c),remove:c=>classes.delete(c),add:c=>classes.add(c),contains:c=>classes.has(c)};}
   setAttribute(k,v){this.attrs[k]=String(v);if(k.startsWith('data-'))this.dataset[k.slice(5)]=String(v);}
   getAttribute(k){return this.attrs[k]??null;}
   append(...nodes){this.children.push(...nodes);}
@@ -33,7 +33,20 @@ for(const [char,code] of Object.entries(codes)){run('reset()');for(const s of co
 assert.equal(run("cleanPhrase('Hello,  world! 日本語 73')"),'HELLO WORLD 73');
 run("reset();mode='phrase';target='A 1';progress=0");pulse('.');run('commitChar()');assert.equal(run('progress'),0,'Wrong letter must not advance');
 for(const s of '.-')pulse(s);run('commitChar()');assert.equal(run('progress'),1);run('addSpace()');assert.equal(run('progress'),2);
+
 for(const s of '.----')pulse(s);run('commitChar()');assert.equal(run('transcript'),'A 1');assert.equal(run('progress'),3);run('undo()');assert.equal(run('progress'),2);
+
+// 空白は符号ではなく「間」。ヒントを切っていても説明が消えてはいけない。
+run("reset();mode='phrase';target='A B';progress=1;$('hint').checked=true;renderTarget()");
+assert.match(run("$('hint-text').textContent"),/符号なし/,'Space note with hints on');
+run("$('hint').checked=false;renderTarget()");
+assert.match(run("$('hint-text').textContent"),/符号なし/,'Space note must survive hints off');
+assert.equal(run("$('target').children[1].classList.contains('gap')"),true,'Space is marked as a gap, not a letter');
+assert.equal(run("$('target').children[0].classList.contains('gap')"),false,'Letters must not be marked as gaps');
+run("progress=0;renderTarget()");
+assert.equal(run("$('hint-text').textContent"),'','Letter hint stays hidden while hints are off');
+run("$('hint').checked=true;renderTarget()");
+assert.match(run("$('hint-text').textContent"),/^A/,'Letter hint returns when hints are on');
 run("reset();mode='free';$('auto').checked=true");pulse('.');advance(1000);assert.equal(run('transcript'),'E','Idle auto confirm');
 run("reset();start('mouse','.');tick()");advance(1500);assert.equal(run('sequence'),'.','Single hover must not repeat or confirm while held');run("release('mouse')");advance(1000);assert.equal(run('transcript'),'E');
 run("reset();$('repeat').value='repeat';start('mouse','-');tick()");advance(410);assert.equal(run('sequence'),'--');run("release('mouse')");advance(1300);assert.equal(run('transcript'),'M');
@@ -49,5 +62,5 @@ run('reset()');handlers.keydown({key:'f',target:new Element('button'),preventDef
 assert.doesNotThrow(()=>handlers.keydown({key:'f',target:{},preventDefault(){}}));handlers.keyup({key:'f'});
 assert.equal(context.commitChar,undefined);assert.equal(context.start,undefined);
 // Playback duration: E [7 units] E = 9 units including tones.
-(async()=>{run('reset()');await run("play('E E')");assert.equal(run('playing'),true);const end=Math.max(...[...timers.values()].map(t=>t.at))-now;assert.equal(end,920);run('stopPlayback()');assert.equal(timers.size,0);assert.equal(run('playing'),false);console.log('PASS: 36 codes, phrase validation, spaces, undo, hover, repeat, auto confirm, blur, overflow, keyboard focus, playback timing and stop.');})().catch(e=>{console.error(e);process.exitCode=1;});
+(async()=>{run('reset()');await run("play('E E')");assert.equal(run('playing'),true);const end=Math.max(...[...timers.values()].map(t=>t.at))-now;assert.equal(end,920);run('stopPlayback()');assert.equal(timers.size,0);assert.equal(run('playing'),false);console.log('PASS: 36 codes, phrase validation, spaces, gap note, undo, hover, repeat, auto confirm, blur, overflow, keyboard focus, playback timing and stop.');})().catch(e=>{console.error(e);process.exitCode=1;});
 

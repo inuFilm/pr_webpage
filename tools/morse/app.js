@@ -43,10 +43,20 @@ function drawMap() {
 function highlight(code){for(const n of all('[data-code]'))n.classList.toggle('active',!!code&&code.startsWith(n.getAttribute('data-code')));$('path-label').textContent=pathFor(code);}
 function choose(char){selected=char;highlight(MORSE[char]);if(!sequence){lastDecoded=char;$('decoded').textContent=$('show-live').checked?char:'?';$('sequence').textContent=symbols(MORSE[char]);}$('status').textContent=`見本 ${char} / ${symbols(MORSE[char])}`;}
 function renderInput(){highlight(sequence||MORSE[lastDecoded]||'');$('sequence').textContent=symbols(sequence);$('decoded').textContent=$('show-live').checked?(sequence?(REVERSE[sequence]||'?'):lastDecoded):'?';$('transcript').textContent=transcript||'入力した文字がここに並びます';}
+const GAP_NOTE='␣ 単語の区切り — 符号なし / 7単位の無音。Space か「空白」ボタン';
 function renderTarget(){
   $('target').replaceChildren();
-  [...target].forEach((char,i)=>{const s=document.createElement('span');s.textContent=char===' '?'␣':char;s.className=i<progress?'done':i===progress?'current':'';$('target').append(s);});
-  const char=target[progress];$('hint-text').textContent=$('hint').checked&&char?(char===' '?'単語の区切り → Space':`${char}  ${symbols(MORSE[char])}`):'';
+  [...target].forEach((char,i)=>{
+    const s=document.createElement('span'),isGap=char===' ';
+    s.textContent=isGap?'␣':char;
+    if(isGap){s.classList.add('gap');s.title='単語の区切り（符号なし・7単位の無音）';}
+    if(i<progress)s.classList.add('done');else if(i===progress)s.classList.add('current');
+    $('target').append(s);
+  });
+  const char=target[progress];
+  // 空白には符号が無く「7単位の無音」でしかない。他の文字と同じ見た目で並ぶと
+  // 打つべき符号があるように見えるので、符号ヒントの ON/OFF に関わらず必ず出す。
+  $('hint-text').textContent=!char?'':char===' '?GAP_NOTE:($('hint').checked?`${char}  ${symbols(MORSE[char])}`:'');
 }
 function stopTone(){if(oscillator){try{oscillator.stop();}catch{}oscillator=null;}if(gain){gain.disconnect();gain=null;}}
 async function enableSound(){

@@ -523,6 +523,23 @@ textarea {
   border-radius: 3px;
 }
 
+/* 空白は打つ符号ではなく「間」なので、文字と同じ塗りにはしない。
+   現在位置でも塗りつぶさず、下線だけで示す。 */
+.target .gap {
+  color: #6f7b75;
+}
+
+.target .gap.done {
+  color: #4d6b60;
+}
+
+.target .gap.current {
+  background: none;
+  color: var(--gold);
+  border-bottom: 2px dashed var(--gold);
+  border-radius: 0;
+}
+
 #hint-text {
   font: 14px monospace;
   color: var(--gold);
