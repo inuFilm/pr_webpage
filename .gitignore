@@ -361,3 +361,6 @@ work/
 
 # 記事エディタが削除した記事の退避先（復旧用。コミットしない）
 tech/_trash/
+
+# Keep the Morse app usage and validation documentation.
+!tools/morse/README.md
