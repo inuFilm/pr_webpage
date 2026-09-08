@@ -1,3 +1,4 @@
+(() => {
 /* International Morse, A-Z and 0-9. No dependencies or network requests. */
 'use strict';
 const MORSE = Object.freeze({A:'.-',B:'-...',C:'-.-.',D:'-..',E:'.',F:'..-.',G:'--.',H:'....',I:'..',J:'.---',K:'-.-',L:'.-..',M:'--',N:'-.',O:'---',P:'.--.',Q:'--.-',R:'.-.',S:'...',T:'-',U:'..-',V:'...-',W:'.--',X:'-..-',Y:'-.--',Z:'--..',0:'-----',1:'.----',2:'..---',3:'...--',4:'....-',5:'.....',6:'-....',7:'--...',8:'---..',9:'----.'});
@@ -86,14 +87,14 @@ function accept(char){
   renderTarget();
   if(mode==='letter'&&progress===target.length){cancelNextQuestion();nextQuestionTimer=setTimeout(()=>{nextQuestionTimer=null;next();},350);}
 }
-function confirm(){
+function commitChar(){
   if(playing)return;
   if(!sequence)return;
   const code=sequence,char=REVERSE[code];sequence='';lastDecoded=char||'?';
   if(char){accept(char);$('status').textContent=`確定 ${char}`;}else{message(`${symbols(code)} は英数字にない符号です。もう一度入力してください。`);$('status').textContent='未定義の符号';}
   renderInput();$('meter').style.width='0%';
 }
-function addSpace(){if(playing)return;stopInput();confirm();if(!transcript.endsWith(' ')&&(transcript||mode!=='free'))accept(' ');renderInput();}
+function addSpace(){if(playing)return;stopInput();commitChar();if(!transcript.endsWith(' ')&&(transcript||mode!=='free'))accept(' ');renderInput();}
 function start(source,s){
   if(nextQuestionTimer!==null)next();
   if(playing||held.has(source))return;
@@ -112,7 +113,7 @@ function tick(){
       const duration=(s==='.'?1:3)*unit();sequence=(sequence+s).slice(0,6);lastSymbol=s;toneUntil=now+duration;busyUntil=toneUntil+unit();idleAt=toneUntil;beep(duration);$(s==='.'?'dit':'dah').classList.add('firing');renderInput();$('status').textContent=REVERSE[sequence]?`入力中 ${sequence.length} 打`:'続けて入力';
     }
   }
-  if(sequence&&!pending.length&&!held.size&&now>=toneUntil){const wait=Math.max(Number($('gap').value),3*unit());const ratio=Math.min(1,(now-idleAt)/wait);$('meter').style.width=$('auto').checked?`${ratio*100}%`:'0%';if($('auto').checked&&ratio>=1)confirm();}
+  if(sequence&&!pending.length&&!held.size&&now>=toneUntil){const wait=Math.max(Number($('gap').value),3*unit());const ratio=Math.min(1,(now-idleAt)/wait);$('meter').style.width=$('auto').checked?`${ratio*100}%`:'0%';if($('auto').checked&&ratio>=1)commitChar();}
 }
 function next(){
   reset();progress=0;
@@ -132,29 +133,58 @@ for(const [id,s] of [['dit','.'],['dah','-']]){
   n.addEventListener('click',e=>{if(e.detail===0){start('accessible',s);release('accessible');}});
 }
 window.addEventListener('keydown',e=>{
-  if(e.ctrlKey||e.altKey||e.metaKey||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-  const k=e.key.toLowerCase();if((e.target.tagName==='BUTTON'||e.target.getAttribute('role')==='button')&&(k==='enter'||k===' ')&&!sequence&&!pending.length)return;if(!['f','j','enter',' ','backspace','escape'].includes(k))return;e.preventDefault();if(e.repeat)return;
-  if(k==='f'||k==='j')start(k,k==='f'?'.':'-');else if(k==='enter'){stopInput();confirm();}else if(k===' ')addSpace();else if(k==='backspace')undo();else{stopInput();stopPlayback();}
+  if(e.ctrlKey||e.altKey||e.metaKey||/INPUT|TEXTAREA|SELECT/.test(e.target?.tagName))return;
+  const k=e.key.toLowerCase();if((e.target?.tagName==='BUTTON'||e.target?.getAttribute?.('role')==='button')&&(k==='enter'||k===' ')&&!sequence&&!pending.length)return;if(!['f','j','enter',' ','backspace','escape'].includes(k))return;e.preventDefault();if(e.repeat)return;
+  if(k==='f'||k==='j')start(k,k==='f'?'.':'-');else if(k==='enter'){stopInput();commitChar();}else if(k===' ')addSpace();else if(k==='backspace')undo();else{stopInput();stopPlayback();}
 });
 window.addEventListener('keyup',e=>release(e.key.toLowerCase()));
 function pause(){cancelNextQuestion();stopInput();stopPlayback();sequence='';renderInput();$('meter').style.width='0%';}
 window.addEventListener('blur',pause);document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});
 function undo(){cancelNextQuestion();stopInput();stopPlayback();if(sequence)sequence=sequence.slice(0,-1);else if(transcript){transcript=transcript.slice(0,-1);if(mode!=='free')progress=Math.max(0,progress-1);}lastDecoded='—';renderInput();renderTarget();}
-$('undo').onclick=undo;$('clear').onclick=()=>{reset();progress=0;renderTarget();message('入力をクリアしました。');};$('confirm').onclick=()=>{stopInput();confirm();};$('space').onclick=addSpace;
+$('undo').onclick=undo;$('clear').onclick=()=>{reset();progress=0;renderTarget();message('入力をクリアしました。');};$('confirm').onclick=()=>{stopInput();commitChar();};$('space').onclick=addSpace;
 $('sound').onclick=()=>{if(soundOn){soundOn=false;stopTone();$('sound').textContent='音を有効にする';$('sound').setAttribute('aria-pressed','false');}else enableSound();};
 $('hear').onclick=()=>play(selected);$('play-phrase').onclick=()=>{if(target)play(target);};
-$('next').onclick=next;$('group').onchange=next;$('apply-phrase').onclick=next;
+$('next').onclick=next;$('group').onchange=()=>{next();saveSettings();};$('apply-phrase').onclick=next;
 let sampleIndex=0;const samples=['HELLO WORLD 73','CQ CQ DE MORSE','THE QUICK BROWN FOX 123','GOOD MORNING','PRACTICE MAKES PERFECT'];
 $('sample').onclick=()=>{$('phrase').value=samples[++sampleIndex%samples.length];next();};
-$('hint').onchange=renderTarget;$('show-live').onchange=renderInput;
-for(const [id,suffix] of [['speed',' WPM'],['gap',' ms'],['volume','%']])$(id).oninput=()=>{$(id+'-value').textContent=$(id).value+suffix;};
-$('repeat').onchange=()=>{stopInput();};
-drawMap();highlight(MORSE.E);setInterval(tick,16);
+$('hint').onchange=()=>{renderTarget();saveSettings();};$('show-live').onchange=()=>{renderInput();saveSettings();};
+for(const [id,suffix] of [['speed',' WPM'],['gap',' ms'],['volume','%']])$(id).oninput=()=>{$(id+'-value').textContent=$(id).value+suffix;saveSettings();};
+$('repeat').onchange=()=>{stopInput();saveSettings();};
+$('auto').onchange=saveSettings;
+loadSettings();
+drawMap();renderInput();setInterval(tick,16);
 
 $('toggle-map').onclick=()=>{
-  const hidden=!$('map-content').hidden;
+  setMapHidden(!$('map-content').hidden);
+  saveSettings();
+};
+function setMapHidden(hidden){
   $('map-content').hidden=hidden;
   $('toggle-map').setAttribute('aria-expanded',String(!hidden));
   $('toggle-map').setAttribute('aria-label',hidden?'符号の地図を表示':'符号の地図を隠す');
   $('toggle-map').innerHTML=hidden?'<span aria-hidden="true">⌄</span> 表示':'<span aria-hidden="true">⌃</span> 隠す';
-};
+}
+
+// Only preferences are stored. Text, answers and audio activation stay session-local.
+function saveSettings(){
+  const settings={mapHidden:$('map-content').hidden};
+  for(const id of ['speed','gap','volume'])settings[id]=Number($(id).value);
+  for(const id of ['repeat','group'])settings[id]=$(id).value;
+  for(const id of ['hint','show-live','auto'])settings[id]=$(id).checked;
+  try{localStorage.setItem('morse-settings-v1',JSON.stringify(settings));}
+  catch{$('settings-note').textContent='このブラウザでは設定を保存できません。この画面では引き続き変更できます。';}
+}
+function loadSettings(){
+  try{
+    const settings=JSON.parse(localStorage.getItem('morse-settings-v1'));
+    if(!settings||typeof settings!=='object'||Array.isArray(settings))return;
+    for(const [id,min,max,step,suffix] of [['speed',5,30,1,' WPM'],['gap',300,2000,50,' ms'],['volume',0,50,1,'%']]){
+      const value=settings[id];
+      if(typeof value==='number'&&Number.isFinite(value)&&value>=min&&value<=max&&(value-min)%step===0){$(id).value=String(value);$(id+'-value').textContent=value+suffix;}
+    }
+    for(const [id,values] of [['repeat',['single','repeat']],['group',['all','letters','numbers']]])if(values.includes(settings[id]))$(id).value=settings[id];
+    for(const id of ['hint','show-live','auto'])if(typeof settings[id]==='boolean')$(id).checked=settings[id];
+    if(typeof settings.mapHidden==='boolean')setMapHidden(settings.mapHidden);
+  }catch{/* Blocked storage or malformed data must never prevent practice. */}
+}
+})();
