@@ -10,10 +10,11 @@ class Element {
   replaceChildren(...nodes){this.children=nodes;}
   addEventListener(k,fn){this.handlers[k]=fn;}
   setPointerCapture(){}
+  scrollIntoView(){}
 }
 const elements={};const html=fs.readFileSync(__dirname+'/index.html','utf8');
 for(const match of html.matchAll(/<([a-z]+)[^>]*\bid="([^"]+)"[^>]*>/g)){const n=elements[match[2]]=new Element(match[1]);const value=match[0].match(/\bvalue="([^"]*)"/);if(value)n.value=value[1];n.checked=/\bchecked\b/.test(match[0]);}
-elements.repeat.value='single';elements.group.value='TMO';elements.phrase.value='HELLO WORLD 73';
+elements.speed.value='12';elements.gap.value='900';elements.repeat.value='single';elements.group.value='TMO';elements.phrase.value='HELLO WORLD 73';
 const modeButtons=['free','letter','phrase'].map(mode=>{const n=new Element('button');n.dataset.mode=mode;return n;});
 const routes=['---','....','.---'].map(route=>{const n=new Element('button');n.dataset.route=route;return n;});
 const descendants=()=>{const out=[];function walk(n){out.push(n);n.children.forEach(walk);}Object.values(elements).forEach(walk);return out;};
@@ -40,7 +41,8 @@ run("reset();$('auto').checked=false;$('repeat').value='single'");
 elements.dit.handlers.pointerenter({pointerType:'mouse'});run('tick()');elements.dit.handlers.pointerleave({pointerType:'mouse'});advance(210);assert.equal(run('sequence'),'.');
 handlers.blur();advance(2000);assert.equal(run('held.size'),0);assert.equal(run('sequence'),'');
 run("start('f','.');tick();start('j','-')");run('pause()');assert.equal(run('pending.length'),0);
-run("reset();$('repeat').value='single'");for(let i=0;i<6;i++)pulse('.');assert.equal(run('sequence').length,5,'Sixth pulse rejected');
+run("reset();$('repeat').value='single'");for(let i=0;i<6;i++)pulse('.');assert.equal(run('sequence').length,6,'Overflow marked invalid without stopping keyer');
+run("reset();$('repeat').value='repeat';start('mouse','.');");for(let i=0;i<9;i++)advance(210);assert.equal(run('held.size'),1,'Holding beyond five must keep firing');assert.equal(run('sequence').length,6);run("release('mouse');reset();$('repeat').value='single'");
 // F/J remain usable after the sound or mode button received focus.
 run('reset()');handlers.keydown({key:'f',target:new Element('button'),preventDefault(){}});run('tick()');handlers.keyup({key:'f'});assert.equal(run('sequence'),'.');
 // Playback duration: E [7 units] E = 9 units including tones.

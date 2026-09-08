@@ -6,6 +6,7 @@ const cleanPhrase = value => value.toUpperCase().replace(/[^A-Z0-9\s]/g,'').repl
 const symbols = value => value.replace(/\./g,'·').replace(/-/g,'−');
 const $ = id => document.getElementById(id);
 const all = selector => [...document.querySelectorAll(selector)];
+let family='TMO', familyPractice='';
 let sequence='', transcript='', selected='E', mode='free', target='', progress=0;
 let pending=[], held=new Map(), busyUntil=0, toneUntil=0, idleAt=0, lastSymbol='-', lastDecoded='—';
 let audio=null, soundOn=false, oscillator=null, gain=null;
@@ -22,7 +23,7 @@ function drawMap() {
   const positions={'':{x:480,y:45}};
   for(const code of [...paths].sort((a,b)=>a.length-b.length)){
     const parent=positions[code.slice(0,-1)], depth=code.length;
-    const x=parent.x+(code.endsWith('.')?1:-1)*(450/2**depth),y=45+depth*85;
+    const x=parent.x+(code.endsWith('.')?-1:1)*(450/2**depth),y=45+depth*85;
     positions[code]={x,y};
     el('path',{d:`M ${parent.x} ${parent.y+14} V ${y-25} H ${x} V ${y-14}`,class:'edge','data-code':code});
     const char=REVERSE[code];
@@ -38,9 +39,9 @@ function drawMap() {
     const name=document.createElement('span'),code=document.createElement('small');name.textContent=char;code.textContent=symbols(MORSE[char]);b.append(name,code);b.onclick=()=>choose(char);$('alphabet').append(b);
   }
 }
-function highlight(code){for(const n of all('[data-code]'))n.classList.toggle('active',!!code&&code.startsWith(n.getAttribute('data-code')));$('path-label').textContent=pathFor(code);}
+function highlight(code){all('[data-step]').forEach(n=>n.setAttribute('aria-pressed',String(n.dataset.step===REVERSE[code])));for(const n of all('[data-code]'))n.classList.toggle('active',!!code&&code.startsWith(n.getAttribute('data-code')));$('path-label').textContent=pathFor(code);}
 function choose(char){selected=char;highlight(MORSE[char]);if(!sequence){lastDecoded=char;$('decoded').textContent=$('show-live').checked?char:'?';$('sequence').textContent=symbols(MORSE[char]);}$('status').textContent=`見本 ${char} / ${symbols(MORSE[char])}`;}
-function renderInput(){highlight(sequence);$('sequence').textContent=symbols(sequence);$('decoded').textContent=$('show-live').checked?(sequence?(REVERSE[sequence]||'?'):lastDecoded):'?';$('transcript').textContent=transcript||'入力した文字がここに並びます';}
+function renderInput(){highlight(sequence||MORSE[lastDecoded]||'');$('sequence').textContent=symbols(sequence);$('decoded').textContent=$('show-live').checked?(sequence?(REVERSE[sequence]||'?'):lastDecoded):'?';$('transcript').textContent=transcript||'入力した文字がここに並びます';}
 function renderTarget(){
   $('target').replaceChildren();
   [...target].forEach((char,i)=>{const s=document.createElement('span');s.textContent=char===' '?'␣':char;s.className=i<progress?'done':i===progress?'current':'';$('target').append(s);});
@@ -93,7 +94,7 @@ function confirm(){
 function addSpace(){if(playing)return;stopInput();confirm();if(!transcript.endsWith(' ')&&(transcript||mode!=='free'))accept(' ');renderInput();}
 function start(source,s){
   if(playing||held.has(source))return;
-  held.set(source,s);if(pending.length<8)pending.push(s);idleAt=0;
+  held.set(source,s);pending=[s];idleAt=0;tick();
 }
 function release(source){held.delete(source);if(!held.size)idleAt=Math.max(performance.now(),toneUntil);}
 function tick(){
@@ -104,22 +105,23 @@ function tick(){
     let s=pending.shift();
     if(!s&&$('repeat').value==='repeat'&&held.size){const values=[...held.values()];s=values.includes('.')&&values.includes('-')?(lastSymbol==='.'?'-':'.'):values[values.length-1];}
     if(s){
-      if(sequence.length>=5){message('英数字は最大5打です。文字を確定するか、1つ戻してください。');pending=[];held.clear();return;}
-      const duration=(s==='.'?1:3)*unit();sequence+=s;lastSymbol=s;toneUntil=now+duration;busyUntil=toneUntil+unit();idleAt=toneUntil;beep(duration);renderInput();$('status').textContent=REVERSE[sequence]?`入力中 ${sequence.length} 打`:'続けて入力';
+      if(sequence.length>=5)message('5打を超えました。連打は続きます。離して区切り、もう一度入力してください。');
+      const duration=(s==='.'?1:3)*unit();sequence=(sequence+s).slice(0,6);lastSymbol=s;toneUntil=now+duration;busyUntil=toneUntil+unit();idleAt=toneUntil;beep(duration);$(s==='.'?'dit':'dah').classList.add('firing');renderInput();$('status').textContent=REVERSE[sequence]?`入力中 ${sequence.length} 打`:'続けて入力';
     }
   }
   if(sequence&&!pending.length&&!held.size&&now>=toneUntil){const wait=Math.max(Number($('gap').value),3*unit());const ratio=Math.min(1,(now-idleAt)/wait);$('meter').style.width=$('auto').checked?`${ratio*100}%`:'0%';if($('auto').checked&&ratio>=1)confirm();}
 }
 function next(){
   reset();progress=0;
-  if(mode==='letter'){let pool=$('group').value;if(pool==='letters')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ';if(pool==='numbers')pool='0123456789';if(pool==='all')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';target=pool[Math.floor(Math.random()*pool.length)];}
+  if(mode==='letter'){let pool=$('group').value;if(pool==='letters')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ';if(pool==='numbers')pool='0123456789';if(pool==='all')pool='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';target=familyPractice||pool[Math.floor(Math.random()*pool.length)];}
   else if(mode==='phrase'){target=cleanPhrase($('phrase').value);$('normalized').textContent=target?`練習文：${target}`:'英字か数字を入力してください。';}
   else target='';renderTarget();message(mode==='free'?'自由に入力できます。空白は Space。':target?'表示された文字をパドルで入力してください。':'練習文を入力してください。');
 }
-for(const b of all('[data-mode]'))b.onclick=()=>{mode=b.dataset.mode;all('[data-mode]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));$('exercise').hidden=mode==='free';$('phrase-tools').hidden=mode!=='phrase';$('group-wrap').hidden=mode!=='letter';next();};
+for(const b of all('[data-mode]'))b.onclick=()=>{familyPractice='';mode=b.dataset.mode;all('[data-mode]').forEach(n=>n.setAttribute('aria-pressed',String(n===b)));$('exercise').hidden=mode==='free';$('phrase-tools').hidden=mode!=='phrase';$('group-wrap').hidden=mode!=='letter';next();};
 for(const [id,s] of [['dit','.'],['dah','-']]){
   const n=$(id);
   n.addEventListener('pointerenter',e=>{if(e.pointerType==='mouse')start('mouse',s);});
+  n.addEventListener('pointermove',e=>{if(e.pointerType==='mouse'&&!held.has('mouse'))start('mouse',s);});
   n.addEventListener('pointerleave',e=>{if(e.pointerType==='mouse')release('mouse');});
   n.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'){e.preventDefault();n.setPointerCapture(e.pointerId);start(`touch${e.pointerId}`,s);}});
   for(const ev of ['pointerup','pointercancel','lostpointercapture'])n.addEventListener(ev,e=>{if(e.pointerType!=='mouse')release(`touch${e.pointerId}`);});
@@ -128,7 +130,7 @@ for(const [id,s] of [['dit','.'],['dah','-']]){
 }
 window.addEventListener('keydown',e=>{
   if(e.ctrlKey||e.altKey||e.metaKey||/INPUT|TEXTAREA|SELECT/.test(e.target.tagName))return;
-  const k=e.key.toLowerCase();if((e.target.tagName==='BUTTON'||e.target.getAttribute('role')==='button')&&(k==='enter'||k===' '))return;if(!['f','j','enter',' ','backspace','escape'].includes(k))return;e.preventDefault();if(e.repeat)return;
+  const k=e.key.toLowerCase();if((e.target.tagName==='BUTTON'||e.target.getAttribute('role')==='button')&&(k==='enter'||k===' ')&&!sequence&&!pending.length)return;if(!['f','j','enter',' ','backspace','escape'].includes(k))return;e.preventDefault();if(e.repeat)return;
   if(k==='f'||k==='j')start(k,k==='f'?'.':'-');else if(k==='enter'){stopInput();confirm();}else if(k===' ')addSpace();else if(k==='backspace')undo();else{stopInput();stopPlayback();}
 });
 window.addEventListener('keyup',e=>release(e.key.toLowerCase()));
@@ -138,11 +140,31 @@ function undo(){stopInput();stopPlayback();if(sequence)sequence=sequence.slice(0
 $('undo').onclick=undo;$('clear').onclick=()=>{reset();progress=0;renderTarget();message('入力をクリアしました。');};$('confirm').onclick=()=>{stopInput();confirm();};$('space').onclick=addSpace;
 $('sound').onclick=()=>{if(soundOn){soundOn=false;stopTone();$('sound').textContent='音を有効にする';$('sound').setAttribute('aria-pressed','false');}else enableSound();};
 $('hear').onclick=()=>play(selected);$('play-phrase').onclick=()=>{if(target)play(target);};
-all('[data-route]').forEach(b=>b.onclick=()=>choose(REVERSE[b.dataset.route]));
-$('next').onclick=next;$('group').onchange=next;$('apply-phrase').onclick=next;
+function renderLesson(){
+  const descriptions={TMO:'長点を1つずつ追加。T は1つ、M は2つ、O は3つ。',EISH:'短点を1つずつ追加。1・2・3・4のリズムで覚えます。',EAWJ:'最初は短点1つ。そこから長点だけを1つずつ足します。'};
+  $('lesson-description').textContent=descriptions[family];$('lesson-steps').replaceChildren();
+  [...family].forEach((char,i)=>{
+    const b=document.createElement('button');b.dataset.step=char;b.setAttribute('aria-pressed','false');b.setAttribute('aria-label',`${char} ${symbols(MORSE[char])} の見本`);
+    const letter=document.createElement('strong');letter.textContent=char;
+    const code=document.createElement('span');code.className='step-code';
+    [...MORSE[char]].forEach((s,j)=>{const mark=document.createElement('i');mark.textContent=s==='.'?'●':'▬';if(j===MORSE[char].length-1)mark.className='added';code.append(mark);});
+    const caption=document.createElement('small');caption.textContent=i?'＋ '+(MORSE[char].endsWith('.')?'短点':'長点'):'ここから';
+    b.append(letter,code,caption);b.onclick=()=>choose(char);$('lesson-steps').append(b);
+  });
+  all('[data-family]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.family===family)));choose(family[0]);
+}
+all('[data-family]').forEach(b=>b.onclick=()=>{family=b.dataset.family;renderLesson();});
+$('practice-path').onclick=()=>{
+  familyPractice=family;mode='letter';$('group').value=family;
+  all('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode==='letter')));
+  $('exercise').hidden=false;$('phrase-tools').hidden=true;$('group-wrap').hidden=false;next();
+  message(`${[...family].join(' → ')} の順に入力。文字ごとに離して確定しましょう。`);
+  $('station-title').scrollIntoView({behavior:'smooth',block:'nearest'});
+};
+$('next').onclick=next;$('group').onchange=()=>{familyPractice='';next();};$('apply-phrase').onclick=next;
 let sampleIndex=0;const samples=['HELLO WORLD 73','CQ CQ DE MORSE','THE QUICK BROWN FOX 123','GOOD MORNING','PRACTICE MAKES PERFECT'];
 $('sample').onclick=()=>{$('phrase').value=samples[++sampleIndex%samples.length];next();};
 $('hint').onchange=renderTarget;$('show-live').onchange=renderInput;
 for(const [id,suffix] of [['speed',' WPM'],['gap',' ms'],['volume','%']])$(id).oninput=()=>{$(id+'-value').textContent=$(id).value+suffix;};
 $('repeat').onchange=()=>{stopInput();};
-drawMap();highlight(MORSE.E);setInterval(tick,16);
+drawMap();renderLesson();setInterval(tick,16);
