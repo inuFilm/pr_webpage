@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#203744">
+  <meta name="description" content="撮影処理学習処。キャラと背景を重ねて、色・光・ぼけを試しながら学ぶ教材。画像は端末内だけで処理します。">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'">
+  <title>撮影処理学習処</title>
+  <link rel="icon" href="../../img/favicons/favicon.ico">
+  <link rel="stylesheet" href="../learning/learning.css">
+  <link rel="stylesheet" href="./style.css">
+  <script src="../learning/lesson-state.js" defer></script>
+  <script type="module" src="./js/app.js"></script>
+</head>
+<body>
+<header class="top">
+  <a class="back" href="../../tech/articles/tools.html" aria-label="ツールまとめに戻る">‹</a>
+  <span class="mark" aria-hidden="true">◒</span><h1>撮影処理学習処</h1>
+  <div class="tabs"><button id="lab-tab" aria-pressed="true">ラボ</button><button id="book-tab" aria-pressed="false">教科書 <span>14章</span></button></div>
+  <span class="privacy">画像は端末内で処理</span>
+</header>
+<div class="toolbar" aria-label="操作">
+  <details class="menu"><summary>読み込み <span>⌄</span></summary><div class="popover">
+    <label class="file-button">キャラ画像<input id="file-char" type="file" accept="image/png,image/jpeg,image/webp"></label>
+    <label class="file-button">背景画像<input id="file-bg" type="file" accept="image/png,image/jpeg,image/webp"></label>
+    <label class="file-button">前景（BOOK）画像<input id="file-book" type="file" accept="image/png,image/jpeg,image/webp"></label>
+    <label class="file-button">シーン JSON<input id="file-scene" type="file" accept=".json,application/json"></label>
+    <p>PNG / JPEG / WebP。キャラは透明 PNG を推奨。</p>
+    <label>ドロップ先<select id="drop-role"><option value="char">キャラ</option><option value="bg">背景</option><option value="book">前景</option></select></label>
+  </div></details>
+  <div class="match-action"><button id="auto-match" class="primary" disabled>背景に合わせる</button><details class="menu"><summary aria-label="背景合わせの設定">⌄</summary><div class="popover" id="match-options">
+    <h2>背景合わせ</h2><label>測る範囲<select id="match-region"><option value="behind">キャラの背後</option><option value="whole">背景全体</option></select></label>
+    <label>全体の強さ<input id="match-strength" type="range" min="0" max="1" step=".01" value="1"><output id="match-strength-value">1.00</output></label>
+    <label><input type="checkbox" data-match="ambient" checked> 環境色</label><label><input type="checkbox" data-match="stats" checked> 統計マッチ</label><label><input type="checkbox" data-match="range" checked> 明暗の範囲</label><label><input type="checkbox" data-match="wrap" checked> ライトラップ</label><label><input type="checkbox" data-match="fog" checked> 空気感</label><label><input type="checkbox" data-match="edge" checked> エッジと粒子</label><label><input type="checkbox" data-match="direction" checked> 光の方向</label><label><input type="checkbox" data-match="whitePara"> 白パラも</label>
+  </div></details></div>
+  <label class="compact">サンプル<select id="sample"><option value="sunset">夕焼けの街</option><option value="day">昼の草原</option><option value="night">夜の部屋</option><option value="rain">曇りの雨</option></select></label>
+  <details class="menu"><summary>プリセット ⌄</summary><div class="popover" id="presets"><button data-preset="intro">基本の2枚</button><button data-preset="ambient">環境色だけ</button><button data-preset="wrap-fog">逆光と空気感</button><button data-preset="automatch">夕方に合わせる</button><button id="blank">白紙</button></div></details>
+  <div class="toolbar-spacer"></div>
+  <button id="ab-toggle" aria-pressed="false" title="効果なしと現在を比較">A/B 比較</button>
+  <button id="undo" aria-label="元に戻す" title="Ctrl+Z" disabled>↶</button><button id="redo" aria-label="やり直す" title="Ctrl+Shift+Z" disabled>↷</button>
+  <details class="menu right"><summary>書き出し ⌄</summary><div class="popover"><button data-export="composite">PNG（合成）</button><button data-export="char">PNG（キャラだけ・透明）</button><button data-export="scene">JSON（シーン）</button><button data-export="report">測定レポート</button><p>画像本体は JSON に含まれません。再開時は元画像を読み込みます。</p></div></details>
+  <details class="menu right"><summary aria-label="設定">⚙</summary><div class="popover">
+    <h2>設定</h2><label>作業解像度<select id="resolution"><option value="1024">長辺 1024 px</option><option value="2048">長辺 2048 px</option><option value="4096">元の解像度（4096まで）</option></select></label>
+    <label>合成空間<select id="space"><option value="linear">リニア</option><option value="gamma">ガンマ</option></select></label>
+    <label>出力露出 EV<input id="output-exposure" type="number" min="-5" max="5" step=".1" value="0"></label>
+    <label><input id="checker" type="checkbox" checked> 透明部を市松表示</label><p id="gpu-info"></p><p>書き出しは元の解像度、長辺4096 pxまで。</p>
+  </div></details>
+</div>
+<p id="status" role="status">サンプルを読み込んでいます…</p>
+<p id="storage-warning" role="status" hidden>この環境では自動保存ができません。シーンJSONを書き出して保管してください。</p>
+<main id="lab" class="lab">
+  <aside id="layers-panel" class="panel layers-panel"><div class="panel-heading"><h2>レイヤー</h2><span>上ほど手前</span></div>
+    <div class="add-row"><select id="layer-type" aria-label="追加するレイヤー"><option value="solid">単色</option><option value="gradient">パラ</option><option value="adjust">調整</option><option value="group">グループ</option></select><button id="add-layer">＋追加</button></div>
+    <div id="layers" role="list" aria-label="レイヤー一覧"></div>
+    <div class="layer-actions"><button id="layer-up" title="1つ上へ" aria-label="レイヤーを上へ">↑</button><button id="layer-down" title="1つ下へ" aria-label="レイヤーを下へ">↓</button><button id="duplicate">複製</button><button id="group">まとめる</button><button id="delete">削除</button><button id="solo" aria-pressed="false">単独表示</button></div>
+    <p class="hint">ドラッグで順番変更。グループの名前へ Shift＋ドロップで中へ。Alt＋選択で単独表示。</p>
+    <button id="post-select" class="wide">全体の効果 <span id="post-count">0</span></button>
+    <div class="first-steps"><b>まずは2枚から</b><ol><li>キャラと背景を選ぶ</li><li>「背景に合わせる」を押す</li><li>各段を切り替えて見比べる</li></ol><a href="#compolab-why-float">なぜ浮いて見える？ →</a></div>
+  </aside>
+  <section class="center" aria-label="合成プレビュー">
+    <div class="view-heading"><span id="scene-name">色をなじませる</span><span id="dimensions">1920 × 1080</span></div>
+    <div id="viewport" tabindex="0" aria-label="ビュー。ホイールで拡大、Spaceとドラッグで移動、0で全体表示">
+      <canvas id="view" width="960" height="540"></canvas>
+      <div id="ab-labels" hidden><span>効果なし</span><span>現在</span></div>
+      <div id="drop-hint" hidden>画像を端末内に読み込みます</div>
+    </div>
+    <div class="view-tools"><button id="fit">全体表示</button><label>ズーム<input id="zoom" type="range" min=".25" max="4" step=".05" value="1"><output id="zoom-value">100%</output></label><button id="hold-before">押している間、効果なし</button></div>
+    <label id="ab-control" hidden>比較位置<input id="ab-split" type="range" min="0" max="1" step=".01" value=".5"></label>
+    <section id="scopes-panel" class="scopes panel" aria-label="スコープ">
+      <div class="scope-heading"><h2>スコープ</h2><select id="scope-target" aria-label="スコープの対象"><option value="all">全体</option><option value="bg">背景</option><option value="char">キャラ</option></select><button id="scope-snapshot">前を記録</button><label><input id="scope-overlay" type="checkbox" checked>前を重ねる</label></div>
+      <div class="scope-tabs"><button data-scope="histogram" aria-pressed="true">ヒストグラム</button><button data-scope="waveform" aria-pressed="false">波形</button><button data-scope="vector" aria-pressed="false">ベクトル</button></div>
+      <canvas id="scope" width="600" height="180"></canvas><p id="scope-caption">横は sRGB の明るさ、山の高さは画素の数。黄は記録した「前」です。</p>
+    </section>
+  </section>
+  <aside id="properties-panel" class="panel properties-panel"><div class="panel-heading"><h2>プロパティ</h2><span id="selected-type"></span></div><div id="properties"></div>
+    <details id="report-panel"><summary>背景合わせのレポート</summary><pre id="report">まだ実行していません。</pre></details>
+  </aside>
+  <nav class="mobile-panels" aria-label="パネル選択"><button data-panel="layers" aria-pressed="true">レイヤー</button><button data-panel="properties" aria-pressed="false">プロパティ</button><button data-panel="scopes" aria-pressed="false">スコープ</button></nav>
+</main>
+<section id="textbook" hidden aria-label="教科書"><nav class="lesson-nav"><h2>教科書</h2><p id="lesson-progress">0 / 14 理解した</p><div id="lesson-list"></div></nav><div id="lessons"></div></section>
+<noscript>この教材は JavaScript と WebGL2 を利用します。</noscript>
+</body></html>

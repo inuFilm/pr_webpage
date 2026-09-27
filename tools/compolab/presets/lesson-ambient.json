@@ -1,0 +1,137 @@
+{
+  "version": 1,
+  "name": "環境色をかぶせる",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "none"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "name": "背景",
+      "type": "image",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:bg:sunset"
+      },
+      "children": []
+    },
+    {
+      "id": "character",
+      "name": "キャラ",
+      "type": "image",
+      "role": "char",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 32,
+        "scale": 0.61,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:char"
+      },
+      "children": []
+    },
+    {
+      "id": "Lmudfdiwpw",
+      "name": "背景合わせ",
+      "type": "group",
+      "role": null,
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": "character",
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "baseLayer": "character",
+        "owner": "automatch"
+      },
+      "children": [
+        {
+          "id": "Lmudfdiwpx",
+          "name": "環境色",
+          "type": "solid",
+          "role": null,
+          "visible": true,
+          "opacity": 0.25,
+          "blend": "color",
+          "clipTo": null,
+          "mask": {
+            "source": "none",
+            "invert": false,
+            "feather": 0
+          },
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "scale": 1,
+            "rotate": 0,
+            "flipX": false
+          },
+          "effects": [],
+          "params": {
+            "color": [
+              0.4209249871190931,
+              0.132882124174036,
+              0.08367926921436983
+            ]
+          },
+          "children": []
+        }
+      ]
+    }
+  ],
+  "postEffects": [],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}

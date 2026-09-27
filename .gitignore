@@ -364,3 +364,6 @@ tech/_trash/
 
 # Keep the Morse app usage and validation documentation.
 !tools/morse/README.md
+
+# Keep the compositing lab usage and acceptance record.
+!tools/compolab/README.md

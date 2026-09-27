@@ -1,0 +1,260 @@
+{
+  "version": 1,
+  "name": "スコープの読み方",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "none"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "name": "背景",
+      "type": "image",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:bg:sunset"
+      },
+      "children": []
+    },
+    {
+      "id": "character",
+      "name": "キャラ",
+      "type": "image",
+      "role": "char",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 32,
+        "scale": 0.61,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [
+        {
+          "type": "lightwrap",
+          "enabled": true,
+          "params": {
+            "radius": 0.03,
+            "intensity": 0.5,
+            "screen": false
+          },
+          "owner": "automatch"
+        },
+        {
+          "type": "fog",
+          "enabled": true,
+          "params": {
+            "color": [
+              0.4209249871190931,
+              0.132882124174036,
+              0.08367926921436983
+            ],
+            "density": 0.08
+          },
+          "owner": "automatch"
+        },
+        {
+          "type": "edgesoft",
+          "enabled": true,
+          "params": {
+            "radius": 0.0022064711660905166
+          },
+          "owner": "automatch"
+        },
+        {
+          "type": "grain",
+          "enabled": true,
+          "params": {
+            "intensity": 0.015,
+            "size": 1.5,
+            "seed": 42,
+            "mono": true
+          },
+          "owner": "automatch"
+        }
+      ],
+      "params": {
+        "src": "sample:char"
+      },
+      "children": []
+    },
+    {
+      "id": "Lmudfdik5k",
+      "name": "背景合わせ",
+      "type": "group",
+      "role": null,
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": "character",
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "baseLayer": "character",
+        "owner": "automatch"
+      },
+      "children": [
+        {
+          "id": "Lmudfdik5l",
+          "name": "環境色",
+          "type": "solid",
+          "role": null,
+          "visible": true,
+          "opacity": 0.25,
+          "blend": "color",
+          "clipTo": null,
+          "mask": {
+            "source": "none",
+            "invert": false,
+            "feather": 0
+          },
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "scale": 1,
+            "rotate": 0,
+            "flipX": false
+          },
+          "effects": [],
+          "params": {
+            "color": [
+              0.4209249871190931,
+              0.132882124174036,
+              0.08367926921436983
+            ]
+          },
+          "children": []
+        },
+        {
+          "id": "Lmudfdin8m",
+          "name": "統計マッチ",
+          "type": "adjust",
+          "role": null,
+          "visible": true,
+          "opacity": 1,
+          "blend": "normal",
+          "clipTo": null,
+          "mask": {
+            "source": "none",
+            "invert": false,
+            "feather": 0
+          },
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "scale": 1,
+            "rotate": 0,
+            "flipX": false
+          },
+          "effects": [],
+          "params": {
+            "kind": "stats",
+            "strength": 0.6,
+            "sourceMean": [
+              0.6185220346897153,
+              0.06448874033005435,
+              0.04842135497695379
+            ],
+            "sourceStd": [
+              0.17635265851822812,
+              0.0346924578821907,
+              0.021872969984322196
+            ],
+            "targetMean": [
+              0.5637802551992552,
+              0.07017325006244826,
+              0.052832074174205136
+            ],
+            "targetStd": [
+              0.11625714777345987,
+              0.028149834585433957,
+              0.04045617940705005
+            ]
+          },
+          "children": []
+        },
+        {
+          "id": "Lmudfdionn",
+          "name": "明暗の範囲",
+          "type": "adjust",
+          "role": null,
+          "visible": true,
+          "opacity": 1,
+          "blend": "normal",
+          "clipTo": null,
+          "mask": {
+            "source": "none",
+            "invert": false,
+            "feather": 0
+          },
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "scale": 1,
+            "rotate": 0,
+            "flipX": false
+          },
+          "effects": [],
+          "params": {
+            "kind": "range",
+            "strength": 0.1614632328885471,
+            "sourceLow": 0.36787554497401026,
+            "sourceHigh": 0.8234343194409814,
+            "targetLow": 0.21523954160797854,
+            "targetHigh": 0.7490693930717109
+          },
+          "children": []
+        }
+      ]
+    }
+  ],
+  "postEffects": [],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}

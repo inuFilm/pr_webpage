@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "name": "リニアとガンマ：合成の明るさ",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "none"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "name": "黒",
+      "type": "solid",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "color": [
+          0,
+          0,
+          0
+        ]
+      },
+      "children": []
+    },
+    {
+      "id": "character",
+      "name": "白50%",
+      "type": "solid",
+      "role": "char",
+      "visible": true,
+      "opacity": 0.5,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "rect",
+        "rect": [
+          0.15,
+          0.1,
+          0.85,
+          0.9
+        ],
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "color": [
+          1,
+          1,
+          1
+        ]
+      },
+      "children": []
+    }
+  ],
+  "postEffects": [],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}
