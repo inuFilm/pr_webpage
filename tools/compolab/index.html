@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#203744">
   <meta name="description" content="撮影処理学習処。キャラと背景を重ねて、色・光・ぼけを試しながら学ぶ教材。画像は端末内だけで処理します。">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; connect-src 'self' blob: data:; script-src 'self' 'sha256-1L0w7/9fgr1D/lg3mkCUoAT/vXk/Io8bX1zkYq4TMH0='; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'none'">
   <title>撮影処理学習処</title>
   <link rel="icon" href="../../img/favicons/favicon.ico">
   <link rel="stylesheet" href="../learning/learning.css">
   <link rel="stylesheet" href="./style.css">
   <script src="../learning/lesson-state.js" defer></script>
+  <script type="importmap">{"imports":{"three":"./vendor/three.module.min.js","@pixiv/three-vrm":"./vendor/three-vrm.module.min.js"}}</script>
   <script type="module" src="./js/app.js"></script>
 </head>
 <body>
 <header class="top">
   <a class="back" href="../../tech/articles/tools.html" aria-label="ツールまとめに戻る">‹</a>
   <span class="mark" aria-hidden="true">◒</span><h1>撮影処理学習処</h1>
-  <div class="tabs"><button id="lab-tab" aria-pressed="true">ラボ</button><button id="book-tab" aria-pressed="false">教科書 <span>14章</span></button></div>
+  <div class="tabs"><button id="lab-tab" aria-pressed="true">ラボ</button><button id="book-tab" aria-pressed="false">教科書 <span>29章</span></button></div>
   <span class="privacy">画像は端末内で処理</span>
 </header>
 <div class="toolbar" aria-label="操作">
@@ -25,6 +26,9 @@
     <label class="file-button">キャラ画像<input id="file-char" type="file" accept="image/png,image/jpeg,image/webp"></label>
     <label class="file-button">背景画像<input id="file-bg" type="file" accept="image/png,image/jpeg,image/webp"></label>
     <label class="file-button">前景（BOOK）画像<input id="file-book" type="file" accept="image/png,image/jpeg,image/webp"></label>
+    <button id="sample-model">3D の同梱素体を使う</button>
+    <label class="file-button">3Dモデル＋関連ファイル<input id="file-model" type="file" multiple accept=".vrm,.glb,.gltf,.bin,.png,.jpg,.jpeg,.webp"></label>
+    <p>VRM / GLB / glTF。別ファイルのbin・画像も一緒に選びます。モデルは端末内で処理します。</p>
     <label class="file-button">シーン JSON<input id="file-scene" type="file" accept=".json,application/json"></label>
     <p>PNG / JPEG / WebP。キャラは透明 PNG を推奨。</p>
     <label>ドロップ先<select id="drop-role"><option value="char">キャラ</option><option value="bg">背景</option><option value="book">前景</option></select></label>
@@ -35,7 +39,7 @@
     <label><input type="checkbox" data-match="ambient" checked> 環境色</label><label><input type="checkbox" data-match="stats" checked> 統計マッチ</label><label><input type="checkbox" data-match="range" checked> 明暗の範囲</label><label><input type="checkbox" data-match="wrap" checked> ライトラップ</label><label><input type="checkbox" data-match="fog" checked> 空気感</label><label><input type="checkbox" data-match="edge" checked> エッジと粒子</label><label><input type="checkbox" data-match="direction" checked> 光の方向</label><label><input type="checkbox" data-match="whitePara"> 白パラも</label>
   </div></details></div>
   <label class="compact">サンプル<select id="sample"><option value="sunset">夕焼けの街</option><option value="day">昼の草原</option><option value="night">夜の部屋</option><option value="rain">曇りの雨</option></select></label>
-  <details class="menu"><summary>プリセット ⌄</summary><div class="popover" id="presets"><button data-preset="intro">基本の2枚</button><button data-preset="ambient">環境色だけ</button><button data-preset="wrap-fog">逆光と空気感</button><button data-preset="automatch">夕方に合わせる</button><button id="blank">白紙</button></div></details>
+  <details class="menu"><summary>プリセット ⌄</summary><div class="popover" id="presets"><button data-preset="intro">基本の2枚</button><button data-preset="ambient">環境色だけ</button><button data-preset="wrap-fog">逆光と空気感</button><button data-preset="automatch">夕方に合わせる</button><button data-recipe="sunset">夕方</button><button data-recipe="night">夜</button><button data-recipe="backlight">逆光</button><button data-recipe="memory">回想</button><button data-recipe="horror">ホラー</button><button data-recipe="fresh">爽やか</button><button id="blank">白紙</button></div></details>
   <div class="toolbar-spacer"></div>
   <button id="ab-toggle" aria-pressed="false" title="効果なしと現在を比較">A/B 比較</button>
   <button id="undo" aria-label="元に戻す" title="Ctrl+Z" disabled>↶</button><button id="redo" aria-label="やり直す" title="Ctrl+Shift+Z" disabled>↷</button>
@@ -44,6 +48,7 @@
     <h2>設定</h2><label>作業解像度<select id="resolution"><option value="1024">長辺 1024 px</option><option value="2048">長辺 2048 px</option><option value="4096">元の解像度（4096まで）</option></select></label>
     <label>合成空間<select id="space"><option value="linear">リニア</option><option value="gamma">ガンマ</option></select></label>
     <label>出力露出 EV<input id="output-exposure" type="number" min="-5" max="5" step=".1" value="0"></label>
+    <label>トーンマップ<select id="output-tonemap"><option value="none">なし</option><option value="reinhard">Reinhard</option><option value="aces">ACES 近似</option></select></label>
     <label><input id="checker" type="checkbox" checked> 透明部を市松表示</label><p id="gpu-info"></p><p>書き出しは元の解像度、長辺4096 pxまで。</p>
   </div></details>
 </div>
@@ -78,6 +83,6 @@
   </aside>
   <nav class="mobile-panels" aria-label="パネル選択"><button data-panel="layers" aria-pressed="true">レイヤー</button><button data-panel="properties" aria-pressed="false">プロパティ</button><button data-panel="scopes" aria-pressed="false">スコープ</button></nav>
 </main>
-<section id="textbook" hidden aria-label="教科書"><nav class="lesson-nav"><h2>教科書</h2><p id="lesson-progress">0 / 14 理解した</p><div id="lesson-list"></div></nav><div id="lessons"></div></section>
+<section id="textbook" hidden aria-label="教科書"><nav class="lesson-nav"><h2>教科書</h2><p id="lesson-progress">0 / 29 理解した</p><div id="lesson-list"></div></nav><div id="lessons"></div></section>
 <noscript>この教材は JavaScript と WebGL2 を利用します。</noscript>
 </body></html>

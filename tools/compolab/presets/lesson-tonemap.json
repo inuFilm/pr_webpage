@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "name": "トーンマップとハイライトの丸め",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "reinhard"
+  },
+  "layers": [
+    {
+      "id": "Lmuqo2zx4n",
+      "name": "暗い背景",
+      "type": "solid",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "color": [
+          0.02,
+          0.02,
+          0.02
+        ]
+      },
+      "children": []
+    },
+    {
+      "id": "Lmuqo2zx4o",
+      "name": "HDR の光（2.0）",
+      "type": "solid",
+      "role": "char",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "rect",
+        "rect": [
+          0.3,
+          0.2,
+          0.7,
+          0.8
+        ],
+        "feather": 0,
+        "invert": false
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "color": [
+          2,
+          2,
+          2
+        ]
+      },
+      "children": []
+    }
+  ],
+  "postEffects": [
+    {
+      "type": "glow",
+      "enabled": true,
+      "params": {
+        "threshold": 0.8,
+        "knee": 0.5,
+        "radius": 0.04,
+        "intensity": 0.3,
+        "color": [
+          1,
+          1,
+          1
+        ]
+      }
+    }
+  ],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}

@@ -1,0 +1,101 @@
+{
+  "version": 1,
+  "name": "ディフュージョンとグロー",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "none"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "name": "背景",
+      "type": "image",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:bg:sunset"
+      },
+      "children": []
+    },
+    {
+      "id": "character",
+      "name": "キャラ",
+      "type": "image",
+      "role": "char",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 32,
+        "scale": 0.61,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:char"
+      },
+      "children": []
+    }
+  ],
+  "postEffects": [
+    {
+      "type": "diffusion",
+      "enabled": true,
+      "params": {
+        "radius": 0.03,
+        "intensity": 0.3
+      }
+    },
+    {
+      "type": "glow",
+      "enabled": false,
+      "params": {
+        "threshold": 0.8,
+        "knee": 0.5,
+        "radius": 0.04,
+        "intensity": 0.6,
+        "color": [
+          1,
+          1,
+          1
+        ]
+      }
+    }
+  ],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}

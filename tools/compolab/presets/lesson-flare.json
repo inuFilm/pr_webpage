@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "name": "フレアとアナモフレア",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "none"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "name": "背景",
+      "type": "image",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:bg:sunset"
+      },
+      "children": []
+    },
+    {
+      "id": "character",
+      "name": "キャラ",
+      "type": "image",
+      "role": "char",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 32,
+        "scale": 0.61,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:char"
+      },
+      "children": []
+    }
+  ],
+  "postEffects": [
+    {
+      "type": "flare",
+      "enabled": true,
+      "params": {
+        "x": 0.75,
+        "y": 0.2,
+        "auto": false,
+        "intensity": 0.3,
+        "ghosts": 5,
+        "spacing": 0.3,
+        "halo": 0.4,
+        "color": [
+          1,
+          0.65,
+          0.3
+        ]
+      }
+    },
+    {
+      "type": "anamorphic",
+      "enabled": true,
+      "params": {
+        "threshold": 0.65,
+        "length": 0.4,
+        "intensity": 1.2,
+        "color": [
+          0.4,
+          0.6,
+          1
+        ]
+      }
+    },
+    {
+      "type": "godrays",
+      "enabled": false,
+      "params": {
+        "x": 0.75,
+        "y": 0.2,
+        "auto": false,
+        "threshold": 0.7,
+        "length": 0.7,
+        "intensity": 0.4,
+        "decay": 0.96
+      }
+    }
+  ],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}

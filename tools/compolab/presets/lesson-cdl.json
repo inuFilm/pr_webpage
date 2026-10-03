@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "name": "3-way：暗部・中間・明部",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "none"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "name": "背景",
+      "type": "image",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:bg:day"
+      },
+      "children": []
+    },
+    {
+      "id": "character",
+      "name": "キャラ",
+      "type": "image",
+      "role": "char",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 32,
+        "scale": 0.61,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [
+        {
+          "type": "colorgrade",
+          "enabled": true,
+          "params": {
+            "exposure": 0,
+            "temp": 0,
+            "tint": 0,
+            "contrast": 1,
+            "saturation": 1,
+            "hue": 0,
+            "slope": [
+              1.1,
+              1,
+              0.92
+            ],
+            "offset": [
+              0,
+              0,
+              0.015
+            ],
+            "power": [
+              1.03,
+              1,
+              1
+            ]
+          }
+        }
+      ],
+      "params": {
+        "src": "sample:char"
+      },
+      "children": []
+    }
+  ],
+  "postEffects": [],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}

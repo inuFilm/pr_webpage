@@ -1,5 +1,6 @@
 import {BLENDS,clamp} from './color.js';
 import {effect} from './effects.js';
+import {modelParams} from './model3d.js';
 export const copy=x=>JSON.parse(JSON.stringify(x));
 let sequence=0;
 export const uid=()=> 'L'+Date.now().toString(36)+(sequence++).toString(36);
@@ -51,7 +52,7 @@ export function repairReferences(comp) {
   for(const {layer:l} of flatLayers(comp)){
     if(l.clipTo&&!seen.has(l.clipTo))l.clipTo=null;
     if(l.params.baseLayer&&l.params.baseLayer!==l.clipTo)delete l.params.baseLayer;
-    const id=l.mask.source.split(':')[1];if(id&&!seen.has(id))l.mask.source='none';
+    const id=l.mask.source.split(':')[1];if(id&&!l.mask.source.startsWith('id:')&&!seen.has(id))l.mask.source='none';
     seen.add(l.id);
   }
 }
@@ -76,7 +77,7 @@ export function validateScene(input) {
   const effects=arr=>(Array.isArray(arr)?arr:[]).slice(0,32).map(e=>({...effect(e.type,e.params),enabled:e.enabled!==false,...(e.owner==='automatch'?{owner:'automatch'}:{})}));
   const layers=(arr,depth=0)=>arr.map(raw=>{
     if(depth>8||++count>64)throw new Error('レイヤーは64枚、グループは8段までです');
-    if(!['image','solid','gradient','adjust','group'].includes(raw.type))throw new Error('対応していないレイヤーです');
+    if(!['image','solid','gradient','adjust','group','render3d'].includes(raw.type))throw new Error('対応していないレイヤーです');
     const id=String(raw.id||uid()).slice(0,100);if(ids.has(id))throw new Error('レイヤーIDが重複しています');ids.add(id);
     const t=raw.transform||{},p=raw.params||{},m=raw.mask||{};
     let params={};
@@ -85,12 +86,16 @@ export function validateScene(input) {
       params={src:p.src};
     }
     if(raw.type==='solid')params={color:vec(p.color,[.5,.5,.5],0,16)};
+    if(raw.type==='render3d'){
+      if(typeof p.src!=='string'||!/^(sample:sotai_girl|user:.{1,180})$/.test(p.src))throw new Error('3Dモデルは同梱素体または端末内ファイルだけを指定できます');
+      params=modelParams(p);
+    }
     if(raw.type==='gradient')params={kind:p.kind==='radial'?'radial':'linear',color:vec(p.color,[0,0,0],0,16),angle:number(p.angle,90,-180,180),start:number(p.start,0,0,1),end:number(p.end,.6,0,1),feather:number(p.feather,.5,0,1),alphaStart:number(p.alphaStart,1,0,1),alphaEnd:number(p.alphaEnd,0,0,1)};
     if(raw.type==='adjust'){const e=effect(p.kind||'colorgrade',p);params={...e.params,kind:e.type};}
     if(raw.type==='group'){if(typeof p.baseLayer==='string')params.baseLayer=p.baseLayer;if(p.owner==='automatch')params.owner=p.owner;}
     return layer(raw.type,String(raw.name||'レイヤー').slice(0,100),{id,role:['char','bg','book'].includes(raw.role)?raw.role:null,visible:raw.visible!==false,
       opacity:number(raw.opacity,1,0,1),blend:Object.hasOwn(BLENDS,raw.blend)?raw.blend:'normal',clipTo:typeof raw.clipTo==='string'?raw.clipTo:null,
-      mask:{source:typeof m.source==='string'&&/^(none|gradient|rect|alpha:[\w-]+|luma:[\w-]+)$/.test(m.source)?m.source:'none',invert:m.invert===true,feather:number(m.feather,0,0,.2),rect:vec(m.rect,[.2,.2,.8,.8],0,1),angle:number(m.angle,90,-180,180)},
+      mask:{source:typeof m.source==='string'&&/^(none|gradient|rect|alpha:[\w-]+|luma:[\w-]+|id:\d{1,3})$/.test(m.source)?m.source:'none',invert:m.invert===true,feather:number(m.feather,0,0,.2),rect:vec(m.rect,[.2,.2,.8,.8],0,1),angle:number(m.angle,90,-180,180)},
       transform:{x:number(t.x,0,-8192,8192),y:number(t.y,0,-8192,8192),scale:number(t.scale,1,.01,20),rotate:number(t.rotate,0,-180,180),flipX:t.flipX===true},
       effects:effects(raw.effects),params,children:raw.type==='group'?layers(Array.isArray(raw.children)?raw.children:[],depth+1):[]});
   });

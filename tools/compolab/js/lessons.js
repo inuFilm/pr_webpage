@@ -1,4 +1,6 @@
 import {blend,linearToSrgb,srgbToLinear,clamp} from './color.js';
+import {EXTRA_LESSONS,GLOSSARY} from './lessons-extra.js';
+import {RECIPES} from './presets.js';
 export const LESSONS=[
   {id:'intro',part:'Part 0 · はじめに',title:'この教材とラボの使い方',core:'撮影処理は、素材を重ねる「合成」と、色・光・ぼけを整える「効果」の組み合わせです。アニメのセルと背景、実写の人物とロケ背景は、素材が違っても見比べる項目は共通です。',how:'最初はサンプルのキャラと夕焼けを使います。「背景に合わせる」を押し、レイヤーの目のボタンで各段を消してみましょう。A/B の左が効果なし、右が現在です。気になる変化は教科書で確認し、元の設定には Undo で戻れます。',failure:'最初から効果を全部強くすると、何が効いたのか分からなくなります。まず環境色、次に明暗、最後に縁という順に一つずつ観察します。',code:'素材 → 合成 → 効果 → 出力',question:'何から試すと、効果の役割が分かりやすい？',options:['一つずつ ON / OFF にして比べる','すべての強さを最大にする'],answer:0,explain:'一つだけ変えると、どの処理が色・明暗・縁を変えたか追えます。',caption:'素材、色合わせ、光、出力を分けて考えます。'},
   {id:'pipeline',part:'Part 1 · 基礎',title:'撮影とは：背景・セル・BOOK・効果',core:'アニメでは背景、その上にセル（キャラ）、さらに手前に前景（BOOK）を置きます。同じ画像でも上下関係が変われば、どれが前に見えるかが変わります。調整レイヤーは下にある合成結果を変え、レイヤーの効果はその一枚を変えます。',how:'「読み込み」から前景画像を足すか、単色レイヤーを追加します。不透明度を下げてから、レイヤーを上下へ移動してください。全体の効果にぼかしを足した場合と、キャラだけに足した場合を比べます。',failure:'全体の効果に色調整を置くと、既に良い色の背景まで変わります。キャラだけを直すならキャラの効果、またはキャラにクリップした調整を選びます。',code:'背景 → キャラ → 前景（BOOK）→ 全体の効果',question:'キャラだけの露出を変えたいときは？',options:['全体の効果に露出を足す','キャラの効果に色調整を足す'],answer:1,explain:'キャラの効果なら、背景と前景の画素はそのままです。',caption:'左から奥→手前。レイヤー一覧では手前が上に表示されます。'},
@@ -15,6 +17,7 @@ export const LESSONS=[
   {id:'direction',part:'Part 2 · なじませる',title:'光の方向をそろえる：パラ',core:'パラはグラデーションにブレンドと不透明度を組み合わせたものです。黒パラは乗算で暗くし、白パラはスクリーンや加算で明るくします。背景の左右の明るさから、キャラのどちら側を暗くするか考えます。',how:'黒パラの角度を回し、開始・終了位置を動かします。キャラにクリップしてから光源の反対側を少し暗くしてください。背景合わせは左右のL平均差が0.08以上のときだけ方向の段を作ります。',failure:'明るい側に白パラを強く足すと、トゥーンの塗りが白く飛びます。まず影側を控えめに落とし、必要な場合だけ白パラを足します。',code:'黒パラ = グラデーション + 乗算 + 不透明度',question:'左から光が来るとき、まず試す黒パラは？',options:['右側を少し暗くする','左側だけを真っ黒にする'],answer:0,explain:'光源の反対側を軽く落として方向をそろえます。',caption:'光の向きとパラの角度を揃えます。'},
   {id:'automatch',part:'Part 2 · なじませる',title:'オートマッチの中身とレポート',core:'ボタンは結果を焼き込まず、環境色・統計マッチ・明暗の範囲・条件付きのパラをグループに作ります。縁の処理はキャラの効果です。レポートは元と背景、処理後の平均、明暗の範囲、平均距離を実際の画素から測ります。',how:'段の選択で環境色だけを有効にして実行し、次に統計と明暗を加えます。背景合わせグループが増殖せず更新されること、Undo一回で前へ戻ることも確かめます。レポートの距離が減っていても、顔や服の色が読み取れるか目で確認します。',failure:'背景やキャラの位置を変えた後は、以前の統計がそのまま最適とは限りません。再実行して測り直します。設定を手で変えた後のレポートを「現在の測定結果」と取り違えないでください。',code:'測定 → 編集できる段を作る → 再測定 → 目で判断',question:'レポートの距離が小さくなったら、それだけで完成？',options:['はい。数値だけで決められる','いいえ。固有色・輪郭・読みやすさも確認する'],answer:1,explain:'色の平均距離は一つの尺度です。意図した絵になったかを最後に見ます。',caption:'自動値から始めて、自分の目で仕上げるための道具です。'}
 ];
+LESSONS.push(...EXTRA_LESSONS);
 const $=id=>document.getElementById(id),el=(tag,text)=>{const e=document.createElement(tag);if(text)e.textContent=text;return e;};
 function figure(canvas,id,mode='color'){
   const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.fillStyle='#142935';ctx.fillRect(0,0,w,h);
@@ -33,6 +36,11 @@ function figure(canvas,id,mode='color'){
     const draw=(center,spread,color)=>{ctx.strokeStyle=color;ctx.lineWidth=3;ctx.beginPath();for(let x=20;x<w-20;x++){const y=125-95*Math.exp(-(((x/w-center)/spread)**2));if(x===20)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();};
     draw(.68,.13,'#ffd166');draw(.4,.18,'#6ee7b7');ctx.fillStyle='#d5e0e7';ctx.fillText('黄：キャラの分布 / 緑：背景の分布（模式図）',w/2,151);
   }else{
+    const lesson=LESSONS.find(l=>l.id===id);
+    if(lesson?.diagram){
+      lesson.diagram.forEach((label,i)=>{const x=10+i*w/4;ctx.fillStyle=['#365970','#2c6670','#60717b','#387960'][i];ctx.fillRect(x,35,w/4-22,65);ctx.fillStyle='#eff6fb';ctx.fillText(label,x+(w/4-22)/2,74);if(i<3)ctx.fillText('→',x+w/4-5,73);});
+      ctx.fillStyle='#a3b6c2';ctx.fillText('各段をラボで切り替えて比較',w/2,145);return;
+    }
     const labels=['素材','色・明暗','光・ぼけ','出力'];
     labels.forEach((label,i)=>{const x=15+i*w/4;ctx.fillStyle=['#365970','#2c6670','#60717b','#387960'][i];ctx.fillRect(x,35,w/4-25,65);ctx.fillStyle='#eff6fb';ctx.fillText(label,x+(w/4-25)/2,74);if(i<3)ctx.fillText('→',x+w/4-7,73);});
     ctx.fillStyle='#a3b6c2';ctx.fillText('一段ずつ変えて、目とスコープで確かめる',w/2,140);
@@ -46,6 +54,9 @@ export function initLessons({tryPreset,openBook,notify}){
     const fig=el('figure'),canvas=el('canvas');canvas.width=640;canvas.height=170;canvas.setAttribute('role','img');canvas.setAttribute('aria-label',l.caption);fig.append(canvas,el('figcaption',l.caption));section.append(fig);figure(canvas,l.id);
     if(l.id==='blend'){const select=el('select');select.setAttribute('aria-label','図のブレンド');for(const [key,name] of Object.entries({normal:'通常',multiply:'乗算',screen:'スクリーン',overlay:'オーバーレイ',darken:'比較（暗）',lighten:'比較（明）',colordodge:'覆い焼き',colorburn:'焼き込み',hardlight:'ハードライト',softlight:'ソフトライト',difference:'差',add:'加算',hue:'色相',saturation:'彩度',color:'カラー',luminosity:'輝度'})){const option=el('option',name);option.value=key;select.append(option);}select.value='color';select.onchange=()=>figure(canvas,l.id,select.value);fig.append(select);}
     section.append(el('h3','やってみる'),el('p',l.how));const run=el('button','ラボで試す');run.className='primary try-lab';run.onclick=()=>tryPreset(l.id);section.append(run,el('h3','よくある失敗'),el('p',l.failure));
+    const table=(headers,rows)=>{const t=el('table'),head=el('tr');headers.forEach(v=>head.append(el('th',v)));t.append(head);rows.forEach(row=>{const tr=el('tr');row.forEach(v=>tr.append(el('td',v)));t.append(tr);});const wrap=el('div');wrap.className='table-scroll';wrap.append(t);section.append(wrap);};
+    if(l.id==='recipes'){const buttons=el('div');buttons.className='recipe-buttons';for(const r of RECIPES){const b=el('button',r.name);b.onclick=()=>tryPreset(r.id,'recipe');buttons.append(b);section.append(el('h3',r.name));table(['部品','値','理由'],r.parts);}section.append(buttons);}
+    if(l.id==='glossary')table(['この教材','After Effects','Nuke','DaVinci Resolve','Blender','Houdini COP','Unity'],GLOSSARY);
     const quiz=el('div');quiz.className='quiz';quiz.dataset.answer=l.answer;quiz.append(el('b','理解チェック：'+l.question));const feedback=el('p');feedback.className='fb';feedback.setAttribute('aria-live','polite');
     l.options.forEach((text,i)=>{const button=el('button',text);button.className='opt';button.onclick=()=>{feedback.textContent=(i===l.answer?'その通りです。':'もう一度考えてみましょう。')+l.explain;};quiz.append(button);});quiz.append(feedback);section.append(quiz);
     const footer=el('div');footer.className='lesson-footer';const done=el('label','理解した'),checkbox=el('input');checkbox.type='checkbox';done.className='done';done.prepend(checkbox);footer.append(done);
@@ -54,7 +65,7 @@ export function initLessons({tryPreset,openBook,notify}){
     const nav=el('button',String(index+1).padStart(2,'0')+'  '+l.title);nav.onclick=()=>location.hash='compolab-'+l.id;$('lesson-list').append(nav);buttons.push(nav);
   }
   const state=new window.LessonState('compolab',sections);
-  const progress=()=>{$('lesson-progress').textContent=state.done.size+' / 14 理解した';sections.forEach((s,i)=>{const done=state.done.has(s.dataset.lessonId);s.querySelector('.done input').checked=done;buttons[i].classList.toggle('done',done);});};
+  const progress=()=>{$('lesson-progress').textContent=state.done.size+' / '+LESSONS.length+' 理解した';sections.forEach((s,i)=>{const done=state.done.has(s.dataset.lessonId);s.querySelector('.done input').checked=done;buttons[i].classList.toggle('done',done);});};
   sections.forEach(s=>s.querySelector('.done input').onchange=e=>{if(e.target.checked)state.done.add(s.dataset.lessonId);else state.done.delete(s.dataset.lessonId);if(!state.save())notify('進捗を保存できません。このまま学習は続けられます。',true);progress();});
   const select=()=>{const hash=location.hash.replace(/^#/,'');const valid=sections.some(s=>s.dataset.lessonId===hash)||LESSONS.some(l=>l.id===hash);
     const normalized=LESSONS.some(l=>l.id===hash)?'#compolab-'+hash:location.hash;const index=state.index(normalized);

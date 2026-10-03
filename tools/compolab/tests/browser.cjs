@@ -129,8 +129,12 @@ async function make(page,kind,options={}){
     const effects=await page.evaluate(async()=>{
       const {scene}=await import('/tools/compolab/js/comp.js'),{effect,EFFECTS}=await import('/tools/compolab/js/effects.js');
       const c=scene();const r=__lab.renderer,base=r.read(c,{maxSize:128}),results={};
-      for(const type of Object.keys(EFFECTS)){
+      // The normal-dependent rim light is covered with 3D passes in browser-phase3.
+      for(const type of Object.keys(EFFECTS).filter(type=>type!=='rimlight')){
         const e=effect(type);if(type==='colorgrade')e.params.exposure=-1;if(type==='stats')e.params.targetMean=[.4,.1,.02];if(type==='range')e.params.targetHigh=.5;
+        if(type==='curve')e.params.points=[0,.4,.65,.85,1];
+        if(['anamorphic','halation','godrays'].includes(type))e.params.threshold=.1;
+        if(type==='lut'){const {lessonScene}=await import('/tools/compolab/js/presets.js');e.params=lessonScene('film',r).postEffects[0].params;}
         c.layers[1].effects=[e];const p=r.read(c,{maxSize:128});results[type]=p.data.reduce((sum,v,i)=>sum+(v!==base.data[i]),0);
       }
       return results;
@@ -157,7 +161,7 @@ async function make(page,kind,options={}){
     await page.goto(env.origin+'/tools/compolab/#compolab-alpha');await page.waitForSelector('body[data-ready=true]');
     await page.locator('.lesson.active .done input').check();await page.reload();await page.waitForSelector('body[data-ready=true]');assert.ok(await page.locator('.lesson.active .done input').isChecked());
     const ids=await page.locator('.lesson').evaluateAll(items=>items.map(i=>i.dataset.lessonId));
-    assert.equal(ids.length,14);
+    assert.equal(ids.length,29);
     for(const id of ids){
       await page.evaluate(id=>location.hash=id,id);await page.waitForSelector('#'+id+'.active');
       await page.locator('.lesson.active .opt').first().click();assert.ok((await page.locator('.lesson.active .fb').textContent()).length>15);

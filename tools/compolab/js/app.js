@@ -1,5 +1,5 @@
 import {scene,layer,copy,findLayer,flatLayers,removeLayer,moveLayer,duplicateLayer,groupLayer,validateScene,History,settings} from './comp.js';
-import {BLENDS,linearToSrgb,srgbToLinear,clamp} from './color.js';
+import {BLENDS,linearToSrgb,srgbToLinear,clamp,imageStats} from './color.js';
 import {EFFECTS,effect} from './effects.js';
 import {Compositor} from './gl.js';
 import {loadSamples,BACKGROUNDS} from './samples.js';
@@ -7,6 +7,8 @@ import {autoMatch,reportText} from './match.js';
 import {scopeData,drawScope} from './scopes.js';
 import {encodePNG} from './png.js';
 import {initLessons} from './lessons.js';
+import {parseCube,curveTable} from './lut.js';
+import {modelParams,lightsFromStats} from './model3d.js';
 const $=id=>document.getElementById(id);
 const status=(message,error=false)=>{$('status').textContent=message;$('status').classList.toggle('error',error);};
 const readStorage=key=>{try{return JSON.parse(localStorage.getItem(key));}catch{return null;}};
@@ -40,6 +42,7 @@ function syncToolbar(){
   $('undo').disabled=!history.past.length;$('redo').disabled=!history.future.length;
   $('space').value=comp.space;$('resolution').value=prefs.resolution;$('checker').checked=prefs.checker;$('output-exposure').value=comp.output.exposure;
   $('post-count').textContent=comp.postEffects.length;
+  $('output-tonemap').value=comp.output.tonemap;
   const bg=comp.layers.find(l=>l.role==='bg');if(bg?.params.src?.startsWith('sample:bg:'))$('sample').value=bg.params.src.split(':')[2];
 }
 function setPanel(panel){prefs.panel=panel;$('lab').dataset.panel=panel;document.querySelectorAll('[data-panel]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.panel===panel)));save();schedule();}
@@ -68,7 +71,18 @@ function control(parent,definition,object,{prefix='',onInput=()=>{}}={}){
   const aria=prefix+d.label;
   const set=value=>{history.begin(comp);object[d.key]=value;onInput();changed();};
   const commit=()=>{history.commit(comp);syncToolbar();};
-  if(d.kind==='color'){
+  if(d.kind==='select'||d.kind==='source'){
+    const options=d.kind==='source'?{'alpha-inverse':'キャラの外側',luma:'明るい所',...Object.fromEntries(flatLayers(comp).map(({layer:l})=>['mask:'+l.id,l.name+'のマスク']))}:d.options;
+    field.append(selectOptions(options,object[d.key],v=>object[d.key]=v,aria));
+  }else if(d.kind==='lut'){
+    const input=node('input');input.type='file';input.accept='.cube';input.setAttribute('aria-label',aria);
+    const info=node('p','hint',object[d.key]?object[d.key].title+' · '+object[d.key].size+'段':'LUT 未読込（変化なし）。選んだ表はシーンと一緒に保存します。');
+    input.onchange=async()=>{try{const file=input.files[0];if(!file)return;if(file.size>5000000)throw new Error('LUT は5 MBまでです');const table=parseCube(await file.text());set(table);commit();renderProperties();status('LUT を端末内に読み込みました。');}catch(e){status(e.message,true);}};field.append(input,info);
+  }else if(d.kind==='curve'){
+    const canvas=node('canvas','curve-preview');canvas.width=256;canvas.height=100;canvas.setAttribute('aria-label','輝度カーブの形');
+    const paint=()=>{const ctx=canvas.getContext('2d'),values=curveTable(object[d.key]);ctx.fillStyle='#142935';ctx.fillRect(0,0,256,100);ctx.strokeStyle='#526878';ctx.beginPath();ctx.moveTo(0,100);ctx.lineTo(256,0);ctx.stroke();ctx.strokeStyle='#6ee7b7';ctx.beginPath();values.forEach((v,i)=>i?ctx.lineTo(i,100-v*100):ctx.moveTo(i,100-v*100));ctx.stroke();};
+    field.append(canvas);object[d.key].forEach((v,i)=>{const row=node('label','curve-point','入力 '+(i/4).toFixed(2));const input=node('input');input.type='number';input.min=0;input.max=1;input.step=.01;input.value=v;input.setAttribute('aria-label',aria+' '+i);input.oninput=()=>{if(!Number.isFinite(input.valueAsNumber))return;const points=[...object[d.key]];points[i]=clamp(input.valueAsNumber,points[i-1]??0,points[i+1]??1);input.value=points[i];set(points);paint();};input.onchange=input.onblur=commit;row.append(input);field.append(row);});paint();
+  }else if(d.kind==='color'){
     const input=node('input');input.type='color';input.setAttribute('aria-label',aria);
     input.value='#'+object[d.key].map(x=>Math.round(clamp(linearToSrgb(x))*255).toString(16).padStart(2,'0')).join('');
     input.oninput=()=>set([1,3,5].map(i=>srgbToLinear(parseInt(input.value.slice(i,i+2),16)/255)));input.onchange=commit;label.append(input);label.classList.add('color-field');
@@ -92,7 +106,7 @@ function effectUI(parent,list){
     for(const [text,title,fn] of [['↑','効果を上へ',()=>{if(index>0)[list[index-1],list[index]]=[list[index],list[index-1]];}],['↓','効果を下へ',()=>{if(index<list.length-1)[list[index+1],list[index]]=[list[index],list[index+1]];}],['×','効果を削除',()=>list.splice(index,1)]]){
       const b=node('button',null,text);b.setAttribute('aria-label',EFFECTS[e.type].label+title);b.onclick=()=>transaction(fn,{structure:true});head.append(b);
     }
-    box.append(head);for(const d of EFFECTS[e.type].params)control(box,d,e.params,{prefix:EFFECTS[e.type].label+' '});parent.append(box);
+    box.append(head);for(const d of EFFECTS[e.type].params)if(!d.globalOnly||list===comp.postEffects)control(box,d,e.params,{prefix:EFFECTS[e.type].label+' '});parent.append(box);
   });
   const add=node('div','effect-add'),select=node('select');select.setAttribute('aria-label','追加する効果');
   for(const [type,def] of Object.entries(EFFECTS)){const opt=node('option',null,def.label);opt.value=type;select.append(opt);}
@@ -100,10 +114,11 @@ function effectUI(parent,list){
 }
 function renderProperties(){
   const parent=$('properties');parent.replaceChildren();
-  if(selected==='post'){$('selected-type').textContent='全体';parent.append(node('p','hint','合成した画像全体に、上から順に掛かります。'));effectUI(parent,comp.postEffects);return;}
+  renderer?.stage3d?.select(findLayer(comp,selected));
+  if(selected==='post'){$('selected-type').textContent='全体';parent.append(node('p','hint','合成した画像全体に、上から順に掛かります。「出力変換の直前」のLUTは他の全体効果の後、出力露出・トーンマップの前に掛かります。'));effectUI(parent,comp.postEffects);return;}
   let l=findLayer(comp,selected);if(!l){l=comp.layers.at(-1);selected=l?.id;}
   if(!l){parent.append(node('p','hint','レイヤーを追加してください。'));return;}
-  $('selected-type').textContent={image:'画像',solid:'単色',gradient:'パラ',adjust:'調整',group:'グループ'}[l.type];
+  $('selected-type').textContent={image:'画像',solid:'単色',gradient:'パラ',adjust:'調整',group:'グループ',render3d:'3D'}[l.type];
   const name=node('input');name.type='text';name.id='layer-name';name.value=l.name;name.setAttribute('aria-label','レイヤー名');name.onchange=()=>transaction(()=>l.name=name.value||'レイヤー');const field=node('div','field');field.append(name);parent.append(field);
   parent.append(selectOptions({none:'役割なし',char:'キャラ',bg:'背景',book:'前景（BOOK）'},l.role||'none',v=>l.role=v==='none'?null:v,'役割'));
   const blendField=node('div','field');blendField.append(node('label','label','ブレンド'),selectOptions(BLENDS,l.blend,v=>l.blend=v,'ブレンド'));parent.append(blendField);
@@ -111,7 +126,8 @@ function renderProperties(){
   const all=flatLayers(comp),index=all.findIndex(x=>x.layer.id===l.id),below=all.slice(0,index).map(x=>x.layer);
   parent.append(selectOptions({'':'クリップなし',...Object.fromEntries(below.map(x=>[x.id,x.name+'にクリップ']))},l.clipTo||'',v=>l.clipTo=v||null,'クリッピング'));
   const maskDetails=node('details'),maskTitle=node('summary',null,'マスク');maskDetails.append(maskTitle);
-  maskDetails.append(selectOptions({none:'なし',gradient:'グラデーション',rect:'矩形',...Object.fromEntries(below.flatMap(x=>[['alpha:'+x.id,x.name+'のアルファ'],['luma:'+x.id,x.name+'の輝度']]))},l.mask.source,v=>l.mask.source=v,'マスクの元'));
+  const model=below.findLast(x=>x.type==='render3d')||(l.type==='render3d'?l:null),materials=renderer?.stage3d?.assets.get(model?.params.src)?.materials||[];
+  maskDetails.append(selectOptions({none:'なし',gradient:'グラデーション',rect:'矩形',...Object.fromEntries(below.flatMap(x=>[['alpha:'+x.id,x.name+'のアルファ'],['luma:'+x.id,x.name+'の輝度']])),...Object.fromEntries(materials.map((m,i)=>['id:'+(i+1),'3D '+(m.name||'材質')+' (ID '+(i+1)+')']))},l.mask.source,v=>l.mask.source=v,'マスクの元'));
   control(maskDetails,{key:'invert',label:'反転',kind:'boolean'},l.mask);control(maskDetails,numeric('feather','ぼかし',0,.2,.001),l.mask);
   if(l.mask.source==='gradient'){l.mask.angle??=90;control(maskDetails,numeric('angle','向き',-180,180,1),l.mask);}
   if(l.mask.source==='rect'){l.mask.rect??=[.2,.2,.8,.8];for(let i=0;i<4;i++)control(maskDetails,numeric(i,['左','上','右','下'][i],0,1,.01),l.mask.rect);}
@@ -128,11 +144,63 @@ function renderProperties(){
     for(const def of [numeric('angle','角度',-180,180,1),numeric('start','開始位置',0,1,.01),numeric('end','終了位置',0,1,.01),numeric('feather','柔らかさ',0,1,.01),numeric('alphaStart','始点の濃さ',0,1,.01),numeric('alphaEnd','終点の濃さ',0,1,.01)])control(parent,def,l.params);
   }
   if(l.type==='adjust'){
-    const kind=l.params.kind||'colorgrade';parent.append(node('h3',null,EFFECTS[kind].label));
-    for(const d of EFFECTS[kind].params)control(parent,d,l.params,{prefix:EFFECTS[kind].label+' '});
+    const kind=l.params.kind||'colorgrade';parent.append(selectOptions(Object.fromEntries(['colorgrade','stats','range','curve','lut'].map(k=>[k,EFFECTS[k].label])),kind,v=>l.params={kind:v,...effect(v).params},'調整の種類'),node('h3',null,EFFECTS[kind].label));
+    for(const d of EFFECTS[kind].params)if(!d.globalOnly)control(parent,d,l.params,{prefix:EFFECTS[kind].label+' '});
   }
   if(l.params.baseLayer)parent.append(node('p','hint','キャラを一度だけ合成する背景合わせグループ。移動・複製・グループ化はキャラと一緒に行います。子の調整を順に切り替えて効果を確かめます。'));
+  if(l.type==='render3d')modelUI(parent,l);
   parent.append(node('h3',null,'レイヤーの効果'));effectUI(parent,l.effects);
+}
+function modelUI(parent,l){
+ const p=l.params,asset=renderer.stage3d?.assets.get(p.src);
+ parent.append(node('h3',null,'3D のカメラと照明'),node('p','hint','モデル選択中：ドラッグで回転、右ドラッグで移動、ホイール／ピンチで距離。編集はUndoで戻せます。'));
+ if(!asset)parent.append(node('p','lesson-note','元のモデルと関連ファイルを読み込み直してください。'));
+ const auto=node('button','wide','背景から照明を作る');auto.id='lights-from-bg';auto.onclick=()=>{
+  try{const pixels=renderer.read(comp,{role:'bg',maxSize:256}),stats=imageStats(pixels.data,pixels.width,pixels.height);if(!stats.count)throw new Error('先に背景を読み込んでください');transaction(()=>p.lights=lightsFromStats(stats),{structure:true});status('背景の上20%・下20%と明部から照明を作りました。各ライトを調整できます。');}catch(e){status(e.message,true);}
+ };parent.append(auto);
+ const camera=node('details');camera.append(node('summary',null,'カメラ'));
+  control(camera,numeric('fov','画角',10,100,1),p.camera);control(camera,{key:'ortho',label:'平行投影',kind:'boolean'},p.camera);
+ control(camera,numeric('zoom','3D ズーム',.1,20,.05),p.camera);
+ for(const [key,label] of [['pos','カメラ位置 XYZ'],['target','注視点 XYZ']])control(camera,{key,label,kind:'vector',min:-20,max:20,step:.05},p.camera);
+ const reset=node('button',null,'カメラを全体へ');reset.onclick=()=>transaction(()=>p.camera=modelParams().camera,{structure:true});camera.append(reset);parent.append(camera);
+ for(const [key,title] of [['key','キーライト'],['fill','フィルライト'],['rim','リムライト'],['hemi','半球光']]){
+  const box=node('details');box.append(node('summary',null,title));const light=p.lights[key];
+  for(const colorKey of key==='hemi'?['sky','ground']:['color'])control(box,{key:colorKey,label:colorKey==='sky'?'上20%の色':colorKey==='ground'?'下20%の色':'色',kind:'color'},light,{prefix:title+' '});
+  control(box,numeric('intensity','強さ',0,10,.05),light,{prefix:title+' '});if(key!=='hemi')control(box,{key:'dir',label:'光の方向 XYZ',kind:'vector',min:-10,max:10,step:.05},light,{prefix:title+' '});parent.append(box);
+ }
+ control(parent,{key:'outline',label:'アウトライン',kind:'boolean'},p);
+ const passes=node('details');passes.append(node('summary',null,'3D のパス'));
+ for(const [key,label] of [['depth','深度'],['normal','法線'],['id','マテリアルID']])control(passes,{key,label:label+'を生成',kind:'boolean'},p.passes);
+ passes.append(selectOptions({color:'カラー',depth:'深度（距離0〜10）',normal:'法線',id:'マテリアルID'},p.preview,v=>p.preview=v,'3Dパスの表示'));
+ passes.append(node('p','hint','深度は空気感・被写界深度、法線は「3D リムライト」に使います。材質限定の色調整は、上に調整レイヤーを追加しマスクにIDを選びます。'));
+ if(asset)passes.append(node('p','hint',asset.materials.map((m,i)=>(i+1)+': '+m.name).join(' / ')));parent.append(passes);
+}
+let stagePromise;
+async function getStage(){
+ if(renderer.stage3d)return renderer.stage3d;
+ if(!stagePromise)stagePromise=import('./stage3d.js').then(({Stage3D})=>renderer.stage3d=new Stage3D(renderer,{start:()=>history.begin(comp),change:()=>{save();schedule();},end:()=>{history.commit(comp);changed({structure:true});}})).catch(e=>{stagePromise=null;throw e;});
+ return stagePromise;
+}
+async function prepare3D(next){
+ const models=flatLayers(next).filter(x=>x.layer.type==='render3d');if(!models.length)return;
+ const stage=await getStage();if(models.some(x=>x.layer.params.src==='sample:sotai_girl'))await stage.sample();
+}
+async function loadModel(files=null){
+ if(!ready||busy)return;busy=true;
+ try{
+  const stage=await getStage();let key='sample:sotai_girl',restoreTarget=null;
+  if(files){const model=[...files].find(f=>/\.(vrm|glb|gltf)$/i.test(f.name));if(!model)throw new Error('VRM / GLB / glTF を選んでください');if([...files].reduce((n,f)=>n+f.size,0)>128*1024*1024)throw new Error('モデルと関連ファイルは合計128 MBまでです');
+   key='user:'+model.name.slice(0,155);const missing=flatLayers(comp).find(x=>x.layer.type==='render3d'&&x.layer.params.src.startsWith(key)&&!stage.assets.has(x.layer.params.src));if(missing){key=missing.layer.params.src;restoreTarget=missing.layer;}let index=2;const base=key;while(stage.assets.has(key))key=base+' ('+(index++)+')';
+   await stage.load(key,await model.arrayBuffer(),[...files].filter(f=>f!==model));
+  }else await stage.sample();
+  transaction(()=>{
+   if(restoreTarget){restoreTarget.params.src=key;selected=restoreTarget.id;return;}
+   let target=flatLayers(comp).find(x=>x.layer.role==='char'&&['image','render3d'].includes(x.layer.type))?.layer||flatLayers(comp).find(x=>x.layer.role==='char')?.layer;
+   if(target){for(const {layer:g,items} of flatLayers(comp))if(g.params.baseLayer===target.id)items.splice(items.indexOf(g),1);}
+   else {target=layer('render3d','3D キャラ',{role:'char'});comp.layers.push(target);}
+   Object.assign(target,{type:'render3d',name:'3D キャラ',params:modelParams({src:key}),effects:[],children:[],transform:{x:0,y:0,scale:1,rotate:0,flipX:false},mask:{source:'none',invert:false,feather:0}});selected=target.id;
+  },{structure:true});status('3Dモデルを読み込みました。「背景から照明を作る」で背景へ寄せられます。');
+ }catch(e){status(e.message,true);}finally{busy=false;}
 }
 function snapshotScopes(){for(const role of [null,'bg','char'])scopeBefore[role||'all']=scopeData(renderer.read(comp,{maxSize:256,role}));}
 async function match(){
@@ -169,13 +237,13 @@ async function loadImage(file,role){
   const pixels=renderer.read(probe,{maxSize:128}),hasAlpha=pixels.data.some((a,i)=>i%4===3&&a<250);
   status(role==='char'&&!hasAlpha?'透明部分がありません。背景に貼り付いたままになります。':file.name+' を端末内に読み込みました。');
 }
-async function loadPreset(slug){
+async function loadPreset(slug,kind='lesson'){
   if(!ready)return;
   try{
-    const response=await fetch('./presets/lesson-'+slug+'.json');if(!response.ok)throw new Error('プリセットを読み込めません');
+    const response=await fetch('./presets/'+kind+'-'+slug+'.json');if(!response.ok)throw new Error('プリセットを読み込めません');
     const input=await response.json();
     for(const l of input.layers||[])if(l.params?.src?.startsWith('slot:')){const role=l.params.src.slice(5),current=comp.layers.find(x=>x.role===role);l.params.src=current?.params.src||(role==='char'?'sample:char':'sample:bg:sunset');}
-    const next=validateScene(input);transaction(()=>{comp=next;selected=comp.layers.find(l=>l.role==='char')?.id||comp.layers.at(-1)?.id;},{structure:true});
+    const next=validateScene(input);await prepare3D(next);transaction(()=>{comp=next;selected=comp.layers.find(l=>l.role==='char')?.id||comp.layers.at(-1)?.id;},{structure:true});
     setTab(false);status('「'+comp.name+'」を開きました。元の作業へは Undo で戻れます。');
   }catch(e){status(e.message,true);}
 }
@@ -191,13 +259,15 @@ async function exportFile(kind){
   }catch(e){status('書き出しに失敗しました: '+e.message,true);}finally{busy=false;schedule();}
 }
 function wire(){
+  $('sample-model').onclick=()=>loadModel();$('file-model').onchange=async e=>{try{if(e.target.files.length)await loadModel(e.target.files);}finally{e.target.value='';}};
   $('auto-match').onclick=match;$('match-strength').oninput=()=>$('match-strength-value').value=Number($('match-strength').value).toFixed(2);
   $('lab-tab').onclick=()=>setTab(false);$('book-tab').onclick=()=>setTab(true);
   document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>setPanel(b.dataset.panel));
   document.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>exportFile(b.dataset.export));
   document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>loadPreset(b.dataset.preset));
+  document.querySelectorAll('[data-recipe]').forEach(b=>b.onclick=()=>loadPreset(b.dataset.recipe,'recipe'));
   for(const role of ['char','bg','book'])$('file-'+role).onchange=async e=>{const file=e.target.files[0];try{if(file)await loadImage(file,role);}catch(err){status(err.message,true);}finally{e.target.value='';}};
-  $('file-scene').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>2000000)throw new Error('シーン JSON は2 MBまでです');const next=validateScene(JSON.parse(await file.text()));transaction(()=>{comp=next;selected=comp.layers.at(-1)?.id;},{structure:true});status('シーンを読み込みました。ユーザー画像は元のファイルを読み込み直してください。');}catch(err){status(err.message,true);}finally{e.target.value='';}};
+  $('file-scene').onchange=async e=>{try{const file=e.target.files[0];if(!file)return;if(file.size>5000000)throw new Error('シーン JSON は5 MBまでです');const next=validateScene(JSON.parse(await file.text()));await prepare3D(next);transaction(()=>{comp=next;selected=comp.layers.at(-1)?.id;},{structure:true});status('シーンを読み込みました。ユーザー画像・モデルは元のファイルを読み込み直してください。');}catch(err){status(err.message,true);}finally{e.target.value='';}};
   $('sample').onchange=()=>transaction(()=>{comp=scene($('sample').value);selected='character';},{structure:true});
   $('blank').onclick=()=>transaction(()=>{comp=scene();comp.name='無題';comp.layers=[];selected=null;},{structure:true});
   $('undo').onclick=()=>{comp=history.undo(comp);changed({structure:true});};$('redo').onclick=()=>{comp=history.redo(comp);changed({structure:true});};
@@ -217,6 +287,7 @@ function wire(){
   $('resolution').onchange=()=>{prefs.resolution=Number($('resolution').value);save();schedule();};
   $('checker').onchange=()=>{prefs.checker=$('checker').checked;save();schedule();};
   $('output-exposure').onchange=()=>transaction(()=>comp.output.exposure=clamp($('output-exposure').valueAsNumber||0,-5,5));
+  $('output-tonemap').onchange=()=>transaction(()=>comp.output.tonemap=$('output-tonemap').value);
   $('ab-toggle').onclick=()=>{const enabled=$('ab-toggle').getAttribute('aria-pressed')!=='true';$('ab-toggle').setAttribute('aria-pressed',String(enabled));$('ab-labels').hidden=!enabled;$('ab-control').hidden=!enabled;schedule();};
   $('ab-split').oninput=schedule;
   $('hold-before').onpointerdown=e=>{e.currentTarget.setPointerCapture(e.pointerId);showBefore=true;schedule();};
@@ -231,10 +302,10 @@ function wire(){
     if(editable(e))return;
     if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();$(e.shiftKey?'redo':'undo').click();return;}
     if(e.key==='0'){$('fit').click();e.preventDefault();}
-    if(e.code==='Space'&&document.activeElement===$('viewport')){space=true;e.preventDefault();}
+    if(e.code==='Space'&&document.activeElement===$('viewport')){space=true;if(renderer?.stage3d)renderer.stage3d.controls.enabled=false;e.preventDefault();}
   });
-  document.addEventListener('keyup',e=>{if(e.code==='Space')space=false;});window.addEventListener('blur',()=>{space=false;drag=null;showBefore=false;});
-  $('viewport').onwheel=e=>{e.preventDefault();comp.view.zoom=clamp(comp.view.zoom*Math.exp(-e.deltaY*.001),.25,4);applyView();};
+  document.addEventListener('keyup',e=>{if(e.code==='Space'){space=false;if(renderer?.stage3d)renderer.stage3d.controls.enabled=!!renderer.stage3d.active;}});window.addEventListener('blur',()=>{space=false;drag=null;showBefore=false;if(renderer?.stage3d)renderer.stage3d.controls.enabled=!!renderer.stage3d.active;});
+  $('viewport').onwheel=e=>{e.preventDefault();if(renderer?.stage3d?.active)return;comp.view.zoom=clamp(comp.view.zoom*Math.exp(-e.deltaY*.001),.25,4);applyView();};
   $('viewport').onpointerdown=e=>{if(space||e.button===1){e.preventDefault();drag={x:e.clientX,y:e.clientY,pan:[...comp.view.pan]};e.currentTarget.setPointerCapture(e.pointerId);}else $('viewport').focus();};
   $('viewport').onpointermove=e=>{if(drag){comp.view.pan=[drag.pan[0]+e.clientX-drag.x,drag.pan[1]+e.clientY-drag.y];applyView();}};
   $('viewport').onpointerup=$('viewport').onpointercancel=()=>drag=null;
@@ -250,10 +321,11 @@ async function boot(){
   try{
     renderer=new Compositor($('view'));
     $('view').addEventListener('webglcontextlost',e=>{e.preventDefault();ready=false;status('描画コンテキストが失われました。作業を保存しています。ページを再読み込みしてください。',true);save();});
-    await loadSamples(renderer);ready=true;$('auto-match').disabled=false;$('gpu-info').textContent=renderer.hdr?'RGBA16F · HDR 合成':'RGBA8 · HDR 不可（この端末の制限）';
+    await loadSamples(renderer);let modelError='';try{await prepare3D(comp);}catch(e){modelError=e.message;}ready=true;$('auto-match').disabled=false;$('gpu-info').textContent=renderer.hdr?'RGBA16F · HDR 合成':'RGBA8 · HDR 不可（この端末の制限）';
     renderLayers();renderProperties();schedule();document.body.dataset.ready='true';
     const missing=flatLayers(comp).filter(x=>x.layer.params.src?.startsWith('user:')).map(x=>x.layer.params.src.slice(5));
-    if(missing.length)status('画像の再読み込みが必要です: '+missing.join('、'));
+    if(modelError)status(modelError,true);
+    else if(missing.length)status('画像・モデルの再読み込みが必要です: '+missing.join('、'));
     else status('サンプルで始められます。「背景に合わせる」で色・明暗・縁の違いを見比べましょう。');
   }catch(e){status(e.message,true);}
 }

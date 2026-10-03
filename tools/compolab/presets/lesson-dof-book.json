@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "name": "被写界深度と BOOK",
+  "width": 1920,
+  "height": 1080,
+  "space": "linear",
+  "output": {
+    "exposure": 0,
+    "tonemap": "none"
+  },
+  "layers": [
+    {
+      "id": "background",
+      "name": "背景",
+      "type": "image",
+      "role": "bg",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 0,
+        "scale": 1,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [
+        {
+          "type": "dof",
+          "enabled": true,
+          "params": {
+            "radius": 0.012,
+            "focus": 0,
+            "distance": 3.6,
+            "range": 1
+          }
+        }
+      ],
+      "params": {
+        "src": "sample:bg:day"
+      },
+      "children": []
+    },
+    {
+      "id": "character",
+      "name": "キャラ",
+      "type": "image",
+      "role": "char",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "none",
+        "invert": false,
+        "feather": 0
+      },
+      "transform": {
+        "x": 0,
+        "y": 32,
+        "scale": 0.61,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [],
+      "params": {
+        "src": "sample:char"
+      },
+      "children": []
+    },
+    {
+      "id": "Lmuqo2zx4e",
+      "name": "手前のBOOK",
+      "type": "image",
+      "role": "book",
+      "visible": true,
+      "opacity": 1,
+      "blend": "normal",
+      "clipTo": null,
+      "mask": {
+        "source": "gradient",
+        "angle": 0,
+        "invert": true,
+        "feather": 0.03
+      },
+      "transform": {
+        "x": -950,
+        "y": 300,
+        "scale": 1.8,
+        "rotate": 0,
+        "flipX": false
+      },
+      "effects": [
+        {
+          "type": "dof",
+          "enabled": true,
+          "params": {
+            "radius": 0.055,
+            "focus": 0,
+            "distance": 3.6,
+            "range": 1
+          }
+        }
+      ],
+      "params": {
+        "src": "sample:bg:day"
+      },
+      "children": []
+    }
+  ],
+  "postEffects": [],
+  "view": {
+    "ab": "off",
+    "zoom": 1,
+    "pan": [
+      0,
+      0
+    ],
+    "solo": null
+  }
+}

@@ -1,3 +1,4 @@
+import {EXTRA_SHADERS} from './shaders-extra.js';
 export const VERT = `#version 300 es
 out vec2 v_uv;
 void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));v_uv=vec2(p.x,1.-p.y);gl_Position=vec4(p*2.-1.,0.,1.);}`;
@@ -42,6 +43,7 @@ vec3 blend(int m,vec3 b,vec3 s){
 }
 `;
 export const SHADERS = {
+ ...EXTRA_SHADERS,
  transform: `uniform sampler2D u_img;uniform vec2 u_comp,u_translate;uniform float u_scale,u_rotate;uniform bool u_flip;
  void main(){vec2 p=(v_uv-.5)*u_comp-u_translate;float c=cos(u_rotate),s=sin(u_rotate);p=mat2(c,-s,s,c)*p;if(u_flip)p.x=-p.x;vec2 q=p/(u_comp*u_scale)+.5;outColor=any(lessThan(q,vec2(0)))||any(greaterThan(q,vec2(1)))?vec4(0):at(u_img,q);}`,
  copy: `uniform sampler2D u_img;void main(){outColor=at(u_img,v_uv);}`,
@@ -79,8 +81,8 @@ export const SHADERS = {
  void main(){vec4 c=unpremul(at(u_img,v_uv));vec3 v=lab(u_space==1?s2l(c.rgb):c.rgb);vec3 mapped=(v-u_sourceMean)*clamp(u_targetStd/max(u_sourceStd,vec3(.000001)),vec3(.5),vec3(2))+u_targetMean;v=rgb(mix(v,mapped,u_strength));if(u_space==1)v=l2s(v);outColor=vec4(v*c.a,c.a);}`,
  range: `uniform sampler2D u_img;uniform int u_space;uniform float u_strength,u_sourceLow,u_sourceHigh,u_targetLow,u_targetHigh;
  void main(){vec4 c=unpremul(at(u_img,v_uv));vec3 v=lab(u_space==1?s2l(c.rgb):c.rgb);float l=(v.x-u_sourceLow)/max(.00001,u_sourceHigh-u_sourceLow)*(u_targetHigh-u_targetLow)+u_targetLow;v.x=mix(v.x,l,u_strength);v=rgb(v);if(u_space==1)v=l2s(v);outColor=vec4(v*c.a,c.a);}`,
- fog: `uniform sampler2D u_img;uniform vec3 u_color;uniform float u_density;uniform int u_space;
- void main(){vec4 c=at(u_img,v_uv);outColor=vec4(mix(c.rgb,(u_space==1?l2s(u_color):u_color)*c.a,u_density),c.a);}`,
+ fog: `uniform sampler2D u_img;uniform vec3 u_color;uniform float u_density,u_smoke,u_seed;uniform int u_space;
+ void main(){vec4 c=at(u_img,v_uv);float d=u_density*mix(1.,fbm(v_uv*8.+u_seed),u_smoke);outColor=vec4(mix(c.rgb,(u_space==1?l2s(u_color):u_color)*c.a,d),c.a);}`,
  grain: `uniform sampler2D u_img;uniform float u_intensity,u_size,u_seed;uniform bool u_mono;uniform vec2 u_comp;
  void main(){vec4 c=unpremul(at(u_img,v_uv));vec2 p=floor(v_uv*u_comp/u_size)+u_seed;vec3 n=vec3(hash(p),hash(p+vec2(91,17)),hash(p+vec2(38,197)))-.5;if(u_mono)n=vec3(n.r);outColor=vec4((c.rgb+u_intensity*n*(.5+lum(c.rgb)))*c.a,c.a);}`,
  vignette: `uniform sampler2D u_img;uniform float u_intensity,u_radius,u_soft,u_roundness;

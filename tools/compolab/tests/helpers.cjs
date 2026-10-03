@@ -20,7 +20,7 @@ async function launch(){
 async function instrument(page){
   await page.route('**/tools/compolab/js/app.js',async route=>{
     const body=fs.readFileSync(path.join(root,'tools/compolab/js/app.js'),'utf8')+
-      '\nwindow.__lab={get comp(){return comp},get renderer(){return renderer},get report(){return report},get history(){return history},set(c){comp=c;selected=c.layers.at(-1)?.id;changed({structure:true})},draw,match,snapshotScopes,loadPreset,exportFile};';
+      '\nwindow.__lab={get comp(){return comp},get renderer(){return renderer},get report(){return report},get history(){return history},set(c){comp=c;selected=c.layers.at(-1)?.id;changed({structure:true})},draw,match,snapshotScopes,loadPreset,exportFile,getStage,loadModel};';
     await route.fulfill({status:200,contentType:'text/javascript',body});
   });
 }

@@ -1,6 +1,6 @@
 # 撮影処理学習処
 
-キャラと背景の色・明暗・光・縁を試す2Dラボと、Part 0〜2の教科書14章。`docs/web/COMPOLAB_SPEC.md` の **Phase 1** を実装しています。
+キャラと背景の色・明暗・光・縁を試すラボと、Part 0〜5の教科書29章。`docs/web/COMPOLAB_SPEC.md` の Phase 1〜3を実装しています。
 
 ## 起動
 
@@ -25,7 +25,10 @@ python tools/compolab/serve.py
 - PNG合成、処理後の透明キャラPNG、シーンJSON、レポートTXT。画像本体はJSONやlocalStorageに入れず、再開時は元画像の再読み込みを案内。同名画像の置換でもUndo用の旧テクスチャを保持します。
 - 履歴100件、ドラッグ中は一回のUndo。Ctrl+Z／Ctrl+Shift+Zはテキスト入力と競合させません。ホイールズーム、ビューにフォーカスしてSpace＋ドラッグ、0で全体表示。ボタンの代替操作もあります。
 - 900px未満ではパネルをタブ切替。保存禁止環境でも作業でき、保存不可の表示を継続します。
-- 共通LessonState、理解チェック14問、本文・図・実験プリセット14本。進捗は `compolab-done-v2`、章IDは `compolab-<slug>`。
+- 共通LessonState、理解チェック29問、本文・図・実験プリセット29本。進捗は `compolab-done-v2`、章IDは `compolab-<slug>`。
+- Phase 2: 透過光（逆アルファ／輝度／レイヤーマスク）、フレア（手動／明部検出）、アナモフレア、光線、レイヤー単位の被写界深度、ハレーション、色収差、レンズ歪み、シャープ、5点の単調輝度カーブ、17/33段 `.cube` LUT、出力トーンマップのUI。空気感には固定ノイズのスモークを追加。
+- Part 3〜5の15章、計29章の本文・図・クイズ・実験プリセット。3D章には照明・カメラ・パス・材質マスクの操作を記載。夕方／夜／逆光／回想／ホラー／爽やかの6レシピと部品・値・理由の表。
+- Phase 3: VRM / GLB / glTFと関連bin・画像を端末内で読み込み、ラボと共有するWebGL2コンテキストの線形RGBA16Fへ描画。3灯＋半球光、背景から照明を作る、OrbitControls、透視／平行投影、深度・法線・材質ID、深度で空気感とぼけ、法線でリムライト、材質IDの色調整。2Dと同じ合成・背景合わせ・PNG出力へ渡します。
 
 ## ファイルと保守
 
@@ -39,6 +42,9 @@ python tools/compolab/serve.py
 | 背景合わせとレポート | `js/match.js` |
 | スコープ・教材・サンプル | `js/scopes.js`、`js/lessons.js`、`js/samples.js` |
 | straight alphaのPNG出力 | `js/png.js` |
+| LUTの解析／追加シェーダー | `js/lut.js`、`js/shaders-extra.js` |
+| 3D描画・モデル設定／背景照明 | `js/stage3d.js`、`js/model3d.js` |
+| 後半教材・レシピの定義 | `js/lessons-extra.js`、`js/presets.js` |
 | 固定した実験設定 | `presets/lesson-*.json` |
 
 画像素材は、今回のユーザー指定により内蔵 **image_gen** で新規生成しました。透明キャラ `assets/sample_char.png` は1024×1536、背景 `day.png` / `sunset.png` / `night.png` / `rain.png` は各1672×941。生成されたアルファを変更せず保存しています。全プロンプトは **`assets/prompts.json`**。モデルや画像を入力して生成したものではありません。
@@ -52,6 +58,10 @@ python tools/compolab/serve.py
 
 ## 検証の実行
 
+### Phase 2 着手前の回帰確認（2026-10-02）
+
+変更前に純粋関数9テストと既存 `browser.cjs` の全項目が通過。リニア188／ガンマ128、背景合わせの距離0.0407352029 → 0.0043754292（89.25885%減）、1920×1080 PNGの画素誤差0、外部request 0、コンソールエラー0。失敗項目なし。証拠は `outputs/compolab-validation/phase2/baseline/results.json` と同フォルダの画像。
+
 Node.js、Playwright、pngjs、Microsoft Edgeを使います。ブラウザテストはループバックの空きポートに配信し、終了時に閉じます。製品側にテスト用の公開APIは置かず、テストのrouteでだけ状態取得を差し込みます。
 
 ```powershell
@@ -60,10 +70,66 @@ node --test tools/compolab/tests/color.test.cjs tools/compolab/tests/comp.test.c
 $env:NODE_PATH='C:/Users/kosya/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules'
 $env:COMPOLAB_SCREENSHOTS='C:/Users/kosya/Documents/Claude_Fable/universe/outputs/compolab-validation'
 node tools/compolab/tests/browser.cjs
+node --test tools/compolab/tests/phase2.test.cjs
+# COMPOLAB_SCREENSHOTS を phase2 フォルダへ切り替える（未指定なら自動）
+Remove-Item Env:COMPOLAB_SCREENSHOTS -ErrorAction SilentlyContinue
+node tools/compolab/tests/browser-phase2.cjs
+node --test tools/compolab/tests/phase3.test.cjs
+node tools/compolab/tests/browser-phase3.cjs
 git diff --check
 ```
 
 教材プリセットを再作成するときだけ `node tools/compolab/tests/build-presets.cjs` を実行します。固定素材から実測してJSONを書き直す保守コマンドで、通常の起動には不要です。
+Phase 2の15実験・6レシピだけを作り直す場合は `node tools/compolab/tests/build-presets.cjs --phase2`。Phase 1のJSONには触れません。
+
+### Phase 2 の受け入れ（2026-10-02）
+
+純粋関数11テスト、既存§14.1/14.2（全29章の操作も確認）、追加§14.3が通過。Edge / SwiftShaderで計測。6レシピと各処理、教材のPNGを実際に開いて見ました。レシピの顔・輪郭・明暗の違い、透過光の内外、背景ぼけ、レンズの外周を確認しています。証拠は `outputs/compolab-validation/phase2/`、既存回帰はその `regression/`。
+
+| 処理 | 実測 |
+|---|---|
+| 色収差 | 白線x=192に対し R=194 / G=192 / B=190（±2px） |
+| 歪み | 角の点の中心距離127.3106 → 119.4927px（k1=-0.25） |
+| アナモフレア | 横RMS29.4353px、縦1画素。縦の最低半幅0.5pxに対し58.87倍 |
+| 透過光 | spill=0の内側誤差0、外側102/255。spill=1の内縁は+24/255 |
+| 被写界深度 | 高周波std 0.5000 → 0.09903、キャラ画素不変、focus=1で不変 |
+| LUT | 恒等の最大誤差0/255（線形・sRGB入力）、反転の誤差1/255。線形0.2へ反転→露出+1は255、出力直前へ移すと153/255（線形0.6） |
+| カーブ | 恒等誤差0、中央128 → 166/255 |
+| トーンマップ | HDR2.0 → Reinhardの表示213/255、逆変換した線形0.66539（理論2/3） |
+| ハレーション | 光源外のRGB 243/85/36、赤寄りの光 |
+| 光線 / シャープ / フレア | 光源外254画素／ピーク79→102／ゴースト位置53・反対位置0 |
+| 利用経路 | LUTの不正入力で元設定保持、33段の入力・適用位置の選択・Undo/Redo・保存復元 |
+| 通信・エラー | 外部request 0、コンソールエラー0、GL error 0 |
+
+Phase 2で設計を具体化した点：カーブは5点間の区分線形補間を256段の1Dテクスチャへ格納。歪みは前向きのBrown式を逆算してサンプリングし、負のk1で像が中心へ寄る受け入れ条件を満たします。LUTの「表示用」はsRGBへ変換・適用・線形へ復帰します。全体LUTは「適用する位置」で効果一覧の位置／出力変換直前を選択。後者は他の全体効果の後、出力露出・トーンマップの前に掛かり、複数なら一覧の相対順序を保ちます。レイヤー／調整のLUTはマスクとその場の順番を維持します。LUT全体をJSONへ保存するため画像とは異なり再選択不要です。
+
+### Phase 3 の使い方と受け入れ（2026-10-02）
+
+「読み込み → 3Dの同梱素体を使う」、または「教科書 → 3Dキャラのとき → ラボで試す」で始めます。3Dキャラを選択し「背景から照明を作る」。ビューのドラッグで回転、右ドラッグで移動、ホイール／ピンチで距離。Space＋ドラッグは2Dビューのパンです。3Dの設定とカメラ操作はUndo対象。平行投影のズームも保存します。
+
+ユーザーのglTFはモデルとbin・画像を一緒に選択してください。外部URIは読み込み前に拒否します。圧縮拡張（Draco / KTX2等）のデコーダーは同梱していません。元モデルの姿勢を保ち、全身の高さを1.65作業単位に合わせ、原点に接地します。シーンJSONにはモデル本体を含めず、再開時に元ファイルを再選択します。再選択してもカメラ・照明・色調整は維持します。
+
+three r177 / three-vrmと関連ローダーは依頼書に従い `universe/vrmpose/vendor/` からこのツール内へコピーしました。同梱モデルもコピーし、元のvrmposeは変更していません。vendorを更新するときは§14.4と回帰テストを再実行します。CSPのimportmapはSHA256で許可。ネットワークは同一オリジン、読み込んだモデル内部のblob/dataのみです。
+
+| §14.4の項目 | 実測・確認 |
+|---|---|
+| 線形RenderTarget | sRGB灰128の板 → 0.215686（基準0.2159±0.01） |
+| premultiplied | 白α0.5の板 → RGB / αとも0.501961 |
+| 共有コンテキスト | Three描画を挟んだ全16ブレンドがCPU式と±1/255以内、GL error 0 |
+| 素体と輪郭 | 透明背景で描画。輪郭のON/OFFで1,197チャンネル値が変化。MToon灰球はキーライトで1,539チャンネルが明るくなる |
+| 背景照明 | 4背景とも上20%／下20%と半球光RGBの差0 |
+| 材質ID | 2材質glTFのHair IDを色相回転し、Skinの最大誤差0、Hairは最大70/255変化 |
+| 深度／法線 | 素体の深度3.4902〜3.6863（8bitへ1/10縮小して読出し）、法線2,160画素。深度フォグ6,499・深度ぼけ21,082・リム4,032チャンネルが変化 |
+| 保存・利用経路 | カメラドラッグのUndo、平行投影ズーム保存、Space＋ドラッグ、2D背景合わせ併用、GLB／関連ファイル付きglTF、モデル再読込、外部URI拒否 |
+| 3D透明PNG | 1920×1080、描画結果との全画素の最大誤差0 |
+| 目視 | 4背景×照明、3パス、材質ID、375/768/1280pxを実際に開いて見た |
+| 通信とエラー | 外部request 0、コンソールエラー0 |
+
+証拠は `outputs/compolab-validation/phase3/results.json` とPNG、Phase 1の回帰結果は同 `regression/results.json`。純粋関数は合計12テスト。Phase 1の背景合わせ89.25885%減、リニア188／ガンマ128、1920×1080 PNG誤差0を維持しています。
+
+同梱素体は実測で1マテリアル、輪郭無効でした。素体のファイルを変えず、読み込み時のMToon設定だけで薄い輪郭を有効化。髪と肌が分離されていないため、ID限定処理はテストが生成するHair/Skinの2材質モデルで確認しました。同梱素体に髪用IDを作ったという意味ではありません。
+
+実機iPad、SwiftShader以外のGPU、MSAA非対応端末でのsamples=0への切替は未確認。色・透明度・共有コンテキストの前提は検証環境で成立しています。
 
 ### §14の受け入れ記録（2026-09-23）
 
@@ -106,6 +172,6 @@ Windows / Edge / WebGL2（SwiftShader）で確認。純粋関数9テストとブ
 
 ## 次のPhase
 
-Phase 2の透過光・フレア・アナモフレア・レンズ歪み・カーブ・LUT・トーンマップUI・後半教材・6レシピ、およびPhase 3のVRM/glTFは未実装。§14.3/14.4はそのPhaseで実施します。Threeのvendorはまだ読み込んでいません。
+Phase 1〜3と§14.1〜14.4の検証を実装済み。次のPhaseの実装はこの依頼には含めていません。
 
 さらに先の予定：動画、切り抜き、vrmposeのポーズ読込、LUT出力、複数キャラ、線の処理、英語版。

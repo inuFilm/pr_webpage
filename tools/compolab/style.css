@@ -13,3 +13,11 @@
 #storage-warning{padding:8px 16px;background:#594a22;color:#fff2cc;font-size:12px}
 #ab-control{white-space:nowrap}#ab-control input{flex:1;width:auto}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+:root .curve-preview { width:100%; height:100px; border:1px solid #526878; }
+.curve-point { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.curve-point input { width:80px; }
+.field input[type=file] { max-width:100%; font-size:.75rem; }
+.lesson table { width:100%; border-collapse:collapse; font-size:.9rem; }
+.lesson th,.lesson td { border:1px solid #526878; padding:8px; text-align:left; }
+.lesson .recipe-buttons { display:flex; flex-wrap:wrap; gap:8px; }
+.table-scroll { max-width:100%; overflow-x:auto; margin:16px 0; }
